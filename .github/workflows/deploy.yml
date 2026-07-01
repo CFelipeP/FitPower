@@ -21,11 +21,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Frontend build
         working-directory: FitPower
         run: |
-          npm ci
+          npm install
           npm run build
       - name: Frontend tests
         working-directory: FitPower
