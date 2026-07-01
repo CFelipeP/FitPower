@@ -16,20 +16,46 @@ function listRecipes(): void {
         return [
             'id' => (int)$r['id'],
             'name' => $r['name'],
-            'description' => $r['description'],
+            'description' => null,
             'mealType' => $r['meal_type'],
             'calories' => (int)$r['calories'],
-            'protein' => (float)$r['protein'],
-            'carbs' => (float)$r['carbs'],
-            'fat' => (float)$r['fat'],
+            'protein' => (float)$r['protein_g'],
+            'carbs' => (float)$r['carbs_g'],
+            'fat' => (float)$r['fat_g'],
             'ingredients' => json_decode($r['ingredients'] ?? '[]', true),
             'instructions' => $r['instructions'],
             'imageUrl' => $r['image_url'],
-            'prepTime' => (int)$r['prep_time'],
+            'prepTime' => (int)$r['prep_time_minutes'],
             'difficulty' => $r['difficulty'],
         ];
     }, $stmt->fetchAll());
     success($result);
+}
+
+function createRecipe(): void {
+    $auth = requireAuth();
+    $input = getJsonInput();
+    $rules = ['name' => 'required|string|min:1|max:255'];
+    $errors = validate($input, $rules);
+    if ($errors) error('Error de validación', 422, $errors);
+    $db = getDB();
+    $stmt = $db->prepare("INSERT INTO recipes (name, meal_type, description, calories, protein_g, carbs_g, fat_g, ingredients, instructions, image_url, prep_time_minutes, difficulty, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([
+        $input['name'],
+        $input['mealType'] ?? null,
+        $input['description'] ?? null,
+        isset($input['calories']) ? (int)$input['calories'] : null,
+        isset($input['protein']) ? (float)$input['protein'] : null,
+        isset($input['carbs']) ? (float)$input['carbs'] : null,
+        isset($input['fat']) ? (float)$input['fat'] : null,
+        isset($input['ingredients']) ? json_encode($input['ingredients']) : null,
+        $input['instructions'] ?? null,
+        $input['imageUrl'] ?? null,
+        isset($input['prepTime']) ? (int)$input['prepTime'] : null,
+        $input['difficulty'] ?? null,
+        isset($input['tags']) ? json_encode($input['tags']) : null,
+    ]);
+    success(['id' => (int)$db->lastInsertId()], 'Receta creada', 201);
 }
 
 function seedRecipes(): void {
@@ -45,15 +71,59 @@ function seedRecipes(): void {
         ['Beef Stir Fry', 'Lean beef with vegetables and rice', 'dinner', 490, 42, 40, 16, '["150g lean beef","2 cups mixed vegetables","1 cup brown rice","soy sauce"]', 'Stir fry beef, add vegetables, serve over rice', 20, 'medium'],
         ['Overnight Oats', 'Make-ahead oatmeal with chia', 'breakfast', 350, 20, 55, 8, '["1/2 cup oats","1 cup milk","1 tbsp chia seeds","1 tbsp maple syrup"]', 'Mix all ingredients, refrigerate overnight', 5, 'easy'],
     ];
-    $stmt = $db->prepare("INSERT INTO recipes (name, description, meal_type, calories, protein, carbs, fat, ingredients, instructions, prep_time, difficulty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt = $db->prepare("INSERT INTO recipes (name, meal_type, calories, protein_g, carbs_g, fat_g, ingredients, instructions, prep_time_minutes, difficulty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $count = 0;
     foreach ($recipes as $r) {
         $chk = $db->prepare("SELECT id FROM recipes WHERE name = ?");
         $chk->execute([$r[0]]);
         if (!$chk->fetch()) {
-            $stmt->execute($r);
+            $stmt->execute([$r[0], $r[2], $r[3], $r[4], $r[5], $r[6], $r[7], $r[8], $r[9], $r[10]]);
             $count++;
         }
     }
     success(['created' => $count], "$count recetas insertadas");
+}
+
+function updateRecipe(string $id): void {
+    $auth = requireAuth();
+    $input = getJsonInput();
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id FROM recipes WHERE id = ?");
+    $stmt->execute([(int)$id]);
+    if (!$stmt->fetch()) error('Receta no encontrada', 404);
+    $fieldMap = [
+        'name' => 'name',
+        'mealType' => 'meal_type',
+        'calories' => 'calories',
+        'protein' => 'protein_g',
+        'carbs' => 'carbs_g',
+        'fat' => 'fat_g',
+        'ingredients' => 'ingredients',
+        'instructions' => 'instructions',
+        'imageUrl' => 'image_url',
+        'prepTime' => 'prep_time_minutes',
+        'difficulty' => 'difficulty',
+    ];
+    $updates = [];
+    $params = [];
+    foreach ($fieldMap as $inputKey => $dbColumn) {
+        if (isset($input[$inputKey])) {
+            $updates[] = "$dbColumn = ?";
+            $params[] = $inputKey === 'ingredients' ? json_encode($input[$inputKey]) : $input[$inputKey];
+        }
+    }
+    if (empty($updates)) error('No hay campos para actualizar', 400);
+    $params[] = (int)$id;
+    $db->prepare("UPDATE recipes SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
+    success(null, 'Receta actualizada');
+}
+
+function deleteRecipe(string $id): void {
+    $auth = requireAuth();
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id FROM recipes WHERE id = ?");
+    $stmt->execute([(int)$id]);
+    if (!$stmt->fetch()) error('Receta no encontrada', 404);
+    $db->prepare("DELETE FROM recipes WHERE id = ?")->execute([(int)$id]);
+    success(null, 'Receta eliminada');
 }

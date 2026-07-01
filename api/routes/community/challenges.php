@@ -64,6 +64,12 @@ function joinChallenge(int $challengeId): void {
 
     updateLeaderboardPoints($auth['sub'], 'forum_posts', 10);
 
+    $chStmt = $db->prepare("SELECT title FROM challenges WHERE id = ?");
+    $chStmt->execute([$challengeId]);
+    $chTitle = $chStmt->fetchColumn();
+    require_once __DIR__ . '/../../helpers/activity.php';
+    logActivity($auth['sub'], 'challenge', 'Te has unido al desafío: ' . $chTitle, 'Trophy', '#f59e0b', 'New', 'bg-warning');
+
     success(null, 'Te has unido al challenge', 201);
 }
 
@@ -106,4 +112,79 @@ function updateProgress(int $challengeId, int $userId, array $data): void {
         ->execute([$progress, $progress, $goalValue, $goalValue, $challengeId, $userId]);
 
     success(null, 'Progreso actualizado');
+}
+
+function createChallenge(): void {
+    $auth = requireRole('admin');
+    $input = getJsonInput();
+    $rules = [
+        'title' => 'required|string|min:3|max:255',
+        'description' => 'string|max:5000',
+        'goalType' => 'required|in:workouts,minutes,weight,custom',
+        'goalValue' => 'required|numeric|min_value:1',
+    ];
+    $errors = validate($input, $rules);
+    if ($errors) error('Error de validación', 422, $errors);
+    $db = getDB();
+    $stmt = $db->prepare("INSERT INTO challenges (title, description, goal_type, goal_value, start_date, end_date, is_featured, max_participants, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([
+        $input['title'],
+        $input['description'] ?? null,
+        $input['goalType'],
+        (int)$input['goalValue'],
+        $input['startDate'] ?? null,
+        $input['endDate'] ?? null,
+        isset($input['isFeatured']) ? (int)$input['isFeatured'] : 0,
+        isset($input['maxParticipants']) ? (int)$input['maxParticipants'] : null,
+        $input['status'] ?? 'active',
+        $auth['sub'],
+    ]);
+    $id = (int)$db->lastInsertId();
+    logAdminAction($auth['sub'], 'create', 'challenge', $id);
+    success(['id' => $id], 'Challenge creado', 201);
+}
+
+function updateChallenge(string $id): void {
+    $auth = requireRole('admin');
+    $input = getJsonInput();
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id FROM challenges WHERE id = ?");
+    $stmt->execute([(int)$id]);
+    if (!$stmt->fetch()) error('Challenge no encontrado', 404);
+    $fieldMap = [
+        'title' => 'title',
+        'description' => 'description',
+        'goalType' => 'goal_type',
+        'goalValue' => 'goal_value',
+        'startDate' => 'start_date',
+        'endDate' => 'end_date',
+        'isFeatured' => 'is_featured',
+        'maxParticipants' => 'max_participants',
+        'status' => 'status',
+    ];
+    $updates = [];
+    $params = [];
+    foreach ($fieldMap as $inputKey => $dbColumn) {
+        if (isset($input[$inputKey])) {
+            $updates[] = "$dbColumn = ?";
+            $params[] = $input[$inputKey];
+        }
+    }
+    if (empty($updates)) error('No hay campos para actualizar', 400);
+    $params[] = (int)$id;
+    $db->prepare("UPDATE challenges SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
+    logAdminAction($auth['sub'], 'update', 'challenge', (int)$id);
+    success(null, 'Challenge actualizado');
+}
+
+function deleteChallenge(string $id): void {
+    $auth = requireRole('admin');
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id FROM challenges WHERE id = ?");
+    $stmt->execute([(int)$id]);
+    if (!$stmt->fetch()) error('Challenge no encontrado', 404);
+    $db->prepare("DELETE FROM challenge_participants WHERE challenge_id = ?")->execute([(int)$id]);
+    $db->prepare("DELETE FROM challenges WHERE id = ?")->execute([(int)$id]);
+    logAdminAction($auth['sub'], 'delete', 'challenge', (int)$id);
+    success(null, 'Challenge eliminado');
 }

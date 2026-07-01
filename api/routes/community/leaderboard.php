@@ -10,7 +10,6 @@ function listLeaderboard(): void {
         'streak' => 'streak_days DESC',
         'calories' => 'total_calories_burned DESC',
         'points' => 'total_points DESC',
-        'volume' => 'total_volume DESC',
         default => 'total_points DESC',
     };
     
@@ -22,11 +21,14 @@ function listLeaderboard(): void {
             u.last_name,
             CONCAT(u.first_name, ' ', u.last_name) as user_name,
             u.photo,
-            (SELECT COUNT(*) FROM user_achievements WHERE user_id = le.user_id) as achievements_count,
-            (SELECT COUNT(*) FROM followers WHERE following_id = le.user_id) as followers_count,
-            (SELECT COUNT(*) FROM social_posts WHERE user_id = le.user_id) as posts_count
+            COALESCE(ua.cnt, 0) as achievements_count,
+            COALESCE(f.cnt, 0) as followers_count,
+            COALESCE(sp.cnt, 0) as posts_count
         FROM leaderboard_entries le
         JOIN users u ON le.user_id = u.id
+        LEFT JOIN (SELECT user_id, COUNT(*) as cnt FROM user_achievements GROUP BY user_id) ua ON ua.user_id = le.user_id
+        LEFT JOIN (SELECT following_id, COUNT(*) as cnt FROM followers GROUP BY following_id) f ON f.following_id = le.user_id
+        LEFT JOIN (SELECT user_id, COUNT(*) as cnt FROM social_posts GROUP BY user_id) sp ON sp.user_id = le.user_id
         ORDER BY $orderBy
         LIMIT $limit
     ");

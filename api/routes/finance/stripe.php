@@ -2,7 +2,14 @@
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
+function guardStripe(): void {
+    if (empty(STRIPE_SECRET_KEY)) {
+        error('Stripe no esta configurado en el servidor', 503);
+    }
+}
+
 function createCheckoutSession(): void {
+    guardStripe();
     $auth = requireAuth();
     $input = getJsonInput();
     $planId = $input['plan_id'] ?? null;
@@ -117,4 +124,53 @@ function handleWebhook(): void {
 
 function getStripePublishableKey(): void {
     success(['publishable_key' => STRIPE_PUBLISHABLE_KEY]);
+}
+
+function cancelSubscription(): void {
+    guardStripe();
+    $auth = requireAuth();
+    $db = getDB();
+
+    $stmt = $db->prepare("SELECT * FROM user_subscriptions WHERE user_id = ? AND status = 'active'");
+    $stmt->execute([$auth['sub']]);
+    $subscription = $stmt->fetch();
+
+    if (!$subscription) error('No active subscription found');
+
+    \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
+
+    try {
+        $stripeSub = \Stripe\Subscription::retrieve($subscription['stripe_subscription_id']);
+        $stripeSub->cancel();
+
+        $db->prepare("UPDATE user_subscriptions SET status = 'cancelled', cancelled_at = NOW() WHERE id = ?")
+            ->execute([$subscription['id']]);
+
+        success(['message' => 'Subscription cancelled successfully']);
+    } catch (\Exception $e) {
+        error('Stripe error: ' . $e->getMessage());
+    }
+}
+
+function getCheckoutSession(): void {
+    guardStripe();
+    $sessionId = $_GET['session_id'] ?? null;
+    if (!$sessionId) error('Session ID required');
+
+    \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
+
+    try {
+        $session = \Stripe\Checkout\Session::retrieve($sessionId);
+
+        $lineItems = \Stripe\Checkout\Session::allLineItems($sessionId, ['limit' => 1]);
+        $planName = $lineItems->data[0]->description ?? '';
+
+        success([
+            'plan_name' => $planName,
+            'amount' => ($session->amount_total ?? 0) / 100,
+            'customer_email' => $session->customer_details->email ?? '',
+        ]);
+    } catch (\Exception $e) {
+        error('Stripe error: ' . $e->getMessage());
+    }
 }

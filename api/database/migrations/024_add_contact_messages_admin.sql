@@ -1,0 +1,4 @@
+ALTER TABLE contact_messages ADD COLUMN is_read TINYINT(1) DEFAULT 0;
+ALTER TABLE contact_messages ADD COLUMN admin_reply TEXT DEFAULT NULL;
+ALTER TABLE contact_messages ADD COLUMN replied_at TIMESTAMP NULL DEFAULT NULL;
+ALTER TABLE contact_messages ADD COLUMN replied_by INT UNSIGNED DEFAULT NULL;

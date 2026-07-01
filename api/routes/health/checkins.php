@@ -26,6 +26,19 @@ function saveCheckin(): void {
     $auth = requireAuth();
     $userId = $auth['sub'];
     $input = getJsonInput();
+
+    $rules = [
+        'mood' => 'in:great,good,okay,bad,terrible',
+        'sleepHours' => 'numeric|min_value:0|max_value:24',
+        'energyLevel' => 'numeric|min_value:1|max_value:10',
+        'notes' => 'string|max:1000',
+    ];
+
+    $errors = validate($input, $rules);
+    if ($errors) {
+        error('Error de validación', 422, $errors);
+    }
+
     $db = getDB();
     $date = $input['date'] ?? date('Y-m-d');
     $stmt = $db->prepare("
@@ -56,12 +69,15 @@ function saveCheckin(): void {
             $streakIncrement = 0;
         }
     }
-    $db->prepare("INSERT INTO leaderboard_entries (user_id, points, streak_days, updated_at) 
+    $db->prepare("INSERT INTO leaderboard_entries (user_id, total_points, streak_days, updated_at) 
         VALUES (?, 5, 1, NOW()) 
-        ON DUPLICATE KEY UPDATE points = points + 5, streak_days = streak_days + ?, updated_at = NOW()")
+        ON DUPLICATE KEY UPDATE total_points = total_points + 5, streak_days = streak_days + ?, updated_at = NOW()")
         ->execute([$userId, $streakIncrement]);
     require_once __DIR__ . '/../gamification/achievements.php';
     checkAndUnlockAchievements();
+
+    require_once __DIR__ . '/../../helpers/activity.php';
+    logActivity($auth['sub'], 'checkin', 'Check-in del día completado', 'Heart', '#ec4899', 'Done', 'bg-success');
 
     success(null, 'Check-in guardado');
 }

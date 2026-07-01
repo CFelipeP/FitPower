@@ -1,10 +1,14 @@
 <?php
-require_once __DIR__ . '/../../helpers/mailer.php';
 
 function processReminders() {
     $db = getDB();
     $notified = [];
-    
+
+    $mailerAvailable = file_exists(__DIR__ . '/../../helpers/mailer.php');
+    if ($mailerAvailable) {
+        require_once __DIR__ . '/../../helpers/mailer.php';
+    }
+
     // 1. Check-in reminders (users who haven't checked in today)
     $today = date('Y-m-d');
     $stmt = $db->query("
@@ -27,11 +31,13 @@ function processReminders() {
                 VALUES (?, 'reminder', 'Daily Check-in Reminder', 'Don\'t forget to complete your daily check-in!', 'Heart', '/client/dashboard', NOW())")
                 ->execute([$user['id']]);
         }
-        if ($emailNotifs) {
-            sendNotificationEmail($user['email'], $user['first_name'], 
-                'Daily Check-in Reminder',
-                "Hi {$user['first_name']}, don't forget to complete your daily check-in! Track your energy, mood, and meals to stay on top of your goals.",
-                APP_URL . '/client/dashboard');
+        if ($emailNotifs && $mailerAvailable) {
+            try {
+                sendNotificationEmail($user['email'], $user['first_name'], 
+                    'Daily Check-in Reminder',
+                    "Hi {$user['first_name']}, don't forget to complete your daily check-in! Track your energy, mood, and meals to stay on top of your goals.",
+                    APP_URL . '/client/dashboard');
+            } catch (\Throwable $e) {}
         }
         $notified[] = $user['id'];
     }
@@ -58,11 +64,13 @@ function processReminders() {
                 VALUES (?, 'workout', 'Workout Starting Soon', 'Your session \"{$row['title']}\" starts in 1 hour!', 'Dumbbell', '/client/dashboard', NOW())")
                 ->execute([$row['user_id']]);
         }
-        if ($emailNotifs) {
-            sendNotificationEmail($row['email'], $row['first_name'],
-                'Workout Starting Soon',
-                "Your session \"{$row['title']}\" starts in 1 hour! Get ready to train.",
-                APP_URL . '/client/dashboard');
+        if ($emailNotifs && $mailerAvailable) {
+            try {
+                sendNotificationEmail($row['email'], $row['first_name'],
+                    'Workout Starting Soon',
+                    "Your session \"{$row['title']}\" starts in 1 hour! Get ready to train.",
+                    APP_URL . '/client/dashboard');
+            } catch (\Throwable $e) {}
         }
         $db->prepare("UPDATE session_participants SET reminded = 1 WHERE session_id = ? AND user_id = ?")
             ->execute([$row['session_id'], $row['user_id']]);

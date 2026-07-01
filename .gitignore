@@ -1,0 +1,28 @@
+# Sensitive files
+.env
+*.env.rpi
+api/.env
+FitPower/.env
+deploy/.env.production
+
+# Dependencies
+node_modules/
+api/vendor/
+
+# Build output
+FitPower/dist/
+
+# Uploads
+api/uploads/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

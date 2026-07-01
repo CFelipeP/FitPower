@@ -137,3 +137,37 @@ function getForumCategories(): void {
     $stmt = $db->query("SELECT DISTINCT category FROM forum_topics WHERE category IS NOT NULL AND status = 'active' ORDER BY category");
     success($stmt->fetchAll(PDO::FETCH_COLUMN));
 }
+
+function pinTopic(string $id): void {
+    requireRole('admin', 'moderator');
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id, is_pinned FROM forum_topics WHERE id = ?");
+    $stmt->execute([(int)$id]);
+    $topic = $stmt->fetch();
+    if (!$topic) error('Tema no encontrado', 404);
+    $newPinned = $topic['is_pinned'] ? 0 : 1;
+    $db->prepare("UPDATE forum_topics SET is_pinned = ? WHERE id = ?")->execute([$newPinned, (int)$id]);
+    success(null, $newPinned ? 'Tema fijado' : 'Tema desafijado');
+}
+
+function lockTopic(string $id): void {
+    requireRole('admin', 'moderator');
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id, status FROM forum_topics WHERE id = ?");
+    $stmt->execute([(int)$id]);
+    $topic = $stmt->fetch();
+    if (!$topic) error('Tema no encontrado', 404);
+    $newStatus = $topic['status'] === 'locked' ? 'active' : 'locked';
+    $db->prepare("UPDATE forum_topics SET status = ? WHERE id = ?")->execute([$newStatus, (int)$id]);
+    success(null, $newStatus === 'locked' ? 'Tema bloqueado' : 'Tema desbloqueado');
+}
+
+function adminDeleteTopic(string $id): void {
+    requireRole('admin', 'moderator');
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id FROM forum_topics WHERE id = ?");
+    $stmt->execute([(int)$id]);
+    if (!$stmt->fetch()) error('Tema no encontrado', 404);
+    $db->prepare("UPDATE forum_topics SET status = 'deleted' WHERE id = ?")->execute([(int)$id]);
+    success(null, 'Tema eliminado');
+}

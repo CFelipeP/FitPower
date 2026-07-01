@@ -8,41 +8,34 @@ function listCoachClients(): void {
     $trainerStmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
     $trainerStmt->execute([$userId]);
     $trainerId = $trainerStmt->fetchColumn();
+    $trainerId = $trainerId ? (int)$trainerId : null;
 
-    if (!$trainerId) {
-        success(['clients' => []]);
-        return;
+    if ($trainerId) {
+        $stmt = $db->prepare("
+            SELECT DISTINCT u.id, u.first_name, u.last_name, u.email
+            FROM users u
+            LEFT JOIN user_programs up ON up.user_id = u.id
+            LEFT JOIN programs p ON p.id = up.program_id AND p.trainer_id = ?
+            WHERE u.role = 'client'
+            ORDER BY u.first_name, u.last_name
+        ");
+        $stmt->execute([$trainerId]);
+    } else {
+        $stmt = $db->prepare("
+            SELECT DISTINCT u.id, u.first_name, u.last_name, u.email
+            FROM users u
+            WHERE u.role = 'client'
+            ORDER BY u.first_name, u.last_name
+        ");
+        $stmt->execute();
     }
-
-    $trainerId = (int)$trainerId;
-
-    $stmt = $db->prepare("
-        SELECT DISTINCT u.id, u.first_name, u.last_name, u.email, u.status, u.created_at, u.updated_at,
-               sp.name as plan_name, up.progress, p.name as program_name
-        FROM users u
-        JOIN user_programs up ON up.user_id = u.id
-        JOIN programs p ON p.id = up.program_id
-        LEFT JOIN user_subscriptions us ON us.user_id = u.id AND us.status = 'active'
-        LEFT JOIN subscription_plans sp ON sp.id = us.plan_id
-        WHERE p.trainer_id = ?
-        ORDER BY u.first_name, u.last_name
-    ");
-    $stmt->execute([$trainerId]);
     $rows = $stmt->fetchAll();
 
     $clients = array_map(function($r) {
-        $daysSince = (int)((time() - strtotime($r['updated_at'])) / 86400);
-        $lastActive = $daysSince === 0 ? 'Today' : ($daysSince === 1 ? 'Yesterday' : "$daysSince days ago");
-
         return [
             'id' => (int)$r['id'],
             'name' => trim($r['first_name'] . ' ' . $r['last_name']),
             'email' => $r['email'],
-            'tier' => $r['plan_name'] ?? 'Starter',
-            'status' => ucfirst($r['status']),
-            'lastActive' => $lastActive,
-            'program' => $r['program_name'] ?? null,
-            'progress' => $r['progress'] ? (float)$r['progress'] : null,
         ];
     }, $rows);
 
