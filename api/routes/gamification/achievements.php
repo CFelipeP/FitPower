@@ -3,11 +3,12 @@
 function listAchievements() {
     $auth = requireAuth();
     $db = getDB();
+    $userId = $auth['sub'];
     
     $achievements = $db->query("SELECT * FROM achievements ORDER BY type, requirement")->fetchAll();
     
     $userAch = $db->prepare("SELECT achievement_id, unlocked_at FROM user_achievements WHERE user_id = ?");
-    $userAch->execute([$auth['id']]);
+    $userAch->execute([$userId]);
     $unlocked = [];
     foreach ($userAch->fetchAll() as $ua) {
         $unlocked[$ua['achievement_id']] = $ua['unlocked_at'];
@@ -26,6 +27,7 @@ function listAchievements() {
 function getUserAchievements() {
     $auth = requireAuth();
     $db = getDB();
+    $userId = $auth['sub'];
     $stmt = $db->prepare("
         SELECT a.*, ua.unlocked_at 
         FROM achievements a 
@@ -33,14 +35,14 @@ function getUserAchievements() {
         WHERE ua.user_id = ?
         ORDER BY ua.unlocked_at DESC
     ");
-    $stmt->execute([$auth['id']]);
+    $stmt->execute([$userId]);
     success($stmt->fetchAll());
 }
 
 function checkAndUnlockAchievements() {
     $auth = requireAuth();
     $db = getDB();
-    $userId = $auth['id'];
+    $userId = $auth['sub'];
     
     $entry = $db->prepare("SELECT * FROM leaderboard_entries WHERE user_id = ?");
     $entry->execute([$userId]);
@@ -65,10 +67,10 @@ function checkAndUnlockAchievements() {
                 $unlock = ($stats['streak_days'] ?? 0) >= $ach['requirement'];
                 break;
             case 'points':
-                $unlock = ($stats['points'] ?? 0) >= $ach['requirement'];
+                $unlock = ($stats['total_points'] ?? 0) >= $ach['requirement'];
                 break;
             case 'calories':
-                $unlock = ($stats['calories_burned'] ?? 0) >= $ach['requirement'];
+                $unlock = ($stats['total_calories_burned'] ?? 0) >= $ach['requirement'];
                 break;
             case 'social':
                 $forum = $db->prepare("SELECT COUNT(*) as cnt FROM forum_replies WHERE user_id = ?");
@@ -81,7 +83,7 @@ function checkAndUnlockAchievements() {
             $ins = $db->prepare("INSERT INTO user_achievements (user_id, achievement_id, unlocked_at) VALUES (?, ?, NOW())");
             $ins->execute([$userId, $ach['id']]);
             
-            $db->prepare("UPDATE leaderboard_entries SET points = points + ? WHERE user_id = ?")->execute([$ach['points'], $userId]);
+            $db->prepare("UPDATE leaderboard_entries SET total_points = total_points + ? WHERE user_id = ?")->execute([$ach['points'], $userId]);
             
             $newUnlocks[] = $ach;
         }

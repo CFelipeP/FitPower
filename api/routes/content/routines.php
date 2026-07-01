@@ -52,6 +52,13 @@ function getDailyRoutine(): void {
 function completeRoutine(): void {
     $auth = requireAuth();
     $input = getJsonInput();
+
+    $rules = ['date' => 'string'];
+    $errors = validate($input, $rules);
+    if ($errors) {
+        error('Error de validación', 422, $errors);
+    }
+
     $date = $input['date'] ?? date('Y-m-d');
 
     $db = getDB();
@@ -66,6 +73,12 @@ function completeRoutine(): void {
         ->execute([$auth['sub']]);
     require_once __DIR__ . '/../gamification/achievements.php';
     checkAndUnlockAchievements();
+
+    $routineStmt = $db->prepare("SELECT title FROM smart_routines WHERE user_id = ? AND routine_date = ?");
+    $routineStmt->execute([$auth['sub'], $date]);
+    $routine = $routineStmt->fetch();
+    require_once __DIR__ . '/../../helpers/activity.php';
+    logActivity($auth['sub'], 'workout', 'Rutina completada: ' . ($routine['title'] ?? 'Daily Routine'), 'Dumbbell', '#10b981', 'Done', 'bg-success');
 
     success(null, 'Rutina completada');
 }

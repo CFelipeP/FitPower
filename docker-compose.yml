@@ -1,0 +1,68 @@
+services:
+  php:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+      platforms:
+        - linux/arm64
+        - linux/amd64
+    volumes:
+      - ./api:/var/www/api
+    environment:
+      DB_HOST: db
+      DB_NAME: fitpower
+      DB_USER: fitpower
+      DB_PASS: ${DB_PASS}
+    depends_on:
+      - db
+    networks:
+      - fitpower
+
+  db:
+    image: mariadb:11
+    platform: linux/arm64
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASS}
+      MYSQL_DATABASE: fitpower
+      MYSQL_USER: fitpower
+      MYSQL_PASSWORD: ${DB_PASS}
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - fitpower
+
+  nginx:
+    image: nginx:alpine
+    platform: linux/arm64
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./api:/var/www/api
+      - ./FitPower/dist:/var/www/html
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+    networks:
+      - fitpower
+
+  node:
+    image: node:20-alpine
+    platform: linux/arm64
+    working_dir: /app
+    volumes:
+      - ./FitPower:/app
+    command: sh -c "npm install --omit=dev && node mediasoup-server.js"
+    ports:
+      - "5180:5180"
+      - "5181:5181"
+    environment:
+      MEDIASOUP_ANNOUNCED_IP: ${MEDIASOUP_IP}
+    networks:
+      - fitpower
+
+volumes:
+  db_data:
+
+networks:
+  fitpower:

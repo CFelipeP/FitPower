@@ -9,19 +9,31 @@ function adminDashboard(): void {
     $userRow = $userStmt->fetch();
     $userName = $userRow ? trim($userRow['first_name'] . ' ' . $userRow['last_name']) : 'Admin';
 
-    // KPIs
-    $activeUsers = (int)$db->query("SELECT COUNT(*) FROM users WHERE status = 'active'")->fetchColumn();
+    // Combined KPIs (7 queries → 1 round trip)
+    $kpiRow = $db->query("
+        SELECT
+            (SELECT COUNT(*) FROM users WHERE status = 'active') as active_users,
+            (SELECT COUNT(*) FROM users) as total_users,
+            (SELECT COUNT(*) FROM user_subscriptions WHERE status = 'cancelled') as cancelled_subs,
+            (SELECT COUNT(*) FROM user_subscriptions) as total_subs_ever,
+            (SELECT COUNT(*) FROM support_tickets WHERE severity IN ('open', 'in_progress', 'critical')) as open_tickets
+    ")->fetch();
+
+    $activeUsers = (int)$kpiRow['active_users'];
+    $totalUsers = (int)$kpiRow['total_users'];
+    $totalSubsEver = (int)$kpiRow['total_subs_ever'];
+    $cancelledSubs = (int)$kpiRow['cancelled_subs'];
+    $openTickets = (int)$kpiRow['open_tickets'];
+    $retentionRate = $totalSubsEver > 0 ? round(($totalSubsEver - $cancelledSubs) / $totalSubsEver * 100) : 89;
 
     $mrr = (float)$db->query("
-        SELECT COALESCE(SUM(sp.price_monthly), 0)
+        SELECT COALESCE(SUM(
+            CASE WHEN us.billing = 'yearly' THEN sp.price_yearly / 12 ELSE sp.price_monthly END
+        ), 0)
         FROM user_subscriptions us
         JOIN subscription_plans sp ON sp.id = us.plan_id
         WHERE us.status = 'active'
     ")->fetchColumn();
-
-    $retentionRate = 89;
-
-    $openTickets = (int)$db->query("SELECT COUNT(*) FROM support_tickets WHERE severity IN ('open', 'in_progress', 'critical')")->fetchColumn();
 
     // User growth (last 8 months)
     $growthStmt = $db->query("
@@ -35,10 +47,14 @@ function adminDashboard(): void {
     $months = [];
     $values = [];
     $counts = [];
+    $maxCount = 1;
     foreach ($growthData as $row) {
         $months[] = date('M', strtotime($row['month'] . '-01'));
-        $values[] = min(100, round($row['count'] / 7.42 * 100));
         $counts[] = (int)$row['count'];
+        $maxCount = max($maxCount, (int)$row['count']);
+    }
+    foreach ($counts as $c) {
+        $values[] = $maxCount > 0 ? round($c / $maxCount * 100) : 0;
     }
 
     // Subscription tiers
@@ -84,10 +100,14 @@ function adminDashboard(): void {
         ];
     }
 
-    // Recent users
+    // Recent users with subscription info
     $recentStmt = $db->query("
-        SELECT id, first_name, last_name, email, status, created_at
-        FROM users ORDER BY created_at DESC LIMIT 5
+        SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.status, u.created_at,
+               COALESCE(sp.name, 'No Plan') as plan_name
+        FROM users u
+        LEFT JOIN user_subscriptions us ON us.user_id = u.id AND us.status = 'active'
+        LEFT JOIN subscription_plans sp ON sp.id = us.plan_id
+        ORDER BY u.created_at DESC LIMIT 5
     ");
     $recentUsers = [];
     foreach ($recentStmt as $u) {
@@ -95,22 +115,53 @@ function adminDashboard(): void {
         $timeAgo = $daysAgo === 0 ? 'Today' : ($daysAgo === 1 ? 'Yesterday' : "$daysAgo days ago");
 
         $recentUsers[] = [
+            'id' => (int)$u['id'],
             'name' => $u['first_name'] . ' ' . $u['last_name'],
             'email' => $u['email'],
-            'tier' => 'STARTER',
-            'tierClass' => 'starter',
+            'role' => $u['role'],
+            'tier' => $u['plan_name'] === 'No Plan' ? 'No Plan' : strtoupper(str_replace(' ', '_', $u['plan_name'])),
+            'tierClass' => $u['plan_name'] === 'No Plan' ? 'no-plan' : 'starter',
             'status' => $u['status'] === 'active' ? 'Active' : 'Pending Verification',
             'registered' => $timeAgo,
             'seed' => (string)$u['id'],
         ];
     }
 
-    // Revenue breakdown
-    $revenueData = [
-        ['label' => 'Recurring Subscriptions', 'value' => '$' . number_format($mrr * 0.81, 0), 'pct' => 81, 'cls' => 'green'],
-        ['label' => '1:1 Coaching Sessions', 'value' => '$' . number_format($mrr * 0.12, 0), 'pct' => 12, 'cls' => 'blue'],
-        ['label' => 'Digital Products / Merch', 'value' => '$' . number_format($mrr * 0.07, 0), 'pct' => 7, 'cls' => 'purple'],
-    ];
+    // Revenue breakdown - real data grouped by plan
+    $revStmt = $db->query("
+        SELECT
+            CASE
+                WHEN sp.name = 'Starter' THEN 'Starter Plan'
+                WHEN sp.name = 'Pro' THEN 'Pro Plan'
+                WHEN sp.name = 'Elite' THEN 'Elite Plan'
+                ELSE 'Other Plans'
+            END as label,
+            COALESCE(SUM(
+                CASE WHEN us.billing = 'yearly' THEN sp.price_yearly / 12 ELSE sp.price_monthly END
+            ), 0) as revenue
+        FROM user_subscriptions us
+        JOIN subscription_plans sp ON sp.id = us.plan_id
+        WHERE us.status = 'active'
+        GROUP BY sp.name
+        ORDER BY revenue DESC
+    ");
+    $revRows = $revStmt->fetchAll();
+    $totalRev = array_sum(array_column($revRows, 'revenue')) ?: 1;
+    $revColors = ['green', 'blue', 'purple'];
+    $revenueData = [];
+    foreach ($revRows as $i => $r) {
+        $revenueData[] = [
+            'label' => $r['label'],
+            'value' => '$' . number_format((float)$r['revenue'], 0),
+            'pct' => round((float)$r['revenue'] / $totalRev * 100),
+            'cls' => $revColors[$i] ?? 'gray',
+        ];
+    }
+    if (empty($revenueData)) {
+        $revenueData = [
+            ['label' => 'Recurring Subscriptions', 'value' => '$0', 'pct' => 100, 'cls' => 'green'],
+        ];
+    }
 
     // Support tickets
     $ticketStmt = $db->query("
@@ -154,10 +205,30 @@ function adminDashboard(): void {
         ];
     }
 
+    // Combined session counts (2 queries → 1)
+    $sessionRow = $db->query("
+        SELECT
+            (SELECT COUNT(*) FROM sessions WHERE status = 'completed') as completed_sessions,
+            (SELECT COUNT(*) FROM sessions) as total_sessions
+    ")->fetch();
+    $completedSessions = (int)$sessionRow['completed_sessions'];
+    $totalSessions = (int)$sessionRow['total_sessions'];
+    $completionRate = $totalSessions > 0 ? round($completedSessions / $totalSessions * 100, 1) : 0;
+
+    $activeRatio = $totalUsers > 0 ? round($activeUsers / $totalUsers * 100) : 0;
+    $infrastructure = [
+        ['label' => 'Active User Rate', 'value' => $activeRatio . '%', 'pct' => $activeRatio, 'cls' => 'green'],
+        ['label' => 'Subscription Rate', 'value' => round($totalSubsEver / max($totalUsers, 1) * 100) . '%', 'pct' => round($totalSubsEver / max($totalUsers, 1) * 100), 'cls' => 'yellow'],
+        ['label' => 'Session Completion', 'value' => $completionRate . '%', 'pct' => $completionRate, 'cls' => 'blue'],
+        ['label' => 'Coach Approval Rate', 'value' => '100%', 'pct' => 100, 'cls' => 'purple'],
+    ];
+
     success([
+        'userName' => $userName,
         'kpis' => [
-            'activeUsers' => $activeUsers ?: 2847,
-            'monthlyMRR' => $mrr ?: 47250,
+            'activeUsers' => $activeUsers ?: 0,
+            'totalUsers' => $totalUsers,
+            'monthlyMRR' => $mrr ?: 0,
             'retentionRate' => $retentionRate,
             'openTickets' => $openTickets,
         ],
@@ -172,12 +243,114 @@ function adminDashboard(): void {
         'recentUsers' => $recentUsers,
         'supportTickets' => $tickets,
         'activities' => $activities,
-        'infrastructure' => [
-            ['label' => 'CPU Utilization', 'value' => '42%', 'pct' => 42, 'cls' => 'green'],
-            ['label' => 'Memory Allocation', 'value' => '68%', 'pct' => 68, 'cls' => 'yellow'],
-            ['label' => 'Storage / CDN', 'value' => '35%', 'pct' => 35, 'cls' => 'blue'],
-            ['label' => 'Bandwidth Usage', 'value' => '52%', 'pct' => 52, 'cls' => 'purple'],
-        ],
+        'infrastructure' => $infrastructure,
+    ]);
+}
+
+function adminAnalytics(): void {
+    requireRole('admin');
+    $db = getDB();
+
+    // Users over last 12 months
+    $userStmt = $db->query("
+        SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as count
+        FROM users
+        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+        GROUP BY month ORDER BY month
+    ");
+    $usersByMonth = [];
+    foreach ($userStmt as $row) {
+        $usersByMonth[] = [
+            'month' => date('M Y', strtotime($row['month'] . '-01')),
+            'count' => (int)$row['count'],
+        ];
+    }
+
+    // Revenue over last 12 months
+    $revStmt = $db->query("
+        SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COALESCE(SUM(amount), 0) as revenue
+        FROM payments
+        WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) AND status = 'completed'
+        GROUP BY month ORDER BY month
+    ");
+    $revenueByMonth = [];
+    foreach ($revStmt as $row) {
+        $revenueByMonth[] = [
+            'month' => date('M Y', strtotime($row['month'] . '-01')),
+            'revenue' => (float)$row['revenue'],
+        ];
+    }
+
+    // Sessions completed
+    $sessionStmt = $db->query("
+        SELECT DATE_FORMAT(date, '%Y-%m') as month, COUNT(*) as count
+        FROM sessions
+        WHERE status = 'completed' AND date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+        GROUP BY month ORDER BY month
+    ");
+    $sessionsByMonth = [];
+    foreach ($sessionStmt as $row) {
+        $sessionsByMonth[] = [
+            'month' => date('M Y', strtotime($row['month'] . '-01')),
+            'count' => (int)$row['count'],
+        ];
+    }
+
+    // Role distribution
+    $roleStmt = $db->query("SELECT role, COUNT(*) as count FROM users GROUP BY role");
+    $roles = [];
+    foreach ($roleStmt as $row) {
+        $roles[] = [
+            'role' => $row['role'],
+            'count' => (int)$row['count'],
+        ];
+    }
+
+    // Programs count
+    $programCount = (int)$db->query("SELECT COUNT(*) FROM programs WHERE status = 'active'")->fetchColumn();
+
+    // Total revenue
+    $totalRevenue = (float)$db->query("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed'")->fetchColumn();
+
+    // Average session completion rate
+    $completedSessions = (int)$db->query("SELECT COUNT(*) FROM sessions WHERE status = 'completed'")->fetchColumn();
+    $totalSessions = (int)$db->query("SELECT COUNT(*) FROM sessions")->fetchColumn();
+    $completionRate = $totalSessions > 0 ? round($completedSessions / $totalSessions * 100, 1) : 0;
+
+    success([
+        'usersByMonth' => $usersByMonth,
+        'revenueByMonth' => $revenueByMonth,
+        'sessionsByMonth' => $sessionsByMonth,
+        'roleDistribution' => $roles,
+        'totalUsers' => (int)$db->query("SELECT COUNT(*) FROM users")->fetchColumn(),
+        'activePrograms' => $programCount,
+        'totalRevenue' => $totalRevenue,
+        'completionRate' => $completionRate,
+        'totalCoaches' => (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'coach'")->fetchColumn(),
+        'totalClients' => (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'client'")->fetchColumn(),
+    ]);
+}
+
+function adminAnalyticsDetailed(): void {
+    requireRole('admin');
+    $db = getDB();
+
+    $activeByDay = $db->query("SELECT DATE(created_at) as day, COUNT(*) as count FROM users WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) GROUP BY day ORDER BY day")->fetchAll();
+
+    $revenueByMonth = $db->query("SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COALESCE(SUM(amount), 0) as revenue FROM payments WHERE status = 'completed' AND created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY month ORDER BY month")->fetchAll();
+
+    $sessionsData = $db->query("SELECT status, COUNT(*) as count FROM sessions WHERE date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) GROUP BY status")->fetchAll();
+
+    $topCoaches = $db->query("SELECT t.first_name, t.last_name, ROUND(AVG(r.rating), 1) as avg_rating, COUNT(r.id) as review_count FROM trainers t JOIN reviews r ON r.trainer_id = t.id GROUP BY t.id HAVING review_count > 0 ORDER BY avg_rating DESC LIMIT 10")->fetchAll();
+
+    $ticketData = $db->query("SELECT severity, COUNT(*) as count FROM support_tickets WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) GROUP BY severity")->fetchAll();
+
+    success([
+        'activeUsersByDay' => array_map(fn($r) => ['day' => $r['day'], 'count' => (int)$r['count']], $activeByDay),
+        'revenueByMonth' => array_map(fn($r) => ['month' => $r['month'], 'revenue' => (float)$r['revenue']], $revenueByMonth),
+        'sessionCompletion' => array_map(fn($r) => ['status' => $r['status'], 'count' => (int)$r['count']], $sessionsData),
+        'topCoaches' => array_map(fn($r) => ['name' => $r['first_name'] . ' ' . $r['last_name'], 'rating' => (float)$r['avg_rating'], 'reviews' => (int)$r['review_count']], $topCoaches),
+        'ticketsBySeverity' => array_map(fn($r) => ['severity' => $r['severity'], 'count' => (int)$r['count']], $ticketData),
     ]);
 }
 
@@ -207,16 +380,16 @@ function coachDashboard(): void {
         WHERE p.trainer_id = ? AND up.status = 'active'
     ");
     $activeClientsStmt->execute([$trainerId]);
-    $clientCount = (int)$activeClientsStmt->fetchColumn() ?: 32;
+    $clientCount = (int)$activeClientsStmt->fetchColumn();
 
     $todaySessionsStmt = $db->prepare("
         SELECT COUNT(*) FROM sessions WHERE trainer_id = ? AND date = CURDATE() AND status = 'scheduled'
     ");
     $todaySessionsStmt->execute([$trainerId]);
-    $todayCount = (int)$todaySessionsStmt->fetchColumn() ?: 4;
+    $todayCount = (int)$todaySessionsStmt->fetchColumn();
 
     $avgRatingStmt = $db->prepare("
-        SELECT COALESCE(AVG(rating), 4.9) FROM reviews WHERE trainer_id = ?
+        SELECT AVG(rating) FROM reviews WHERE trainer_id = ?
     ");
     $avgRatingStmt->execute([$trainerId]);
     $rating = (float)$avgRatingStmt->fetchColumn();
@@ -316,15 +489,153 @@ function coachDashboard(): void {
         ];
     }
 
-    // Earnings
-    $earningsTotal = 3840;
+    // Completion rate (2 queries → 1)
+    $compRow = $db->prepare("
+        SELECT
+            (SELECT COUNT(*) FROM sessions WHERE trainer_id = ? AND status = 'completed' AND date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as completed,
+            (SELECT COUNT(*) FROM sessions WHERE trainer_id = ? AND date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as total_sess
+    ");
+    $compRow->execute([$trainerId, $trainerId]);
+    $compData = $compRow->fetch();
+    $completed = (int)$compData['completed'];
+    $totalSess = (int)$compData['total_sess'];
+    $completionRate = $totalSess > 0 ? round($completed / $totalSess * 100) : 0;
+
+    // Reviews / Feedback
+    $reviewStmt = $db->prepare("
+        SELECT r.rating, r.comment, r.created_at,
+               CONCAT(u.first_name, ' ', u.last_name) as user_name, u.id as user_id
+        FROM reviews r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.trainer_id = ?
+        ORDER BY r.created_at DESC LIMIT 10
+    ");
+    $reviewStmt->execute([$trainerId]);
+    $reviews = [];
+    $feedback = [];
+    $starColors = ['#ef4444','#f97316','#eab308','#22c55e','#22c55e'];
+    foreach ($reviewStmt as $r) {
+        $starCount = (int)$r['rating'];
+        $reviews[] = [
+            'name' => $r['user_name'],
+            'rating' => $starCount,
+            'text' => $r['comment'] ?? 'Great session!',
+            'date' => date('M j, Y', strtotime($r['created_at'])),
+            'seed' => (string)$r['user_id'],
+            'tags' => [],
+        ];
+        $feedback[] = [
+            'name' => $r['user_name'],
+            'stars' => $starCount,
+            'text' => $r['comment'] ?? 'Great session!',
+            'meta' => date('M j, Y', strtotime($r['created_at'])),
+            'seed' => (string)$r['user_id'],
+        ];
+    }
+    if (!$reviews) {
+        $reviews = [];
+        $feedback = [];
+    }
+
+    // Full client roster
+    $rosterStmt = $db->prepare("
+        SELECT DISTINCT u.id, u.first_name, u.last_name, up.progress
+        FROM user_programs up
+        JOIN users u ON u.id = up.user_id
+        JOIN programs p ON p.id = up.program_id
+        WHERE p.trainer_id = ? AND up.status = 'active'
+        ORDER BY u.first_name LIMIT 20
+    ");
+    $rosterStmt->execute([$trainerId]);
+    $clientRoster = [];
+    foreach ($rosterStmt as $c) {
+        $pct = (int)$c['progress'];
+        $status = $pct >= 80 ? 'On Track' : ($pct >= 40 ? 'In Progress' : 'Needs Attention');
+        $statusCls = $pct >= 80 ? 'on-track' : ($pct >= 40 ? 'in-progress' : 'needs-attention');
+        $dotCls = $pct >= 80 ? 'green' : ($pct >= 40 ? 'yellow' : 'red');
+        $clientRoster[] = [
+            'name' => $c['first_name'] . ' ' . $c['last_name'],
+            'seed' => (string)$c['id'],
+            'tier' => 'Active',
+            'prog' => 'Program',
+            'progCls' => 'orange',
+            'status' => $status,
+            'statusCls' => $statusCls,
+            'dotCls' => $dotCls,
+        ];
+    }
+
+    // Attention items (clients with low progress or cancelled sessions)
+    $attention = [];
+    $lowProgStmt = $db->prepare("
+        SELECT u.id, u.first_name, u.last_name, MAX(up.progress) as progress
+        FROM user_programs up
+        JOIN users u ON u.id = up.user_id
+        JOIN programs p ON p.id = up.program_id
+        WHERE p.trainer_id = ? AND up.status = 'active'
+        GROUP BY u.id HAVING progress < 30 ORDER BY progress LIMIT 3
+    ");
+    $lowProgStmt->execute([$trainerId]);
+    foreach ($lowProgStmt as $lp) {
+        $attention[] = [
+            'text' => $lp['first_name'] . ' ' . $lp['last_name'] . ' is behind on program progress (' . (int)$lp['progress'] . '%)',
+            'sub' => 'Send a check-in message',
+            'badge' => 'Behind',
+            'badgeCls' => 'missed',
+            'iconCls' => 'red',
+            'borderCls' => 'red',
+            'btnText' => 'Message',
+            'btnCls' => 'red',
+        ];
+    }
+
+    // Recent payouts from payments table
+    $payoutStmt = $db->prepare("
+        SELECT p.amount, p.created_at, p.status
+        FROM payments p
+        WHERE p.status = 'completed'
+        ORDER BY p.created_at DESC LIMIT 4
+    ");
+    $payoutStmt->execute();
+    $recentPayouts = [];
+    foreach ($payoutStmt as $pay) {
+        $recentPayouts[] = [
+            'date' => date('M j, Y', strtotime($pay['created_at'])),
+            'amount' => '$' . number_format((float)$pay['amount'], 0),
+            'status' => ucfirst($pay['status']),
+        ];
+    }
+
+
+    // Earnings totals (5 queries → 1)
+    $earnRow = $db->query("
+        SELECT
+            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed') as earnings_total,
+            (SELECT COALESCE(SUM(p.amount), 0) FROM payments p JOIN user_subscriptions us ON us.id = p.subscription_id WHERE p.status = 'completed' AND p.type = 'subscription') as sub_rev,
+            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed' AND type = 'coaching') as coach_rev,
+            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed' AND type = 'product') as prod_rev,
+            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'pending') as pending_payout
+    ")->fetch();
+    $earningsTotal = (float)$earnRow['earnings_total'];
+    $subRev = (int)$earnRow['sub_rev'];
+    $coachRev = (int)$earnRow['coach_rev'];
+    $prodRev = (int)$earnRow['prod_rev'];
+    $pendingPayout = (int)$earnRow['pending_payout'];
+
+    $totalEarnings = $subRev + $coachRev + $prodRev ?: 1;
+
+    $earningsBreakdown = [
+        ['label' => '1:1 Coaching', 'value' => '$' . number_format($coachRev), 'pct' => round($coachRev / $totalEarnings * 100), 'cls' => 'yellow'],
+        ['label' => 'Group Sessions', 'value' => '$' . number_format($subRev), 'pct' => round($subRev / $totalEarnings * 100), 'cls' => 'blue'],
+        ['label' => 'Program Royalties', 'value' => '$' . number_format($prodRev), 'pct' => round($prodRev / $totalEarnings * 100), 'cls' => 'purple'],
+    ];
 
     success([
         'userName' => $userName,
         'kpis' => [
             'activeClients' => $clientCount,
             'todaySessions' => $todayCount,
-            'completionRate' => 87,
+            'completionRate' => $completionRate,
             'avgRating' => round($rating, 1),
         ],
         'sessions' => $sessions,
@@ -337,30 +648,17 @@ function coachDashboard(): void {
         'clientProgress' => $clients,
         'programs' => $programs,
         'earnings' => [
-            'breakdown' => [
-                ['label' => '1:1 Coaching', 'value' => '$2,160', 'pct' => 56, 'cls' => 'yellow'],
-                ['label' => 'Group Sessions', 'value' => '$1,200', 'pct' => 31, 'cls' => 'blue'],
-                ['label' => 'Program Royalties', 'value' => '$480', 'pct' => 13, 'cls' => 'purple'],
-            ],
+            'breakdown' => $earningsBreakdown,
             'total' => '$' . number_format($earningsTotal),
             'growth' => '+22% MoM',
-            'pendingPayout' => '$1,920',
-            'sessionsDelivered' => 18,
+            'pendingPayout' => '$' . number_format($pendingPayout),
+            'sessionsDelivered' => array_sum($weekCounts),
         ],
-        'clientRoster' => array_map(function($c) {
-            return [
-                'name' => $c['name'],
-                'seed' => $c['seed'],
-                'tier' => 'Pro · Since ' . date('M Y'),
-                'prog' => 'Active Program',
-                'progCls' => 'orange',
-                'status' => 'On Track',
-                'statusCls' => 'on-track',
-                'dotCls' => 'green',
-            ];
-        }, $clients),
-        'feedback' => [],
-        'attention' => [],
+        'clientRoster' => $clientRoster,
+        'reviews' => $reviews,
+        'feedback' => $feedback,
+        'attention' => $attention,
+        'recentPayouts' => $recentPayouts,
     ]);
 }
 
@@ -369,18 +667,25 @@ function clientDashboard(): void {
     $userId = $auth['sub'];
     $db = getDB();
 
-    // KPIs
-    $nutrition = $db->prepare("SELECT * FROM nutrition_logs WHERE user_id = ? AND log_date = CURDATE()");
-    $nutrition->execute([$userId]);
+    $nutrition = $db->prepare("SELECT * FROM nutrition_logs WHERE user_id = ? AND log_date = ?");
+    $nutrition->execute([$userId, date('Y-m-d')]);
     $nutritionData = $nutrition->fetch() ?: [];
 
-    $calories = $nutritionData ? (int)$nutritionData['calories_consumed'] : 847;
-    $workoutsDone = 5;
-    $workoutTarget = 6;
-    $totalHours = 4.2;
-    $streak = 23;
+    $calories = $nutritionData ? (int)$nutritionData['calories_consumed'] : 0;
 
-    // Active program
+    $thisMonth = date('Y-m-01');
+    $workoutsDoneStmt = $db->prepare("
+        SELECT COUNT(*) FROM session_participants sp
+        JOIN sessions s ON s.id = sp.session_id
+        WHERE sp.user_id = ? AND sp.status = 'completed' AND s.date >= ?
+    ");
+    $workoutsDoneStmt->execute([$userId, $thisMonth]);
+    $workoutsDone = (int)$workoutsDoneStmt->fetchColumn();
+
+    $workoutTarget = 16;
+    $totalHours = 0;
+    $streak = 0;
+
     $progStmt = $db->prepare("
         SELECT p.*, up.progress, up.current_week,
                CONCAT(t.first_name, ' ', t.last_name) as coach_name
@@ -393,61 +698,90 @@ function clientDashboard(): void {
     $progStmt->execute([$userId]);
     $activeProg = $progStmt->fetch();
 
+    if ($activeProg) {
+        $workoutTarget = ((int)($activeProg['sessions_per_week'] ?? 4)) * 4;
+        $hoursStmt = $db->prepare("
+            SELECT COALESCE(SUM(TIME_TO_SEC(TIMEDIFF(s.end_time, s.start_time)) / 3600), 0)
+            FROM session_participants sp
+            JOIN sessions s ON s.id = sp.session_id
+            WHERE sp.user_id = ? AND sp.status = 'completed' AND s.date >= ? AND s.start_time IS NOT NULL AND s.end_time IS NOT NULL
+        ");
+        $hoursStmt->execute([$userId, $thisMonth]);
+        $totalHours = round((float)$hoursStmt->fetchColumn(), 1);
+    }
+
+    $streakStmt = $db->prepare("
+        SELECT checkin_date FROM daily_checkins WHERE user_id = ? ORDER BY checkin_date DESC LIMIT 60
+    ");
+    $streakStmt->execute([$userId]);
+    $checkinDates = $streakStmt->fetchAll(PDO::FETCH_COLUMN);
+    $today = new DateTime();
+    $streak = 0;
+    $expected = clone $today;
+    if (!empty($checkinDates) && $checkinDates[0] === $today->format('Y-m-d')) {
+        $streak = 1;
+    } elseif (!empty($checkinDates) && $checkinDates[0] === (clone $today)->modify('-1 day')->format('Y-m-d')) {
+        $expected->modify('-1 day');
+        $streak = 1;
+    } else {
+        $expected = null;
+    }
+    if ($expected && count($checkinDates) > 1) {
+        for ($i = 0; $i < count($checkinDates) - 1; $i++) {
+            $current = new DateTime($checkinDates[$i]);
+            $next = new DateTime($checkinDates[$i + 1]);
+            $diff = $current->diff($next)->days;
+            if ($diff === 1) {
+                $streak++;
+            } else {
+                break;
+            }
+        }
+    }
+
+    $avgRpeStmt = $db->prepare("
+        SELECT ROUND(AVG(s.rpe), 1) FROM session_participants sp
+        JOIN sessions s ON s.id = sp.session_id
+        WHERE sp.user_id = ? AND sp.status = 'completed' AND s.rpe IS NOT NULL
+    ");
+    $avgRpeStmt->execute([$userId]);
+    $avgRPE = $avgRpeStmt->fetchColumn() ?: 0;
+
     $activeProgram = $activeProg ? [
         'name' => $activeProg['name'],
         'coach' => $activeProg['coach_name'] ?? 'Alex Rivera',
         'duration' => ($activeProg['duration_minutes'] ?? '40 min') . ' sessions · ' . ($activeProg['sessions_per_week'] ?? 4) . 'x/week',
         'week' => 'Week ' . ($activeProg['current_week'] ?? 6) . '/' . ($activeProg['weeks'] ?? 12),
         'progress' => (int)($activeProg['progress'] ?? 50),
-        'workoutsDone' => (int)(($activeProg['progress'] ?? 50) / 100 * 24) . '/24',
-        'avgRPE' => '7.2/10',
-    ] : [
-        'name' => 'HIIT Inferno — Advanced',
-        'coach' => 'Alex Rivera',
-        'duration' => '40 min sessions · 4x/week',
-        'week' => 'Week 6/12',
-        'progress' => 50,
-        'workoutsDone' => '12/24',
-        'avgRPE' => '7.2/10',
-    ];
+        'workoutsDone' => $workoutsDone . '/' . $workoutTarget,
+        'avgRPE' => $avgRPE . '/10',
+    ] : null;
 
-    // Macros
-    $macros = [
-        'target' => number_format($nutritionData['calories_target'] ?? 1940) . ' kcal',
-        'totalConsumed' => number_format($nutritionData['calories_consumed'] ?? 1780) . ' kcal',
+    $macros = $nutritionData ? [
+        'target' => number_format($nutritionData['calories_target'] ?? 0) . ' kcal',
+        'totalConsumed' => number_format($nutritionData['calories_consumed'] ?? 0) . ' kcal',
         'protein' => [
-            'current' => (float)($nutritionData['protein_current'] ?? 142),
-            'target' => (float)($nutritionData['protein_target'] ?? 150),
-            'pct' => round(($nutritionData['protein_current'] ?? 142) / ($nutritionData['protein_target'] ?? 150) * 100) . '%',
+            'current' => (float)($nutritionData['protein_current'] ?? 0),
+            'target' => (float)($nutritionData['protein_target'] ?? 0),
+            'pct' => $nutritionData['protein_target'] ? round(($nutritionData['protein_current'] ?? 0) / $nutritionData['protein_target'] * 100) . '%' : '0%',
         ],
         'carbs' => [
-            'current' => (float)($nutritionData['carbs_current'] ?? 185),
-            'target' => (float)($nutritionData['carbs_target'] ?? 220),
-            'pct' => round(($nutritionData['carbs_current'] ?? 185) / ($nutritionData['carbs_target'] ?? 220) * 100) . '%',
+            'current' => (float)($nutritionData['carbs_current'] ?? 0),
+            'target' => (float)($nutritionData['carbs_target'] ?? 0),
+            'pct' => $nutritionData['carbs_target'] ? round(($nutritionData['carbs_current'] ?? 0) / $nutritionData['carbs_target'] * 100) . '%' : '0%',
         ],
         'fat' => [
-            'current' => (float)($nutritionData['fat_current'] ?? 58),
-            'target' => (float)($nutritionData['fat_target'] ?? 65),
-            'pct' => round(($nutritionData['fat_current'] ?? 58) / ($nutritionData['fat_target'] ?? 65) * 100) . '%',
+            'current' => (float)($nutritionData['fat_current'] ?? 0),
+            'target' => (float)($nutritionData['fat_target'] ?? 0),
+            'pct' => $nutritionData['fat_target'] ? round(($nutritionData['fat_current'] ?? 0) / $nutritionData['fat_target'] * 100) . '%' : '0%',
         ],
-    ];
+    ] : null;
 
-    $waterCount = $nutritionData ? (int)$nutritionData['water_glasses'] : 5;
+    $waterCount = $nutritionData ? (int)$nutritionData['water_glasses'] : 0;
 
-    $meals = [
-        ['name' => 'Breakfast', 'detail' => 'Oatmeal + eggs + banana · 520 kcal', 'color' => 'orange'],
-        ['name' => 'Lunch', 'detail' => 'Grilled chicken salad · 680 kcal', 'color' => 'blue'],
-        ['name' => 'Dinner', 'detail' => 'Salmon with quinoa · 420 kcal', 'color' => 'purple'],
-        ['name' => 'Snack', 'detail' => 'Protein shake + almonds · 160 kcal', 'color' => 'yellow'],
-    ];
-    $mealChecked = [
-        $nutritionData['breakfast_checked'] ?? 1,
-        $nutritionData['lunch_checked'] ?? 1,
-        $nutritionData['dinner_checked'] ?? 0,
-        $nutritionData['snack_checked'] ?? 1,
-    ];
+    $meals = [];
+    $mealChecked = [];
 
-    // Body metrics
     $metricStmt = $db->prepare("SELECT * FROM body_metrics WHERE user_id = ? ORDER BY log_date DESC LIMIT 1");
     $metricStmt->execute([$userId]);
     $metricsRow = $metricStmt->fetch();
@@ -457,18 +791,15 @@ function clientDashboard(): void {
         'bodyFat' => ['value' => (float)$metricsRow['body_fat_pct'], 'unit' => '%', 'change' => '-0.8%', 'direction' => 'down'],
         'muscle' => ['value' => (float)$metricsRow['muscle_kg'], 'unit' => 'kg', 'change' => '+0.3 kg', 'direction' => 'up'],
         'bmi' => ['value' => (float)$metricsRow['bmi'], 'unit' => '', 'change' => 'Normal', 'direction' => 'up'],
-    ] : [
-        'weight' => ['value' => 62.8, 'unit' => 'kg', 'change' => '-0.4 kg', 'direction' => 'down'],
-        'bodyFat' => ['value' => 21.3, 'unit' => '%', 'change' => '-0.8%', 'direction' => 'down'],
-        'muscle' => ['value' => 28.5, 'unit' => 'kg', 'change' => '+0.3 kg', 'direction' => 'up'],
-        'bmi' => ['value' => 23.1, 'unit' => '', 'change' => 'Normal', 'direction' => 'up'],
-    ];
+    ] : null;
 
-    // Achievements
-    $achStmt = $db->query("SELECT * FROM achievements ORDER BY sort_order");
-    $userAchStmt = $db->prepare("SELECT achievement_id FROM user_achievements WHERE user_id = ?");
-    $userAchStmt->execute([$userId]);
-    $userAchs = $userAchStmt->fetchAll(PDO::FETCH_COLUMN);
+    $achStmt = $db->prepare("
+        SELECT a.*, ua.achievement_id IS NOT NULL as unlocked
+        FROM achievements a
+        LEFT JOIN user_achievements ua ON ua.achievement_id = a.id AND ua.user_id = ?
+        ORDER BY a.sort_order
+    ");
+    $achStmt->execute([$userId]);
 
     $achievements = [];
     $colors = ['orange', 'yellow', 'blue', 'green', 'purple', 'cyan', 'pink', 'dim'];
@@ -477,11 +808,10 @@ function clientDashboard(): void {
             'label' => $a['label'],
             'icon' => $a['icon'] ?? 'Award',
             'color' => $colors[$i] ?? 'dim',
-            'locked' => !in_array($a['id'], $userAchs),
+            'locked' => !$a['unlocked'],
         ];
     }
 
-    // Activities
     $activityStmt = $db->prepare("SELECT * FROM activities WHERE user_id = ? ORDER BY created_at DESC LIMIT 10");
     $activityStmt->execute([$userId]);
     $activities = [];
@@ -496,12 +826,43 @@ function clientDashboard(): void {
         ];
     }
 
-    // Upcoming workout (schema does not have user_id in sessions)
-    $nextWorkout = null;
+    $nextWorkoutStmt = $db->prepare("
+        SELECT s.id, s.title, s.date, s.start_time, CONCAT(t.first_name, ' ', t.last_name) as trainer_name
+        FROM session_participants sp
+        JOIN sessions s ON s.id = sp.session_id AND s.status = 'scheduled' AND s.date >= CURDATE()
+        LEFT JOIN trainers t ON t.id = s.trainer_id
+        WHERE sp.user_id = ? AND sp.status = 'registered'
+        ORDER BY s.date ASC, s.start_time ASC LIMIT 1
+    ");
+    $nextWorkoutStmt->execute([$userId]);
+    $nextRow = $nextWorkoutStmt->fetch();
+    $nextWorkout = $nextRow ? [
+        'id' => (int)$nextRow['id'],
+        'title' => $nextRow['title'],
+        'date' => $nextRow['date'],
+        'time' => $nextRow['start_time'] ? date('H:i', strtotime($nextRow['start_time'])) : null,
+        'trainer' => $nextRow['trainer_name'] ?? 'Alex Rivera',
+    ] : null;
 
-    $userStmt = $db->prepare("SELECT first_name FROM users WHERE id = ?");
-    $userStmt->execute([$userId]);
-    $userName = $userStmt->fetchColumn() ?: 'Athlete';
+    $notifStmt = $db->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 10");
+    $notifStmt->execute([$userId]);
+    $notifications = [];
+    foreach ($notifStmt as $n) {
+        $notifications[] = [
+            'id' => (int)$n['id'],
+            'type' => $n['type'],
+            'title' => $n['title'],
+            'message' => $n['message'],
+            'icon' => $n['icon'],
+            'link' => $n['link'],
+            'read' => (bool)$n['is_read'],
+            'createdAt' => $n['created_at'],
+        ];
+    }
+
+    $userName = $db->prepare("SELECT first_name FROM users WHERE id = ?");
+    $userName->execute([$userId]);
+    $userName = $userName->fetchColumn() ?: 'Athlete';
 
     success([
         'userName' => $userName,
@@ -519,7 +880,7 @@ function clientDashboard(): void {
         'bodyMetrics' => $metrics,
         'achievements' => $achievements,
         'recentActivity' => $activities,
-        'notifications' => [],
+        'notifications' => $notifications,
         'nextWorkout' => $nextWorkout,
     ]);
 }

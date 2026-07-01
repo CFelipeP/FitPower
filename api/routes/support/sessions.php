@@ -68,6 +68,13 @@ function createSession(): void {
     $rules = [
         'title' => 'required|string|min:1|max:255',
         'date' => 'required|string',
+        'description' => 'string|max:2000',
+        'startTime' => 'string|max:10',
+        'endTime' => 'string|max:10',
+        'type' => 'in:group,1on1,video',
+        'status' => 'in:scheduled,completed,cancelled',
+        'rpe' => 'numeric|min_value:1|max_value:10',
+        'rpeNotes' => 'string|max:1000',
     ];
 
     $errors = validate($input, $rules);
@@ -128,6 +135,24 @@ function updateSession(string $id): void {
         error('Sesión no encontrada', 404);
     }
 
+    $validationRules = [];
+    if (isset($input['title'])) $validationRules['title'] = 'string|min:1|max:255';
+    if (isset($input['date'])) $validationRules['date'] = 'string';
+    if (isset($input['description'])) $validationRules['description'] = 'string|max:2000';
+    if (isset($input['startTime'])) $validationRules['startTime'] = 'string|max:10';
+    if (isset($input['endTime'])) $validationRules['endTime'] = 'string|max:10';
+    if (isset($input['type'])) $validationRules['type'] = 'in:group,1on1,video';
+    if (isset($input['status'])) $validationRules['status'] = 'in:scheduled,completed,cancelled';
+    if (isset($input['rpe'])) $validationRules['rpe'] = 'numeric|min_value:1|max_value:10';
+    if (isset($input['rpeNotes'])) $validationRules['rpeNotes'] = 'string|max:1000';
+
+    if ($validationRules) {
+        $errors = validate($input, $validationRules);
+        if ($errors) {
+            error('Error de validación', 422, $errors);
+        }
+    }
+
     $fieldMap = [
         'title' => 'title',
         'description' => 'description',
@@ -166,6 +191,11 @@ function updateSession(string $id): void {
             ->execute([$userId]);
         require_once __DIR__ . '/../gamification/achievements.php';
         checkAndUnlockAchievements();
+        $sessionStmt = $db->prepare("SELECT title FROM sessions WHERE id = ?");
+        $sessionStmt->execute([$id]);
+        $session = $sessionStmt->fetch();
+        require_once __DIR__ . '/../../helpers/activity.php';
+        logActivity($auth['sub'], 'workout', 'Sesión completada: ' . ($session['title'] ?? 'Session'), 'Dumbbell', '#10b981', 'Done', 'bg-success');
     }
 
     success(null, 'Sesión actualizada');

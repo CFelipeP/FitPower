@@ -77,6 +77,20 @@ function validate(array $data, array $rules): array {
                         $errors[$field][] = "El campo $field debe ser booleano";
                     }
                     break;
+
+                case 'min_value':
+                    $min = (float)($params[0] ?? 0);
+                    if (is_numeric($value) && (float)$value < $min) {
+                        $errors[$field][] = "El campo $field debe ser al menos $min";
+                    }
+                    break;
+
+                case 'max_value':
+                    $max = (float)($params[0] ?? 999999);
+                    if (is_numeric($value) && (float)$value > $max) {
+                        $errors[$field][] = "El campo $field no debe exceder $max";
+                    }
+                    break;
             }
         }
     }

@@ -1,0 +1,15 @@
+[Unit]
+Description=FitPower Push Notification Server
+After=network.target
+
+[Service]
+Type=simple
+User=fitpower
+WorkingDirectory=/home/fitpower/FitPower
+ExecStart=/usr/bin/node public/push-server.cjs
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

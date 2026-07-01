@@ -1,0 +1,2 @@
+[Mediasoup] worker pid: 27812
+[Mediasoup] signaling on ws://localhost:5181

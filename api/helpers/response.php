@@ -11,7 +11,7 @@ function success(mixed $data = null, string $message = 'OK', int $status = 200):
     jsonResponse([
         'success' => true,
         'message' => $message,
-        'data' => $data,
+        'data' => sanitizeOutput($data),
     ], $status);
 }
 
@@ -30,4 +30,14 @@ function getJsonInput(): array {
     $input = file_get_contents('php://input');
     $data = json_decode($input, true);
     return is_array($data) ? $data : [];
+}
+
+function sanitizeOutput($data) {
+    if (is_string($data)) return h($data);
+    if (is_array($data)) {
+        foreach ($data as $key => $value) {
+            $data[$key] = sanitizeOutput($value);
+        }
+    }
+    return $data;
 }
