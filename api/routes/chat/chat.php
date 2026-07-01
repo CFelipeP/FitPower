@@ -1,5 +1,5 @@
 <?php
-
+//prueba
 function listConversations(): void {
     $auth = requireAuth();
     $userId = $auth['sub'];
