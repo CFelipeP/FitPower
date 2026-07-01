@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FitPower - Completing sign in...</title>
+  <style>
+    body { margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; background: #0a0a0f; color: #fff; font-family: Arial, sans-serif; }
+    .spinner { width: 32px; height: 32px; border: 3px solid rgba(255,255,255,.1); border-top-color: #FFD600; border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    p { color: #888; text-align: center; }
+  </style>
+</head>
+<body>
+  <div style="text-align:center">
+    <div class="spinner"></div>
+    <p>Completing Google sign-in...</p>
+  </div>
+  <script>
+    (function() {
+      var params = new URLSearchParams(window.location.search);
+      var code = params.get('code');
+      var state = params.get('state');
+      var error = params.get('error');
+
+      if (error) { window.location.href = '/login?error=' + encodeURIComponent(error); return; }
+      if (!code || !state) { window.location.href = '/login?error=invalid_response'; return; }
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/auth/google/callback', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.onload = function() {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          if (data.success) {
+            localStorage.setItem('token', data.data.token);
+            if (data.data.refresh_token) localStorage.setItem('refresh_token', data.data.refresh_token);
+            if (data.data.csrf_token) localStorage.setItem('csrf_token', data.data.csrf_token);
+            if (data.data.user && data.data.user.role) localStorage.setItem('role', data.data.user.role);
+            window.location.href = '/client/dashboard';
+          } else {
+            window.location.href = '/login?error=' + encodeURIComponent(data.message || 'Login failed');
+          }
+        } catch(e) {
+          window.location.href = '/login?error=parse_error';
+        }
+      };
+      xhr.onerror = function() { window.location.href = '/login?error=connection_error'; };
+      xhr.send(JSON.stringify({ code: code, state: state }));
+    })();
+  </script>
+</body>
+</html>

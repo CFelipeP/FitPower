@@ -1,0 +1,241 @@
+.ar-container {
+  background: #13131a;
+  color: #fff;
+  padding: 24px;
+  font-family: var(--font-sans);
+  min-height: 100%;
+  border-radius: 16px;
+}
+
+.ar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ar-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ar-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f97316;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s;
+  font-family: inherit;
+}
+
+.ar-add-btn:hover {
+  background: #ea580c;
+}
+
+.ar-form {
+  background: #1a1a24;
+  border: 1px solid #2a2a35;
+  border-radius: 14px;
+  padding: 24px;
+}
+
+.ar-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ar-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ar-field label {
+  font-size: 13px;
+  color: #888;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ar-field label svg {
+  width: 14px;
+  height: 14px;
+  color: #555;
+}
+
+.ar-input {
+  background: #13131a;
+  border: 1px solid #2a2a35;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .2s;
+}
+
+.ar-input:focus {
+  border-color: #f97316;
+}
+
+.ar-input::placeholder {
+  color: #555;
+}
+
+.ar-input-sm {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.ar-exercises-section {
+  margin-bottom: 20px;
+}
+
+.ar-exercises-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.ar-exercises-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ccc;
+}
+
+.ar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid #2a2a35;
+  color: #888;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .2s;
+}
+
+.ar-btn:hover {
+  border-color: #555;
+  color: #fff;
+}
+
+.ar-btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.ar-exercise-row {
+  background: rgba(255,255,255,.02);
+  border: 1px solid #2a2a35;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+.ar-exercise-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ar-ex-name {
+  flex: 1;
+}
+
+.ar-remove-btn {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  transition: all .2s;
+}
+
+.ar-remove-btn:hover {
+  background: rgba(239,68,68,.1);
+}
+
+.ar-exercise-inputs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.ar-submit-btn {
+  width: 100%;
+  background: #f97316;
+  color: #fff;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s;
+  font-family: inherit;
+}
+
+.ar-submit-btn:hover {
+  background: #ea580c;
+}
+
+.ar-submit-btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.ar-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  gap: 12px;
+  color: #555;
+}
+
+.ar-placeholder svg {
+  opacity: .4;
+}
+
+.ar-placeholder p {
+  font-size: 15px;
+  margin: 0;
+  color: #888;
+}
+
+@media (max-width: 600px) {
+  .ar-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .ar-exercise-inputs {
+    grid-template-columns: 1fr;
+  }
+}

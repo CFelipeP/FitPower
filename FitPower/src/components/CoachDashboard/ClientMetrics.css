@@ -1,0 +1,152 @@
+.cm-container {
+  background: #13131a;
+  color: #fff;
+  padding: 24px;
+  font-family: var(--font-sans);
+  min-height: 100%;
+  border-radius: 16px;
+}
+
+.cm-header {
+  margin-bottom: 20px;
+}
+
+.cm-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cm-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.cm-summary-card {
+  background: #1a1a24;
+  border: 1px solid #2a2a35;
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.cm-summary-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #f97316;
+}
+
+.cm-summary-label {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.cm-chart-card {
+  background: #1a1a24;
+  border: 1px solid #2a2a35;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.cm-chart-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.cm-chart-header svg {
+  color: #f97316;
+}
+
+.cm-chart-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.cm-chart-svg {
+  width: 100%;
+  height: auto;
+  min-width: 400px;
+}
+
+.cm-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #888;
+  font-size: 14px;
+}
+
+.cm-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  gap: 12px;
+  color: #555;
+}
+
+.cm-empty svg {
+  opacity: .4;
+}
+
+.cm-empty p {
+  font-size: 15px;
+  margin: 0;
+  color: #888;
+}
+
+.cm-table-wrap {
+  overflow-x: auto;
+}
+
+.cm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.cm-table th {
+  text-align: left;
+  padding: 12px 16px;
+  color: #737373;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  border-bottom: 1px solid #2a2a35;
+}
+
+.cm-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  color: #d4d4d4;
+}
+
+.cm-table tbody tr:hover {
+  background: rgba(255,255,255,.02);
+}
+
+.cm-value-cell {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 600px) {
+  .cm-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

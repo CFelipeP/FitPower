@@ -1,0 +1,9 @@
+version: "2"
+authtoken: "PON_TU_TOKEN_AQUI"
+tunnels:
+  web:
+    proto: http
+    addr: 8080
+  turn:
+    proto: tcp
+    addr: 3478
