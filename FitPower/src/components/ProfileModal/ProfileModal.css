@@ -1,0 +1,161 @@
+.pm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pm-modal {
+    background: #13131a;
+    border: 1px solid #2a2a35;
+    border-radius: 16px;
+    width: 420px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.pm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 0;
+}
+
+.pm-header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: #fff;
+}
+
+.pm-close {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.pm-close:hover {
+    background: #2a2a35;
+    color: #fff;
+}
+
+.pm-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 60px 24px;
+    color: #888;
+}
+
+.pm-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid #2a2a35;
+    border-top-color: #f97316;
+    border-radius: 50%;
+    animation: pm-spin 0.8s linear infinite;
+}
+
+@keyframes pm-spin {
+    to { transform: rotate(360deg); }
+}
+
+.pm-form {
+    padding: 20px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.pm-avatar-section {
+    display: flex;
+    justify-content: center;
+}
+
+.pm-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #2a2a35;
+}
+
+.pm-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pm-field label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #888;
+}
+
+.pm-field input {
+    background: #1a1a24;
+    border: 1px solid #2a2a35;
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.pm-field input:focus {
+    border-color: #f97316;
+}
+
+.pm-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+.pm-btn {
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.pm-btn-cancel {
+    background: #2a2a35;
+    color: #888;
+}
+
+.pm-btn-cancel:hover {
+    background: #3a3a45;
+    color: #fff;
+}
+
+.pm-btn-save {
+    background: #f97316;
+    color: #fff;
+}
+
+.pm-btn-save:hover {
+    background: #ea580c;
+}
+
+.pm-btn-save:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

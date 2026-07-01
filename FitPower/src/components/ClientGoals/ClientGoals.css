@@ -1,0 +1,389 @@
+.cg-container {
+  background: #13131a;
+  color: #fff;
+  padding: 24px;
+  font-family: var(--font-sans);
+  min-height: 100%;
+  border-radius: 16px;
+}
+
+.cg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cg-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cg-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #f97316;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s;
+  font-family: inherit;
+}
+
+.cg-add-btn:hover {
+  background: #ea580c;
+}
+
+.cg-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #888;
+}
+
+.cg-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  gap: 8px;
+  color: #555;
+}
+
+.cg-empty svg {
+  opacity: .4;
+}
+
+.cg-empty p {
+  margin: 0;
+  font-size: 15px;
+  color: #888;
+}
+
+.cg-empty-sub {
+  font-size: 13px !important;
+  color: #666 !important;
+  margin-bottom: 8px !important;
+}
+
+.cg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .cg-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cg-card {
+  background: #1a1a24;
+  border: 1px solid #2a2a35;
+  border-radius: 14px;
+  padding: 20px;
+  transition: all .2s;
+}
+
+.cg-card:hover {
+  border-color: #3a3a45;
+}
+
+.cg-completed {
+  border-color: rgba(34,197,94,.3);
+  background: rgba(34,197,94,.03);
+}
+
+.cg-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.cg-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cg-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.cg-check-icon {
+  color: #22c55e;
+  flex-shrink: 0;
+}
+
+.cg-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.cg-action-btn {
+  background: transparent;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  display: flex;
+  transition: all .2s;
+}
+
+.cg-action-btn:hover {
+  color: #ccc;
+  background: rgba(255,255,255,.05);
+}
+
+.cg-delete-btn:hover {
+  color: #ef4444;
+}
+
+.cg-confirm-group {
+  display: flex;
+  gap: 4px;
+}
+
+.cg-confirm-yes {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.cg-confirm-no {
+  background: transparent;
+  border: 1px solid #2a2a35;
+  color: #888;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.cg-card-desc {
+  font-size: 13px;
+  color: #888;
+  margin: 0 0 14px;
+  line-height: 1.4;
+}
+
+.cg-progress-section {
+  margin-bottom: 12px;
+}
+
+.cg-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.cg-progress-value {
+  font-size: 13px;
+  color: #999;
+  font-variant-numeric: tabular-nums;
+}
+
+.cg-progress-pct {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f97316;
+}
+
+.cg-completed .cg-progress-pct {
+  color: #22c55e;
+}
+
+.cg-progress-track {
+  height: 6px;
+  background: rgba(255,255,255,.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.cg-progress-fill {
+  height: 100%;
+  background: #f97316;
+  border-radius: 3px;
+  transition: width .5s ease;
+}
+
+.cg-fill-done {
+  background: #22c55e;
+}
+
+.cg-card-footer {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cg-footer-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #666;
+}
+
+.cg-footer-item svg {
+  width: 12px;
+  height: 12px;
+}
+
+.cg-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cg-modal {
+  background: #1a1a24;
+  border: 1px solid #2a2a35;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 480px;
+  padding: 28px;
+  animation: cg-modal-in .25s ease;
+}
+
+@keyframes cg-modal-in {
+  from { opacity: 0; transform: scale(.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.cg-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.cg-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cg-modal-close {
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  transition: color .2s;
+}
+
+.cg-modal-close:hover {
+  color: #fff;
+}
+
+.cg-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.cg-field label {
+  font-size: 13px;
+  color: #888;
+  font-weight: 500;
+}
+
+.cg-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.cg-input {
+  background: #13131a;
+  border: 1px solid #2a2a35;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .2s;
+}
+
+.cg-input:focus {
+  border-color: #f97316;
+}
+
+.cg-input::placeholder {
+  color: #555;
+}
+
+.cg-input textarea {
+  resize: vertical;
+}
+
+.cg-submit-btn {
+  background: #f97316;
+  color: #fff;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s;
+  font-family: inherit;
+  margin-top: 4px;
+}
+
+.cg-submit-btn:hover {
+  background: #ea580c;
+}
+
+.cg-submit-btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}

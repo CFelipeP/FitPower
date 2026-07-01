@@ -1,0 +1,11 @@
+.payment-result { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; background: var(--bg); }
+.payment-result-card { text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 48px 32px; max-width: 420px; width: 100%; }
+.payment-result-icon { margin-bottom: 16px; }
+.payment-result-icon.success { color: #22c55e; }
+.payment-result-icon.cancelled { color: #ef4444; }
+.payment-result-card h1 { font-size: 24px; font-weight: 700; color: var(--text-primary); margin: 0 0 8px; }
+.payment-result-card p { font-size: 15px; color: var(--text-secondary); margin: 0 0 24px; line-height: 1.5; }
+.payment-result-btn { display: inline-flex; align-items: center; gap: 6px; padding: 12px 32px; background: var(--power-500); color: #000; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 15px; }
+.payment-result-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.spin { animation: spin 0.8s linear infinite; }

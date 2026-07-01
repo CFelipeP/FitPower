@@ -1,0 +1,253 @@
+.wl-workout-logs {
+    background: #13131a;
+    color: #fff;
+    min-height: 100vh;
+    padding: 24px 16px;
+    font-family: var(--font-sans);
+}
+
+.wl-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.wl-title {
+    font-size: 20px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.wl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: var(--font-sans);
+}
+
+.wl-btn-primary {
+    background: var(--power-500, #ffd600);
+    color: #000;
+}
+.wl-btn-primary:hover { filter: brightness(1.1); }
+.wl-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+.wl-btn-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+    background: rgba(255,255,255,.08);
+    color: #ccc;
+}
+.wl-btn-sm:hover { background: rgba(255,255,255,.15); }
+
+.wl-btn-icon {
+    background: none;
+    border: none;
+    color: #737373;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+}
+.wl-btn-icon:hover { color: #fff; background: rgba(255,255,255,.1); }
+
+.wl-btn-full {
+    width: 100%;
+    justify-content: center;
+    padding: 12px;
+    font-size: 14px;
+    margin-top: 8px;
+}
+
+/* ── Form ── */
+.wl-form {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 24px;
+}
+
+.wl-form-group { margin-bottom: 16px; }
+
+.wl-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #a3a3a3;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 6px;
+}
+
+.wl-select {
+    width: 100%;
+    padding: 10px 12px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    font-family: var(--font-sans);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px;
+}
+.wl-select:focus { outline: none; border-color: var(--power-500, #ffd600); }
+
+.wl-input {
+    padding: 8px 10px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 13px;
+    font-family: var(--font-sans);
+    width: 100%;
+}
+.wl-input:focus { outline: none; border-color: var(--power-500, #ffd600); }
+
+/* Exercise rows */
+.wl-exercises-section { margin-bottom: 16px; }
+.wl-exercises-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.wl-exercise-row {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.04);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+}
+
+.wl-exercise-row-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.wl-exercise-select { flex: 1; }
+
+.wl-exercise-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.wl-notes { margin-top: 6px; }
+
+/* ── Log List ── */
+.wl-log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.wl-log-item {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.04);
+    border-radius: 10px;
+    padding: 14px;
+    transition: background .15s;
+}
+.wl-log-item:hover { background: rgba(255,255,255,.05); }
+
+.wl-log-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.wl-log-exercise {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.wl-log-meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.wl-log-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(255,214,0,.1);
+    color: var(--power-500, #ffd600);
+    font-weight: 600;
+}
+
+.wl-log-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: #737373;
+}
+
+.wl-log-date { color: #a3a3a3; }
+.wl-log-session {
+    padding: 1px 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,.05);
+    color: #ccc;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wl-log-notes {
+    font-size: 12px;
+    color: #737373;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,.05);
+    font-style: italic;
+}
+
+.wl-loading, .wl-empty {
+    text-align: center;
+    color: #737373;
+    padding: 48px 16px;
+    font-size: 14px;
+}
+
+.wl-pagination {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 20px;
+}
+
+/* ── Mobile ── */
+@media (max-width: 480px) {
+    .wl-workout-logs { padding: 16px 12px; }
+    .wl-title { font-size: 18px; }
+    .wl-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .wl-exercise-inputs { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    .wl-log-main { flex-direction: column; align-items: flex-start; }
+    .wl-log-right { margin-top: 4px; }
+    .wl-log-badge { font-size: 10px; padding: 1px 6px; }
+}

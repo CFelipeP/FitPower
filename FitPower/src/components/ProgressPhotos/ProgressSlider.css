@@ -1,0 +1,114 @@
+.ps-container {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.ps-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  background: #1a1a24;
+  border: 1px solid #2a2a35;
+  border-radius: 14px;
+  color: #888;
+  font-size: 14px;
+}
+
+.ps-slider {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4/3;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #13131a;
+  user-select: none;
+  cursor: col-resize;
+}
+
+.ps-image {
+  position: absolute;
+  inset: 0;
+}
+
+.ps-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+.ps-before {
+  z-index: 2;
+}
+
+.ps-after {
+  z-index: 1;
+}
+
+.ps-label {
+  position: absolute;
+  top: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 4px 12px;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.ps-label-before {
+  left: 16px;
+  background: rgba(0,0,0,.6);
+  color: #fff;
+}
+
+.ps-label-after {
+  right: 16px;
+  background: #f97316;
+  color: #fff;
+}
+
+.ps-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  z-index: 3;
+  transform: translateX(-50%);
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ps-handle-line {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #fff;
+  box-shadow: 0 0 8px rgba(0,0,0,.5);
+}
+
+.ps-handle-knob {
+  width: 40px;
+  height: 40px;
+  background: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 12px rgba(0,0,0,.4);
+  z-index: 1;
+  color: #111;
+}
+
+.ps-handle-knob svg {
+  width: 18px;
+  height: 18px;
+}

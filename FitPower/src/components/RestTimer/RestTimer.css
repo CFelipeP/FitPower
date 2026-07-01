@@ -1,0 +1,132 @@
+.rt-container {
+  background: #1a1a24;
+  border: 1px solid #2a2a35;
+  border-radius: 14px;
+  padding: 20px;
+  font-family: var(--font-sans);
+  color: #fff;
+  max-width: 280px;
+}
+
+.rt-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  color: #ccc;
+}
+
+.rt-header svg {
+  color: #f97316;
+}
+
+.rt-presets {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.rt-preset-btn {
+  background: rgba(255,255,255,.04);
+  border: 1px solid #2a2a35;
+  color: #bbb;
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .2s;
+}
+
+.rt-preset-btn:hover {
+  background: rgba(255,255,255,.08);
+  color: #fff;
+}
+
+.rt-preset-btn.rt-active {
+  background: #f97316;
+  border-color: #f97316;
+  color: #fff;
+}
+
+.rt-timer-display {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.rt-ring {
+  width: 120px;
+  height: 120px;
+}
+
+.rt-ring-bg {
+  fill: none;
+  stroke: rgba(255,255,255,.06);
+  stroke-width: 6;
+}
+
+.rt-ring-fill {
+  fill: none;
+  stroke: #f97316;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear;
+}
+
+.rt-time {
+  position: absolute;
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.rt-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.rt-ctrl-btn {
+  width: 44px;
+  height: 44px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid #2a2a35;
+  color: #ccc;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+  font-family: inherit;
+}
+
+.rt-ctrl-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,.12);
+  color: #fff;
+}
+
+.rt-ctrl-btn:disabled {
+  opacity: .3;
+  cursor: not-allowed;
+}
+
+.rt-idle {
+  text-align: center;
+  padding: 16px 0;
+}
+
+.rt-idle p {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+}

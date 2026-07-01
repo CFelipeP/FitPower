@@ -1,0 +1,77 @@
+.test-grid {
+    display: grid;
+    gap: 24px;
+}
+
+@media (min-width: 768px) {
+    .test-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .test-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.testimonial-card {
+    background: rgba(20, 20, 20, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-2xl);
+    padding: 32px;
+    transition: border-color 0.4s ease;
+}
+
+.testimonial-card:hover {
+    border-color: rgba(255, 214, 0, 0.3);
+}
+
+.stars {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+}
+
+.star-icon {
+    color: var(--power-500);
+}
+
+.test-text {
+    color: #d4d4d4;
+    font-weight: 300;
+    line-height: 1.6;
+    margin-bottom: 32px;
+    font-size: 14px;
+}
+
+.test-author {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.test-img {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 214, 0, 0.3);
+}
+
+.test-name {
+    font-weight: 600;
+    color: white;
+    font-size: 14px;
+}
+
+.test-sub {
+    color: #737373;
+    font-size: 12px;
+}
+
+.section-intro { margin-bottom: 64px; }
+
+@media (max-width: 480px) {
+    .section-intro { margin-bottom: 32px; }
+}

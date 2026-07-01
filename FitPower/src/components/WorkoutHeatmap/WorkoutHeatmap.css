@@ -1,0 +1,176 @@
+.wh-container {
+  background: #13131a;
+  color: #fff;
+  padding: 24px;
+  font-family: var(--font-sans);
+  border-radius: 16px;
+}
+
+.wh-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.wh-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wh-year-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wh-year-btn {
+  background: transparent;
+  border: 1px solid #2a2a35;
+  color: #888;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  transition: all .2s;
+  font-family: inherit;
+}
+
+.wh-year-btn:hover:not(:disabled) {
+  border-color: #555;
+  color: #fff;
+}
+
+.wh-year-btn:disabled {
+  opacity: .3;
+  cursor: not-allowed;
+}
+
+.wh-year-label {
+  font-size: 16px;
+  font-weight: 700;
+  min-width: 50px;
+  text-align: center;
+}
+
+.wh-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #888;
+  font-size: 14px;
+}
+
+.wh-heatmap-wrap {
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.wh-heatmap {
+  display: flex;
+  gap: 6px;
+  min-width: 700px;
+}
+
+.wh-day-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 20px;
+}
+
+.wh-day-label {
+  font-size: 10px;
+  color: #555;
+  height: 14px;
+  line-height: 14px;
+  text-align: right;
+  padding-right: 4px;
+}
+
+.wh-grid {
+  flex: 1;
+}
+
+.wh-month-labels {
+  display: grid;
+  grid-template-columns: repeat(53, 1fr);
+  margin-bottom: 4px;
+}
+
+.wh-month-label {
+  font-size: 10px;
+  color: #555;
+  font-weight: 600;
+}
+
+.wh-cells {
+  display: flex;
+  gap: 3px;
+}
+
+.wh-week {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.wh-cell {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+
+.wh-cell:hover {
+  opacity: .7;
+}
+
+.wh-has-data {
+  border: 1px solid rgba(255,255,255,.05);
+}
+
+.wh-tooltip {
+  background: #1a1a24;
+  border: 1px solid #2a2a35;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #ccc;
+  display: inline-block;
+  margin-top: 12px;
+  min-height: 36px;
+}
+
+.wh-tooltip-idle {
+  color: #555;
+  font-style: italic;
+}
+
+.wh-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+
+.wh-legend-label {
+  font-size: 11px;
+  color: #555;
+  margin: 0 4px;
+}
+
+.wh-legend-cell {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}

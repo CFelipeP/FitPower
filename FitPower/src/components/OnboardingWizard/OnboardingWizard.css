@@ -1,0 +1,527 @@
+/* ═══════════════════════════════════
+   OnboardingWizard — Multi-step wizard
+   ═══════════════════════════════════ */
+
+.ow-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    padding: 24px;
+}
+
+.ow-card {
+    width: 100%;
+    max-width: 600px;
+    background: #111;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Progress ── */
+.ow-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 40px;
+}
+
+.ow-progress-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ow-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    transition: all 0.5s ease;
+}
+
+.ow-dot.active {
+    background: var(--power-500);
+    box-shadow: 0 0 14px rgba(255, 214, 0, 0.4);
+}
+
+.ow-dot.done {
+    background: #22c55e;
+}
+
+.ow-line {
+    width: 48px;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    transition: background 0.5s ease;
+}
+
+.ow-line.active {
+    background: var(--power-500);
+}
+
+/* ── Step Transitions ── */
+.ow-step {
+    animation: owFadeIn 0.4s ease both;
+}
+
+.ow-step-next {
+    animation: owSlideInRight 0.4s ease both;
+}
+
+.ow-step-prev {
+    animation: owSlideInLeft 0.4s ease both;
+}
+
+@keyframes owFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes owSlideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(40px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes owSlideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-40px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* ── Header ── */
+.ow-header {
+    margin-bottom: 32px;
+}
+
+.ow-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 24px;
+    letter-spacing: -0.03em;
+    color: white;
+    margin: 0 0 8px;
+}
+
+.ow-title-center {
+    text-align: center;
+}
+
+.ow-desc {
+    color: #a3a3a3;
+    font-size: 14px;
+    margin: 0;
+}
+
+.ow-desc-center {
+    text-align: center;
+}
+
+/* ── Grid ── */
+.ow-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.ow-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+/* ── Goal Cards ── */
+.ow-option-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 20px;
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    background: transparent;
+    color: #a3a3a3;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: var(--font-sans);
+    text-align: left;
+}
+
+.ow-option-card:hover {
+    border-color: rgba(255, 214, 0, 0.3);
+    color: white;
+    background: rgba(255, 214, 0, 0.03);
+}
+
+.ow-option-card.selected {
+    border-color: rgba(255, 214, 0, 0.5);
+    background: rgba(255, 214, 0, 0.08);
+    color: var(--power-500);
+}
+
+.ow-option-card.selected .ow-option-icon {
+    color: var(--power-500);
+}
+
+.ow-option-icon {
+    color: #737373;
+    transition: color 0.3s ease;
+}
+
+.ow-option-label {
+    font-weight: 600;
+    font-size: 14px;
+    color: inherit;
+}
+
+.ow-option-desc {
+    font-size: 12px;
+    color: #737373;
+    line-height: 1.4;
+}
+
+.ow-option-card.selected .ow-option-desc {
+    color: rgba(255, 214, 0, 0.6);
+}
+
+/* ── Level Rows (radio style) ── */
+.ow-option-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: var(--font-sans);
+    text-align: left;
+    width: 100%;
+    color: #a3a3a3;
+}
+
+.ow-option-row:hover {
+    border-color: rgba(255, 214, 0, 0.3);
+    color: white;
+}
+
+.ow-option-row.selected {
+    border-color: rgba(255, 214, 0, 0.5);
+    background: rgba(255, 214, 0, 0.08);
+    color: var(--power-500);
+}
+
+.ow-option-radio {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.ow-option-row.selected .ow-option-radio {
+    border-color: var(--power-500);
+}
+
+.ow-radio-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--power-500);
+    animation: owPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes owPop {
+    0% {
+        transform: scale(0);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.ow-option-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ow-option-row .ow-option-desc {
+    color: #737373;
+}
+
+.ow-option-row.selected .ow-option-desc {
+    color: rgba(255, 214, 0, 0.6);
+}
+
+/* ── Days Selector ── */
+.ow-days-grid {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 16px;
+}
+
+.ow-day-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 72px;
+    border-radius: 14px;
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: var(--font-sans);
+    gap: 2px;
+}
+
+.ow-day-btn:hover {
+    border-color: rgba(255, 214, 0, 0.3);
+    background: rgba(255, 214, 0, 0.03);
+}
+
+.ow-day-btn.selected {
+    border-color: rgba(255, 214, 0, 0.5);
+    background: rgba(255, 214, 0, 0.1);
+}
+
+.ow-day-num {
+    font-size: 22px;
+    font-weight: 700;
+    color: #a3a3a3;
+    transition: color 0.3s ease;
+}
+
+.ow-day-btn:hover .ow-day-num {
+    color: white;
+}
+
+.ow-day-btn.selected .ow-day-num {
+    color: var(--power-500);
+}
+
+.ow-day-label {
+    font-size: 10px;
+    color: #525252;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ow-day-btn.selected .ow-day-label {
+    color: var(--power-500);
+}
+
+.ow-days-hint {
+    text-align: center;
+    font-size: 13px;
+    color: #737373;
+    margin-bottom: 24px;
+    min-height: 20px;
+}
+
+/* ── Summary ── */
+.ow-summary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.ow-check-circle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(34, 197, 94, 0.15);
+    border: 2px solid #22c55e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #22c55e;
+    margin-bottom: 24px;
+    animation: owPop 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
+.ow-summary-card {
+    width: 100%;
+    background: rgba(13, 13, 13, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 32px;
+}
+
+.ow-summary-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+}
+
+.ow-summary-label {
+    color: #737373;
+    font-size: 13px;
+    min-width: 72px;
+}
+
+.ow-summary-value {
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    flex: 1;
+    text-transform: capitalize;
+}
+
+.ow-summary-icon {
+    color: #525252;
+}
+
+.ow-goal-icon {
+    color: var(--power-500);
+}
+
+.ow-summary-divider {
+    width: 100%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* ── Submit ── */
+.ow-submit-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 16px 0;
+    border-radius: var(--radius-full);
+    border: none;
+    background: var(--power-500);
+    color: black;
+    font-weight: 700;
+    font-size: 15px;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 40px rgba(255, 214, 0, 0.3);
+}
+
+.ow-submit-btn:hover {
+    background: var(--power-400);
+    transform: scale(1.02);
+}
+
+.ow-submit-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ── Navigation ── */
+.ow-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+}
+
+.ow-nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 24px;
+    border-radius: var(--radius-full);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    background: transparent;
+    color: #a3a3a3;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.ow-nav-btn:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.ow-next {
+    background: rgba(255, 214, 0, 0.1);
+    border-color: rgba(255, 214, 0, 0.3);
+    color: var(--power-500);
+}
+
+.ow-next:hover {
+    background: rgba(255, 214, 0, 0.2);
+    border-color: var(--power-500);
+}
+
+/* ── Spinner ── */
+.ow-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(0, 0, 0, 0.3);
+    border-top-color: black;
+    border-radius: 50%;
+    animation: owSpin 0.6s linear infinite;
+}
+
+@keyframes owSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (max-width: 768px) {
+    .ow-card { padding: 28px 20px; }
+    .ow-days-grid { flex-wrap: wrap; justify-content: center; gap: 8px; }
+    .ow-day-btn { width: 48px; height: 60px; font-size: 14px; }
+    .ow-grid-2 { grid-template-columns: 1fr; gap: 10px; }
+    .ow-level-btn { padding: 14px 12px; font-size: 14px; }
+    .ow-goal-btn { padding: 14px 12px; }
+    .ow-title { font-size: 20px; }
+    .ow-subtitle { font-size: 14px; }
+}
+@media (max-width: 480px) {
+    .ow-card { padding: 22px 14px; }
+    .ow-overlay { padding: 12px; }
+    .ow-day-btn { width: 40px; height: 54px; font-size: 12px; }
+    .ow-days-grid { gap: 6px; }
+    .ow-title { font-size: 18px; }
+    .ow-steps { padding: 0 8px; }
+    .ow-nav { padding: 14px; flex-direction: column; gap: 8px; }
+    .ow-nav-btn, .ow-submit-btn { width: 100%; }
+}

@@ -1,0 +1,108 @@
+.driver-tour-fab {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    width: 48px;
+    height: 48px;
+    border: 2px solid #ffd700;
+    border-radius: 50%;
+    background: #000;
+    color: #ffd700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.4), 0 0 32px rgba(255, 215, 0, 0.15);
+    transition: transform .2s, box-shadow .2s;
+}
+
+.driver-tour-fab:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 24px rgba(255, 215, 0, 0.6), 0 0 48px rgba(255, 215, 0, 0.25);
+}
+
+.driver-popover.driver-tour-theme {
+    background: #0d0d0d !important;
+    border: 1.5px solid #ffd700 !important;
+    border-radius: 12px !important;
+    box-shadow:
+        0 0 12px rgba(255, 215, 0, 0.35),
+        0 0 30px rgba(255, 215, 0, 0.12),
+        0 8px 32px rgba(0, 0, 0, 0.8) !important;
+}
+
+.driver-tour-theme .driver-popover-title {
+    color: #ffd700 !important;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.driver-tour-theme .driver-popover-description {
+    color: #ffd700 !important;
+    font-size: 13px;
+    line-height: 1.6;
+    opacity: 0.9;
+}
+
+.driver-tour-theme .driver-popover-close-btn {
+    color: #ffd700 !important;
+    font-size: 18px;
+    opacity: 0.7;
+    transition: opacity .2s;
+}
+
+.driver-tour-theme .driver-popover-close-btn:hover {
+    opacity: 1;
+}
+
+.driver-tour-theme .driver-popover-progress-text {
+    color: #ffd700 !important;
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.7;
+}
+
+.driver-tour-theme .driver-popover-arrow {
+    color: #0d0d0d !important;
+    filter: drop-shadow(1px 1px 2px rgba(255, 215, 0, 0.4));
+}
+
+.driver-tour-theme .driver-popover-footer button {
+    font-weight: 600;
+    border-radius: 6px;
+}
+
+.driver-tour-theme .driver-popover-footer button:first-child {
+    background: transparent !important;
+    color: #ffd700 !important;
+    border: 1px solid #ffd700 !important;
+}
+
+.driver-tour-theme .driver-popover-footer button:last-child {
+    background: #ffd700 !important;
+    color: #000 !important;
+    border: 1px solid #ffd700 !important;
+}
+
+@media (max-width: 768px) {
+    .driver-popover.driver-tour-theme {
+        max-width: calc(100vw - 24px) !important;
+        min-width: 200px !important;
+        margin: 0 12px;
+        border-radius: 10px !important;
+    }
+
+    .driver-tour-theme .driver-popover-title {
+        font-size: 14px !important;
+    }
+
+    .driver-tour-theme .driver-popover-description {
+        font-size: 12px !important;
+    }
+
+    .driver-tour-theme .driver-popover-footer button {
+        font-size: 11px !important;
+        padding: 6px 10px !important;
+    }
+}
