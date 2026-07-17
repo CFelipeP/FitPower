@@ -699,6 +699,11 @@ route('/admin/users/batch/activate', ['method' => 'POST', 'handler' => function(
     adminBatchActivate();
 }]);
 
+route('/admin/users/batch/delete', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/users/users.php';
+    adminBatchDelete();
+}]);
+
 // --- Admin Subscription Management Routes ---
 route('/admin/subscriptions', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/finance/subscriptions.php';

@@ -90,6 +90,10 @@ export default function AdminUsers() {
             if (type === 'delete') {
                 await apiFetch(`/admin/users/${user.id}`, { method: 'DELETE' })
                 showToast('User deleted')
+            } else if (type === 'batch-delete') {
+                await apiFetch('/admin/users/batch/delete', { method: 'POST', body: JSON.stringify({ ids: selected }) })
+                showToast(`${selected.length} users deleted`)
+                setSelected([])
             } else if (type === 'suspend') {
                 const newStatus = user.status === 'suspended' ? 'active' : 'suspended'
                 await apiFetch(`/admin/users/${user.id}`, { method: 'PUT', body: JSON.stringify({ status: newStatus }) })
@@ -129,6 +133,7 @@ export default function AdminUsers() {
                         <>
                             <button className="ad-btn ad-btn-primary ad-btn-xs" onClick={() => batchAction('activate')}><Check size={14} /> Activate ({selected.length})</button>
                             <button className="ad-btn ad-btn-danger ad-btn-xs" onClick={() => batchAction('suspend')}><Ban size={14} /> Suspend ({selected.length})</button>
+                            <button className="ad-btn ad-btn-danger ad-btn-xs" style={{ background: '#991b1b' }} onClick={() => setConfirmAction({ type: 'batch-delete', user: null })}><Trash2 size={14} /> Delete ({selected.length})</button>
                         </>
                     )}
                 </div>
@@ -229,6 +234,17 @@ export default function AdminUsers() {
                                     <span style={{ color: '#ef4444', fontSize: 13 }}>Esta acción no se puede deshacer.</span>
                                 </p>
                             </>
+                        ) : confirmAction.type === 'batch-delete' ? (
+                            <>
+                                <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(239,68,68,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                                    <AlertTriangle size={32} color="#ef4444" />
+                                </div>
+                                <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>Eliminar {selected.length} usuarios</h3>
+                                <p style={{ color: '#a3a3a3', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+                                    ¿Eliminar permanentemente <strong style={{ color: '#fff' }}>{selected.length} usuarios seleccionados</strong>?<br />
+                                    <span style={{ color: '#ef4444', fontSize: 13 }}>Esta acción no se puede deshacer.</span>
+                                </p>
+                            </>
                         ) : (
                             <>
                                 <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(245,158,11,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
@@ -248,7 +264,7 @@ export default function AdminUsers() {
                             <button
                                 className="ad-btn"
                                 style={{
-                                    background: confirmAction.type === 'delete' ? '#dc2626' : undefined,
+                                    background: confirmAction.type === 'delete' || confirmAction.type === 'batch-delete' ? '#dc2626' : undefined,
                                     color: '#fff',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -256,8 +272,8 @@ export default function AdminUsers() {
                                 }}
                                 onClick={executeConfirmAction}
                             >
-                                {confirmAction.type === 'delete' && <Trash2 size={14} />}
-                                {confirmAction.type === 'delete' ? 'Eliminar' : confirmAction.user?.status === 'suspended' ? 'Reactivar' : 'Suspender'}
+                                {(confirmAction.type === 'delete' || confirmAction.type === 'batch-delete') && <Trash2 size={14} />}
+                                {confirmAction.type === 'batch-delete' ? `Eliminar ${selected.length}` : confirmAction.type === 'delete' ? 'Eliminar' : confirmAction.user?.status === 'suspended' ? 'Reactivar' : 'Suspender'}
                             </button>
                         </div>
                     </div>
