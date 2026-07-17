@@ -228,10 +228,10 @@ export default function AdminUsers() {
                                 <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(239,68,68,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                                     <AlertTriangle size={32} color="#ef4444" />
                                 </div>
-                                <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>Eliminar usuario</h3>
+                                <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>Delete User</h3>
                                 <p style={{ color: '#a3a3a3', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
-                                    ¿Eliminar permanentemente a <strong style={{ color: '#fff' }}>{confirmAction.user?.firstName} {confirmAction.user?.lastName}</strong> ({confirmAction.user?.email})?<br />
-                                    <span style={{ color: '#ef4444', fontSize: 13 }}>Esta acción no se puede deshacer.</span>
+                                    Are you sure you want to permanently delete <strong style={{ color: '#fff' }}>{confirmAction.user?.firstName} {confirmAction.user?.lastName}</strong> ({confirmAction.user?.email})?<br />
+                                    <span style={{ color: '#ef4444', fontSize: 13 }}>This action cannot be undone.</span>
                                 </p>
                             </>
                         ) : confirmAction.type === 'batch-delete' ? (
@@ -239,10 +239,10 @@ export default function AdminUsers() {
                                 <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(239,68,68,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                                     <AlertTriangle size={32} color="#ef4444" />
                                 </div>
-                                <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>Eliminar {selected.length} usuarios</h3>
+                                <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>Delete {selected.length} Users</h3>
                                 <p style={{ color: '#a3a3a3', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
-                                    ¿Eliminar permanentemente <strong style={{ color: '#fff' }}>{selected.length} usuarios seleccionados</strong>?<br />
-                                    <span style={{ color: '#ef4444', fontSize: 13 }}>Esta acción no se puede deshacer.</span>
+                                    Are you sure you want to permanently delete <strong style={{ color: '#fff' }}>{selected.length} selected users</strong>?<br />
+                                    <span style={{ color: '#ef4444', fontSize: 13 }}>This action cannot be undone.</span>
                                 </p>
                             </>
                         ) : (
@@ -251,16 +251,16 @@ export default function AdminUsers() {
                                     <AlertTriangle size={32} color="#f59e0b" />
                                 </div>
                                 <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>
-                                    {confirmAction.user?.status === 'suspended' ? 'Reactivar' : 'Suspender'} usuario
+                                    {confirmAction.user?.status === 'suspended' ? 'Reactivate' : 'Suspend'} User
                                 </h3>
                                 <p style={{ color: '#a3a3a3', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
-                                    ¿{confirmAction.user?.status === 'suspended' ? 'Reactivar' : 'Suspender'} a <strong style={{ color: '#fff' }}>{confirmAction.user?.firstName} {confirmAction.user?.lastName}</strong>?
-                                    {confirmAction.user?.status !== 'suspended' && <><br /><span style={{ color: '#f59e0b', fontSize: 13 }}>El usuario no podrá acceder a la plataforma.</span></>}
+                                    Are you sure you want to {confirmAction.user?.status === 'suspended' ? 'reactivate' : 'suspend'} <strong style={{ color: '#fff' }}>{confirmAction.user?.firstName} {confirmAction.user?.lastName}</strong>?
+                                    {confirmAction.user?.status !== 'suspended' && <><br /><span style={{ color: '#f59e0b', fontSize: 13 }}>The user will not be able to access the platform.</span></>}
                                 </p>
                             </>
                         )}
                         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                            <button className="ad-btn ad-btn-secondary" onClick={() => setConfirmAction(null)}>Cancelar</button>
+                            <button className="ad-btn ad-btn-secondary" onClick={() => setConfirmAction(null)}>Cancel</button>
                             <button
                                 className="ad-btn"
                                 style={{
@@ -273,7 +273,7 @@ export default function AdminUsers() {
                                 onClick={executeConfirmAction}
                             >
                                 {(confirmAction.type === 'delete' || confirmAction.type === 'batch-delete') && <Trash2 size={14} />}
-                                {confirmAction.type === 'batch-delete' ? `Eliminar ${selected.length}` : confirmAction.type === 'delete' ? 'Eliminar' : confirmAction.user?.status === 'suspended' ? 'Reactivar' : 'Suspender'}
+                                {confirmAction.type === 'batch-delete' ? `Delete ${selected.length}` : confirmAction.type === 'delete' ? 'Delete' : confirmAction.user?.status === 'suspended' ? 'Reactivate' : 'Suspend'}
                             </button>
                         </div>
                     </div>

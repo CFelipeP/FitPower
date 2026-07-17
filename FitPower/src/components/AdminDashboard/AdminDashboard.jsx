@@ -1308,18 +1308,18 @@ export default function AdminDashboard() {
                         <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(239,68,68,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                             <AlertTriangle size={32} color="#ef4444" />
                         </div>
-                        <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>Eliminar usuario</h3>
+                        <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>Delete User</h3>
                         <p style={{ color: '#a3a3a3', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
-                            ¿Eliminar permanentemente a <strong style={{ color: '#fff' }}>{confirmDeleteUser.firstName} {confirmDeleteUser.lastName}</strong> ({confirmDeleteUser.email})?<br />
-                            <span style={{ color: '#ef4444', fontSize: 13 }}>Esta acción no se puede deshacer.</span>
+                            Are you sure you want to permanently delete <strong style={{ color: '#fff' }}>{confirmDeleteUser.firstName} {confirmDeleteUser.lastName}</strong> ({confirmDeleteUser.email})?<br />
+                            <span style={{ color: '#ef4444', fontSize: 13 }}>This action cannot be undone.</span>
                         </p>
                         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                            <button className="ad-btn ad-btn-secondary" onClick={() => setConfirmDeleteUser(null)}>Cancelar</button>
+                            <button className="ad-btn ad-btn-secondary" onClick={() => setConfirmDeleteUser(null)}>Cancel</button>
                             <button className="ad-btn ad-btn-danger" style={{ background: '#dc2626', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => {
                                 apiFetch('/admin/users/' + confirmDeleteUser.id, { method: 'DELETE' })
                                     .then(() => { showToast('User deleted'); setConfirmDeleteUser(null); closeModal(); fetchUsers(usersPage, usersSearch) })
                                     .catch(err => { showToast(err.message || 'Error'); setConfirmDeleteUser(null) })
-                            }}><Trash2 size={14} /> Eliminar</button>
+                            }}><Trash2 size={14} /> Delete</button>
                         </div>
                     </div>
                 </div>
@@ -1333,19 +1333,19 @@ export default function AdminDashboard() {
                         {(() => {
                             const isSuspended = confirmSuspendUser?.status === 'suspended'
                             return (<>
-                                <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>{isSuspended ? 'Reactivar' : 'Suspender'} usuario</h3>
+                                <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>{isSuspended ? 'Reactivate' : 'Suspend'} User</h3>
                                 <p style={{ color: '#a3a3a3', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
-                                    ¿{isSuspended ? 'Reactivar' : 'Suspender'} a <strong style={{ color: '#fff' }}>{confirmSuspendUser?.firstName} {confirmSuspendUser?.lastName}</strong>?
-                                    {isSuspended ? null : <><br /><span style={{ color: '#f59e0b', fontSize: 13 }}>El usuario no podrá acceder a la plataforma.</span></>}
+                                    Are you sure you want to {isSuspended ? 'reactivate' : 'suspend'} <strong style={{ color: '#fff' }}>{confirmSuspendUser?.firstName} {confirmSuspendUser?.lastName}</strong>?
+                                    {isSuspended ? null : <><br /><span style={{ color: '#f59e0b', fontSize: 13 }}>The user will not be able to access the platform.</span></>}
                                 </p>
                                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                                    <button className="ad-btn ad-btn-secondary" onClick={() => setConfirmSuspendUser(null)}>Cancelar</button>
+                                    <button className="ad-btn ad-btn-secondary" onClick={() => setConfirmSuspendUser(null)}>Cancel</button>
                                     <button className="ad-btn ad-btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => {
                                         const newStatus = isSuspended ? 'active' : 'suspended'
                                         apiFetch('/admin/users/' + confirmSuspendUser.id, { method: 'PUT', body: JSON.stringify({ status: newStatus }) })
                                             .then(() => { showToast('User ' + (newStatus === 'suspended' ? 'suspended' : 'activated')); setConfirmSuspendUser(null); closeModal(); fetchUsers(usersPage, usersSearch) })
                                             .catch(err => { showToast(err.message || 'Error'); setConfirmSuspendUser(null) })
-                                    }}>{isSuspended ? 'Reactivar' : 'Suspender'}</button>
+                                    }}>{isSuspended ? 'Reactivate' : 'Suspend'}</button>
                                 </div>
                             </>)
                         })()}
