@@ -737,18 +737,10 @@
 .ad-welcome-wrap {
     display: flex;
     flex-direction: column;
-    gap: 24px;
-}
-
-@media (min-width: 1024px) {
-    .ad-welcome-wrap {
-        flex-direction: row;
-        gap: 24px;
-    }
+    gap: 20px;
 }
 
 .ad-welcome-card {
-    flex: 1;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -861,34 +853,34 @@
 .ad-kpi-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    gap: 10px;
 }
 
 @media (min-width: 1024px) {
     .ad-kpi-grid {
         grid-template-columns: repeat(4, 1fr);
-        gap: 16px;
+        gap: 12px;
     }
 }
 
 .ad-kpi-card {
     text-align: center;
-    padding: 20px;
+    padding: 14px 12px;
 }
 
 .ad-kpi-icon-box {
-    width: 48px;
-    height: 48px;
-    margin: 0 auto 12px;
-    border-radius: 16px;
+    width: 36px;
+    height: 36px;
+    margin: 0 auto 8px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .ad-kpi-icon-box svg {
-    width: 24px;
-    height: 24px;
+    width: 18px;
+    height: 18px;
 }
 
 .ad-kpi-icon-box.ad-blue {
@@ -923,10 +915,18 @@
     color: #f87171;
 }
 
+.ad-kpi-icon-box.ad-purple {
+    background: rgba(168, 85, 247, .1);
+}
+
+.ad-kpi-icon-box.ad-purple svg {
+    color: #a78bfa;
+}
+
 .ad-kpi-value {
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 24px;
+    font-size: 20px;
     color: #fff;
 }
 
@@ -1494,15 +1494,18 @@
     color: var(--power-500);
     font-size: 12px;
     font-weight: 600;
-    background: none;
-    border: none;
+    background: rgba(255, 214, 0, .08);
+    border: 1px solid rgba(255, 214, 0, .15);
     cursor: pointer;
-    padding: 0;
+    padding: 6px 14px;
+    border-radius: 8px;
     font-family: var(--font-sans);
+    transition: all .25s;
 }
 
 .ad-infra-link:hover {
-    text-decoration: underline;
+    background: rgba(255, 214, 0, .15);
+    border-color: rgba(255, 214, 0, .3);
 }
 
 /* ── Table ── */
@@ -1642,10 +1645,18 @@
     font-size: 12px;
     font-weight: 600;
     text-decoration: none;
+    background: rgba(255, 214, 0, .08);
+    border: 1px solid rgba(255, 214, 0, .15);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: all .25s;
 }
 
 .ad-table-link:hover {
-    text-decoration: underline;
+    background: rgba(255, 214, 0, .15);
+    border-color: rgba(255, 214, 0, .3);
 }
 
 /* ── Support Queue ── */
@@ -1727,9 +1738,21 @@
     font-size: 14px;
     font-weight: 600;
     text-decoration: none;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
+    background: rgba(255, 214, 0, .08);
+    border: 1px solid rgba(255, 214, 0, .15);
+    padding: 8px 18px;
+    border-radius: 9999px;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: all .25s;
+}
+
+.ad-activity-export:hover {
+    background: rgba(255, 214, 0, .15);
+    border-color: rgba(255, 214, 0, .3);
 }
 
 .ad-activity-export:hover svg {
@@ -2083,8 +2106,10 @@
     .ad-welcome-actions { flex-direction: column; }
     .ad-welcome-actions button { width: 100%; justify-content: center; }
     .ad-kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-    .ad-kpi-card { padding: 14px 10px; }
-    .ad-kpi-value { font-size: 20px; }
+    .ad-kpi-card { padding: 12px 8px; }
+    .ad-kpi-value { font-size: 18px; }
+    .ad-kpi-icon-box { width: 32px; height: 32px; margin-bottom: 6px; }
+    .ad-kpi-icon-box svg { width: 16px; height: 16px; }
     .ad-card { padding: 16px; border-radius: 14px; }
     .ad-section-title { font-size: 16px; }
     .ad-grid-5, .ad-grid-3, .ad-grid-2 { gap: 16px; }

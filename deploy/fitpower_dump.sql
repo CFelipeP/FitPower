@@ -1102,7 +1102,7 @@ CREATE TABLE `trainers` (
   `terms_accepted` tinyint(1) NOT NULL DEFAULT '0',
   `privacy_accepted` tinyint(1) NOT NULL DEFAULT '0',
   `marketing_optin` tinyint(1) NOT NULL DEFAULT '0',
-  `status` enum('pending','approved','rejected','suspended') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `status` enum('pending','approved','rejected','suspended') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'approved',
   `avg_rating` decimal(2,1) NOT NULL DEFAULT '0.0',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

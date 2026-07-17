@@ -56,7 +56,8 @@ async function getCsrfToken() {
 
 export async function apiFetch(endpoint, options = {}) {
     const token = localStorage.getItem('token')
-    const headers = { 'Content-Type': 'application/json', ...options.headers }
+    const isFormData = options.body instanceof FormData
+    const headers = isFormData ? { ...options.headers } : { 'Content-Type': 'application/json', ...options.headers }
     if (token) headers['Authorization'] = `Bearer ${token}`
 
     const method = (options.method || 'GET').toUpperCase()

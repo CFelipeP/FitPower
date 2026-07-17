@@ -35,7 +35,7 @@ function listVideos(): void {
 
     $params[] = $limit;
     $params[] = $offset;
-    $stmt = $db->prepare("SELECT * FROM video_library $whereClause ORDER BY created_at DESC LIMIT ? OFFSET ?");
+    $stmt = $db->prepare("SELECT v.*, u.first_name AS coach_first_name, u.last_name AS coach_last_name FROM video_library v LEFT JOIN users u ON u.id = v.coach_id $whereClause ORDER BY v.created_at DESC LIMIT ? OFFSET ?");
     $stmt->execute($params);
     $videos = array_map(function($v) {
         return [
@@ -47,6 +47,7 @@ function listVideos(): void {
             'category' => $v['category'],
             'exerciseId' => $v['exercise_id'] ? (int)$v['exercise_id'] : null,
             'coachId' => $v['coach_id'] ? (int)$v['coach_id'] : null,
+            'coachName' => trim(($v['coach_first_name'] ?? '') . ' ' . ($v['coach_last_name'] ?? '')) ?: null,
             'durationSeconds' => (int)$v['duration_seconds'],
             'fileSizeBytes' => (int)$v['file_size_bytes'],
             'mimeType' => $v['mime_type'],

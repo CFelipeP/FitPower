@@ -11,7 +11,7 @@ import {
     Sunrise, Sun, Moon, Play, ArrowRight,
     Award, Heart, LogOut, User, Cookie, Camera, Video, Calculator
 } from 'lucide-react'
-import ProfileModal from '../ProfileModal/ProfileModal'
+import ProfileEditModal from '../ProfileModal/ProfileEditModal'
 import NotificationsDropdown from '../NotificationsDropdown/NotificationsDropdown'
 import ProgramsManager from '../ProgramsManager/ProgramsManager'
 import WorkoutTracker from '../WorkoutTracker/WorkoutTracker'
@@ -30,6 +30,7 @@ import Leaderboard from '../Leaderboard/Leaderboard'
 import SettingsPanel from '../Settings/Settings'
 import SocialFeed from '../SocialFeed/SocialFeed'
 import LiveSessions from '../LiveSessions/LiveSessions'
+import ClientTrainingVideos from './ClientTrainingVideos'
 import SubscriptionPlans from '../SubscriptionPlans/SubscriptionPlans'
 import ClientGoals from '../ClientGoals/ClientGoals'
 import WorkoutHeatmap from '../WorkoutHeatmap/WorkoutHeatmap'
@@ -37,6 +38,7 @@ import TDEECalculator from '../TDEECalculator/TDEECalculator'
 import ProgressSlider from '../ProgressPhotos/ProgressSlider'
 
 import Sidebar from '../Sidebar/Sidebar'
+import '../DashboardShared.css'
 import './ClientDashboard.css'
 import { Counter } from '../Counter'
 
@@ -56,6 +58,7 @@ const navSections = [
     { type: 'heading', label: 'Community' },
     { type: 'item', label: 'Messages', icon: MessageCircle, badge: 3 },
     { type: 'item', label: 'Live Sessions', icon: Video },
+    { type: 'item', label: 'Training Videos', icon: Video },
     { type: 'item', label: 'Social Feed', icon: Users },
     { type: 'item', label: 'Exercises', icon: Dumbbell },
     { type: 'item', label: 'Leaderboard', icon: Users },
@@ -84,6 +87,13 @@ export default function ClientDashboard() {
     const { logout: authLogout } = useAuth()
     const [notifOpen, setNotifOpen] = useState(false)
     const [profileModalOpen, setProfileModalOpen] = useState(false)
+    const [profileForm, setProfileForm] = useState({
+        firstName: '', lastName: '', email: '', photo: '',
+        fitnessLevel: '', primaryGoal: '', trainingDays: ''
+    })
+    const [profileFormLoading, setProfileFormLoading] = useState(false)
+    const [profileFormSaving, setProfileFormSaving] = useState(false)
+    const [userPhoto, setUserPhoto] = useState('')
     const [activeNav, setActiveNav] = useState('Dashboard')
     const [waterCount, setWaterCount] = useState(0)
     const [mealChecked, setMealChecked] = useState([])
@@ -92,6 +102,8 @@ export default function ClientDashboard() {
     const [barAnimated, setBarAnimated] = useState(false)
     const [data, setData] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [profileData, setProfileData] = useState(null)
+    const [profileLoading, setProfileLoading] = useState(false)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
     const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
 
@@ -137,7 +149,20 @@ export default function ClientDashboard() {
             })
             .catch(() => showToast('Error loading data'))
             .finally(() => setLoading(false))
+        apiFetch('/auth/me')
+            .then(u => setUserPhoto(u.photo || ''))
+            .catch(() => {})
     }, [showToast])
+
+    useEffect(() => {
+        if (activeNav === 'Profile') {
+            setProfileLoading(true)
+            apiFetch('/auth/me')
+                .then(setProfileData)
+                .catch(() => {})
+                .finally(() => setProfileLoading(false))
+        }
+    }, [activeNav])
 
     useEffect(() => {
         const interval = setInterval(async () => {
@@ -230,7 +255,7 @@ export default function ClientDashboard() {
             return
         }
         if (label === 'Profile') {
-            setProfileModalOpen(true)
+            setActiveNav(label)
             return
         }
         setActiveNav(label)
@@ -276,7 +301,7 @@ export default function ClientDashboard() {
                 onNavClick={handleNavClick}
                 userName={data?.userName || 'Athlete'}
                 userSubtitle="PRO PLAN"
-                avatarUrl="https://picsum.photos/seed/user-1/80/80.jpg"
+                avatarUrl={userPhoto || `https://picsum.photos/seed/${data?.id || 'user-1'}/80/80.jpg`}
                 role="client"
                 collapsed={sidebarCollapsed}
                 onToggle={handleSidebarToggle}
@@ -320,7 +345,7 @@ export default function ClientDashboard() {
                                         <div className="cl-notif-dot" />
                                     </div>
                                     <div className="cl-avatar-wrap">
-                                        <img loading="lazy" src="https://picsum.photos/seed/user-1/36/36.jpg" alt="User avatar" className="cl-avatar" />
+                                        <img loading="lazy" src={userPhoto || 'https://picsum.photos/seed/user-1/36/36.jpg'} alt="User avatar" className="cl-avatar" />
                                         <ChevronDown className="cl-avatar-chevron" />
                                     </div>
                                 </div>
@@ -676,6 +701,8 @@ export default function ClientDashboard() {
         </div>
     ) : activeNav === 'Live Sessions' ? (
         <LiveSessions role="client" />
+    ) : activeNav === 'Training Videos' ? (
+        <ClientTrainingVideos />
     ) : activeNav === 'Exercises' ? (
         <ExerciseLibrary />
     ) : activeNav === 'Daily Check-in' || activeNav === 'Goals' ? (
@@ -713,7 +740,7 @@ export default function ClientDashboard() {
                             <div className="cl-notif-dot" />
                         </div>
                         <div className="cl-avatar-wrap">
-                            <img loading="lazy" src="https://picsum.photos/seed/user-1/36/36.jpg" alt="User avatar" className="cl-avatar" />
+                            <img loading="lazy" src={userPhoto || 'https://picsum.photos/seed/user-1/36/36.jpg'} alt="User avatar" className="cl-avatar" />
                             <ChevronDown className="cl-avatar-chevron" />
                         </div>
                     </div>
@@ -728,6 +755,81 @@ export default function ClientDashboard() {
         </div>
     ) : activeNav === 'Challenges' ? (
         <Challenges />
+    ) : activeNav === 'Profile' ? (
+        <div className="cl-profile-view">
+            <header className="cl-header">
+                <div className="cl-header-inner">
+                    <div className="cl-header-left">
+                        <div className="cl-search-wrap">
+                            <Search className="cl-search-icon" />
+                            <input type="text" placeholder="Search workouts, exercises..." className="cl-search-input" />
+                        </div>
+                    </div>
+                    <div className="cl-header-right">
+                        <div className="cl-notif-wrap" ref={notifBtnRef} onClick={() => setNotifOpen(!notifOpen)}>
+                            <Bell className="cl-notif-bell" />
+                            <div className="cl-notif-dot" />
+                        </div>
+                        <div className="cl-avatar-wrap">
+                            <img loading="lazy" src={userPhoto || 'https://picsum.photos/seed/user-1/36/36.jpg'} alt="User avatar" className="cl-avatar" />
+                            <ChevronDown className="cl-avatar-chevron" />
+                        </div>
+                    </div>
+                </div>
+            </header>
+            <div className="cl-content">
+                <div className="cl-space">
+                    {profileLoading ? (
+                        <div className="cl-spinner" style={{ margin: '80px auto' }} />
+                    ) : profileData ? (
+                        <div className="cl-profile-page">
+                            <div className="cl-profile-cover">
+                                <div className="cl-profile-avatar-large">
+                                    {profileData.photo ? (
+                                        <img src={profileData.photo} alt="" />
+                                    ) : (
+                                        <span>{profileData.firstName?.[0]}{profileData.lastName?.[0]}</span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="cl-profile-info-section">
+                                <div className="cl-profile-info-header">
+                                    <div>
+                                        <h1 className="cl-profile-name">{profileData.firstName} {profileData.lastName}</h1>
+                                        <p className="cl-profile-email">{profileData.email}</p>
+                                        <span className="cl-profile-role">{profileData.role}</span>
+                                    </div>
+                                    <button className="cl-btn cl-btn-primary" onClick={() => setProfileModalOpen(true)}>
+                                        Edit Profile
+                                    </button>
+                                </div>
+                                <div className="cl-profile-details-grid">
+                                    <div className="cl-card">
+                                        <div className="cl-profile-detail-label">Fitness Level</div>
+                                        <div className="cl-profile-detail-value">{profileData.fitnessLevel ? profileData.fitnessLevel.charAt(0).toUpperCase() + profileData.fitnessLevel.slice(1) : 'Not set'}</div>
+                                    </div>
+                                    <div className="cl-card">
+                                        <div className="cl-profile-detail-label">Primary Goal</div>
+                                        <div className="cl-profile-detail-value">{profileData.primaryGoal ? profileData.primaryGoal.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Not set'}</div>
+                                    </div>
+                                    <div className="cl-card">
+                                        <div className="cl-profile-detail-label">Training Days / Week</div>
+                                        <div className="cl-profile-detail-value">{profileData.trainingDays || 'Not set'}</div>
+                                    </div>
+                                    <div className="cl-card">
+                                        <div className="cl-profile-detail-label">Member Since</div>
+                                        <div className="cl-profile-detail-value">{profileData.memberSince ? new Date(profileData.memberSince).toLocaleDateString() : '—'}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="cl-spacer" />
+                    )}
+                    <div className="cl-spacer" />
+                </div>
+            </div>
+        </div>
     ) : activeNav === 'Upgrade Plan' ? (
         <div className="cl-upgrade-view">
             <header className="cl-header">
@@ -744,7 +846,7 @@ export default function ClientDashboard() {
                             <div className="cl-notif-dot" />
                         </div>
                         <div className="cl-avatar-wrap">
-                            <img loading="lazy" src="https://picsum.photos/seed/user-1/36/36.jpg" alt="User avatar" className="cl-avatar" />
+                            <img loading="lazy" src={userPhoto || 'https://picsum.photos/seed/user-1/36/36.jpg'} alt="User avatar" className="cl-avatar" />
                             <ChevronDown className="cl-avatar-chevron" />
                         </div>
                     </div>
@@ -773,7 +875,7 @@ export default function ClientDashboard() {
                             <div className="cl-notif-dot" />
                         </div>
                         <div className="cl-avatar-wrap">
-                            <img loading="lazy" src="https://picsum.photos/seed/user-1/36/36.jpg" alt="User avatar" className="cl-avatar" />
+                            <img loading="lazy" src={userPhoto || 'https://picsum.photos/seed/user-1/36/36.jpg'} alt="User avatar" className="cl-avatar" />
                             <ChevronDown className="cl-avatar-chevron" />
                         </div>
                     </div>
@@ -839,9 +941,23 @@ export default function ClientDashboard() {
                     </div>
                 </div>
             </div>
-            <ProfileModal isOpen={profileModalOpen} onClose={() => setProfileModalOpen(false)} onSaved={() => {
-                apiFetch('/dashboard/client').then(d => { setData(d); if (d.waterCount !== undefined) setWaterCount(d.waterCount); if (d.mealChecked) setMealChecked(d.mealChecked) })
-            }} />
+            {profileModalOpen && <ProfileEditModal
+                profileForm={profileForm}
+                setProfileForm={setProfileForm}
+                profileFormLoading={profileFormLoading}
+                setProfileFormLoading={setProfileFormLoading}
+                profileFormSaving={profileFormSaving}
+                setProfileFormSaving={setProfileFormSaving}
+                onClose={() => setProfileModalOpen(false)}
+                onSaved={() => {
+                    apiFetch('/dashboard/client').then(d => {
+                        setData(d)
+                        if (d.waterCount !== undefined) setWaterCount(d.waterCount)
+                        if (d.mealChecked) setMealChecked(d.mealChecked)
+                    }).catch(() => {})
+                    apiFetch('/auth/me').then(setProfileData).catch(() => {})
+                }}
+            />}
         </div>
     )
 }

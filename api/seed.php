@@ -102,15 +102,15 @@ $db->exec("INSERT INTO certifications (slug, name) VALUES
     ('precision-nutrition', 'Precision Nutrition'),
     ('other', 'Other')");
 
-$db->exec("INSERT INTO achievements (slug, label, icon, sort_order) VALUES
-    ('7-day-streak', '7-Day Streak', 'Zap', 1),
-    ('first-pr', 'First PR', 'Trophy', 2),
-    ('50-workouts', '50 Workouts', 'Dumbbell', 3),
-    ('5k-calories', '5K Calories', 'Flame', 4),
-    ('30-day-challenge', '30 Day Challenge', 'Calendar', 5),
-    ('consistency-king', 'Consistency King', 'Award', 6),
-    ('community-hero', 'Community Hero', 'Users', 7),
-    ('master', 'Master', 'Crown', 8)");
+$db->exec("INSERT INTO achievements (slug, label, icon, type, sort_order) VALUES
+    ('7-day-streak', '7-Day Streak', 'Zap', 'streak', 1),
+    ('first-pr', 'First PR', 'Trophy', 'strength', 2),
+    ('50-workouts', '50 Workouts', 'Dumbbell', 'volume', 3),
+    ('5k-calories', '5K Calories', 'Flame', 'nutrition', 4),
+    ('30-day-challenge', '30 Day Challenge', 'Calendar', 'streak', 5),
+    ('consistency-king', 'Consistency King', 'Award', 'streak', 6),
+    ('community-hero', 'Community Hero', 'Users', 'social', 7),
+    ('master', 'Master', 'Crown', 'milestone', 8)");
 
 echo "  Lookup data inserted.\n\n";
 
@@ -545,6 +545,106 @@ foreach ($reviews as $r) {
 
 echo "  ✓ " . count($reviews) . " reviews\n\n";
 
+// Future sessions for Live Dashboard
+$futureStmt = $db->prepare(
+    "INSERT INTO sessions (program_id, trainer_id, title, description, `date`, start_time, end_time, type, max_participants, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+);
+$futureSessions = [
+    [$hiitId, $trainerId, 'HIIT Inferno – Live Today', 'Live HIIT session - today!',     $today,       '10:00', '10:45', 'group', 20, 'scheduled', $now, $now],
+    [$strengthId, $trainerId, 'Strength – Afternoon Session', 'Afternoon strength',       $today,       '15:00', '16:00', 'group', 15, 'scheduled', $now, $now],
+    [$yogaId, $trainerId, 'Evening Yoga Flow', 'Relaxing evening yoga',                  date('Y-m-d', strtotime('+1 day')), '18:00', '18:45', 'group', 25, 'scheduled', $now, $now],
+    [$upperId, $trainerId, 'Upper Body – Tomorrow Morning', 'Morning push session',      date('Y-m-d', strtotime('+1 day')), '07:00', '07:50', 'group', 12, 'scheduled', $now, $now],
+];
+foreach ($futureSessions as $fs) {
+    $futureStmt->execute([$fs[0], $fs[1], $fs[2], $fs[3], $fs[4], $fs[5], $fs[6], $fs[7], $fs[8], $fs[9], $now, $now]);
+}
+echo "  ✓ " . count($futureSessions) . " future sessions\n";
+
+// Articles
+$artStmt = $db->prepare(
+    "INSERT INTO articles (author_id, title, slug, excerpt, content, category, status, published_at, created_at, updated_at, is_featured, is_archived)
+     VALUES (?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?, ?)"
+);
+$articles = [
+    [$coachUserId, '5 Tips to Maximize Your HIIT Workouts', 'hiit-tips', 'Learn how to get the most out of every HIIT session with these expert tips.', 'Full article content about HIIT workouts...', 'Training', '2026-07-01 08:00:00', '2026-07-01 08:00:00', '2026-07-01 08:00:00', 1, 0],
+    [$coachUserId, 'Nutrition Guide for Athletes', 'nutrition-guide', 'A comprehensive guide to eating for performance and recovery.', 'Full nutrition article content...', 'Nutrition', '2026-06-28 10:00:00', '2026-06-28 10:00:00', '2026-06-28 10:00:00', 0, 0],
+    [$adminId, 'New Features in FitPower 2026', 'fitpower-2026-features', 'Check out the latest features we have added this year.', 'Feature announcement content...', 'Announcements', '2026-06-15 09:00:00', '2026-06-15 09:00:00', '2026-06-15 09:00:00', 0, 0],
+    [$coachUserId, 'The Importance of Recovery Days', 'recovery-days', 'Why rest days are crucial for your progress and how to use them effectively.', 'Recovery article content...', 'Wellness', '2026-06-10 07:00:00', '2026-06-10 07:00:00', '2026-06-10 07:00:00', 0, 0],
+    [$adminId, 'Community Spotlight: Maria Journey', 'community-spotlight-maria', 'Read about how Maria transformed her fitness journey with FitPower.', 'Spotlight article content...', 'Community', '2026-05-30 12:00:00', '2026-05-30 12:00:00', '2026-05-30 12:00:00', 0, 0],
+];
+foreach ($articles as $a) {
+    $artStmt->execute($a);
+}
+echo "  ✓ " . count($articles) . " articles\n";
+
+// Admin audit log
+$auditStmt = $db->prepare(
+    "INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)"
+);
+$auditLogs = [
+    [$adminId, 'login', 'session', 0, json_encode(['ip' => '192.168.1.1']), '2026-07-08 08:00:00'],
+    [$adminId, 'update_settings', 'platform_settings', 1, json_encode(['setting' => 'platform_name', 'old' => 'FitPower', 'new' => 'FitPower']), '2026-07-07 14:30:00'],
+    [$adminId, 'delete_user', 'users', 99, json_encode(['user_email' => 'spam@example.com', 'reason' => 'spam_account']), '2026-07-06 10:15:00'],
+    [$adminId, 'approve_content', 'articles', 1, json_encode(['action' => 'published', 'title' => 'HIIT Tips']), '2026-07-01 08:30:00'],
+    [$adminId, 'login', 'session', 0, json_encode(['ip' => '192.168.1.1']), '2026-07-07 09:00:00'],
+    [$adminId, 'failed_login', 'session', 0, json_encode(['ip' => '10.0.0.5', 'attempts' => 3]), '2026-07-06 03:00:00'],
+    [$adminId, 'failed_login', 'session', 0, json_encode(['ip' => '10.0.0.5', 'attempts' => 5]), '2026-07-06 03:05:00'],
+    [$adminId, 'resolve_report', 'content_reports', 3, json_encode(['new_status' => 'dismissed']), '2026-07-05 11:00:00'],
+];
+foreach ($auditLogs as $al) {
+    $auditStmt->execute($al);
+}
+echo "  ✓ " . count($auditLogs) . " audit log entries\n";
+
+// Platform settings
+$settingsStmt = $db->prepare(
+    "INSERT IGNORE INTO platform_settings (setting_key, setting_value, description) VALUES (?, ?, ?)"
+);
+$settingsData = [
+    ['platform_name', 'FitPower', 'Nombre de la plataforma'],
+    ['support_email', 'support@fitpower.app', 'Email de soporte'],
+    ['default_language', 'es', 'Idioma por defecto'],
+    ['timezone', 'America/Mexico_City', 'Zona horaria'],
+    ['max_users', '10000', 'Máximo de usuarios permitidos'],
+    ['max_storage_gb', '50', 'Almacenamiento máximo en GB'],
+    ['api_rate_limit', '60', 'Límite de peticiones por minuto'],
+    ['file_upload_max_mb', '25', 'Tamaño máximo de archivo en MB'],
+];
+foreach ($settingsData as $s) { $settingsStmt->execute($s); }
+echo "  ✓ platform settings\n";
+
+// Media assets
+$mediaStmt = $db->prepare(
+    "INSERT INTO media_assets (file_name, file_path, file_type, file_size, mime_type, uploaded_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)"
+);
+$mediaAssets = [
+    ['banner-hiit.jpg', 'uploads/media/banner-hiit.jpg', 'image', 245760, 'image/jpeg', $coachUserId, '2026-06-01 10:00:00'],
+    ['logo.png', 'uploads/media/logo.png', 'image', 51200, 'image/png', $adminId, '2026-05-01 09:00:00'],
+    ['workout-demo.mp4', 'uploads/media/workout-demo.mp4', 'video', 52428800, 'video/mp4', $coachUserId, '2026-06-15 14:00:00'],
+    ['nutrition-plan.pdf', 'uploads/media/nutrition-plan.pdf', 'document', 102400, 'application/pdf', $adminId, '2026-06-20 11:00:00'],
+    ['podcast-episode-1.mp3', 'uploads/media/podcast-episode-1.mp3', 'audio', 8388608, 'audio/mpeg', $coachUserId, '2026-06-25 16:00:00'],
+];
+foreach ($mediaAssets as $m) {
+    $mediaStmt->execute($m);
+}
+echo "  ✓ " . count($mediaAssets) . " media assets\n";
+
+// Content reports (flagged reports)
+$reportStmt = $db->prepare(
+    "INSERT INTO content_reports (reporter_id, content_type, content_id, reason, status, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+);
+$reports = [
+    [$adminId, 'forum_topic', 1, 'Inappropriate content', 'pending', '2026-05-27 10:00:00'],
+    [$adminId, 'social_post', 3, 'Suspicious account activity', 'pending', '2026-05-27 14:00:00'],
+    [$mariaId, 'forum_reply', 5, 'Spam messages', 'dismissed', '2026-05-25 09:00:00'],
+    [$juanId,  'forum_topic', 2, 'Fake review submitted', 'action_taken', '2026-05-24 16:00:00'],
+];
+foreach ($reports as $r) { $reportStmt->execute($r); }
+echo "  ✓ content reports (flagged)\n";
+
 // ============================================================
 // DONE
 // ============================================================
@@ -553,12 +653,15 @@ echo " Database seeding completed successfully!\n";
 echo "====================================\n";
 echo " Users created: " . count($users) . "\n";
 echo " Programs created: " . count($programs) . "\n";
-echo " Sessions created: " . count($sessionsData) . "\n";
+echo " Sessions created: " . (count($sessionsData) + count($futureSessions)) . "\n";
 echo " Participants registered: " . count($participants) . "\n";
 echo " Nutrition logs: " . count($nutritionData) . "\n";
 echo " Body metric records: " . count($metricsData) . "\n";
 echo " Activities: " . count($activities) . "\n";
 echo " Support tickets: " . count($tickets) . "\n";
 echo " Reviews: " . count($reviews) . "\n";
+echo " Articles: " . count($articles) . "\n";
+echo " Media assets: " . count($mediaAssets) . "\n";
+echo " Audit log entries: " . count($auditLogs) . "\n";
 echo "====================================\n";
 echo "\nAll passwords: Prueba123xd\n";

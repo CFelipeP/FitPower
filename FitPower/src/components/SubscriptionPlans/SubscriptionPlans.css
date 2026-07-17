@@ -319,34 +319,4 @@
     .sp-current-banner h3 { font-size: 16px; }
 }
 
-/* PayPal button in subscription plans */
-.sp-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: auto;
-    padding-top: 16px;
-}
 
-.sp-actions .paypal-init-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    padding: 10px 14px;
-    border-radius: 24px;
-    font-weight: 600;
-    font-size: 13px;
-    cursor: pointer;
-    background: #ffc439;
-    color: #003087;
-    border: none;
-    transition: filter 0.2s;
-}
-.sp-actions .paypal-init-btn:hover { filter: brightness(1.1); }
-.sp-actions .paypal-init-btn:disabled { opacity: 0.5; cursor: default; }
-
-.sp-actions .paypal-buttons-wrapper {
-    width: 100%;
-    min-height: 42px;
-}

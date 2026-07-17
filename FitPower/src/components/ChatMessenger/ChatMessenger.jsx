@@ -69,7 +69,7 @@ export default function ChatMessenger() {
     const [typingUsers, setTypingUsers] = useState({})
     const [stickToBottom, setStickToBottom] = useState(true)
     const stickToBottomRef = useRef(true)
-    stickToBottomRef.current = stickToBottom
+    useEffect(() => { stickToBottomRef.current = stickToBottom }, [stickToBottom])
     const wsRef = useRef(null)
     const typingTimerRef = useRef(null)
     const msgEndRef = useRef(null)
@@ -208,10 +208,10 @@ export default function ChatMessenger() {
         ws.onerror = () => { ws.close() }
     }, [handleWSMessage])
 
-    useEffect(() => { loadConversations() }, [loadConversations]) // eslint-disable-line react-hooks/set-state-in-effect
+    useEffect(() => { loadConversations() }, [loadConversations])
     useEffect(() => {
         if (activeConv) {
-            loadMessages(activeConv.id) // eslint-disable-line react-hooks/set-state-in-effect
+            loadMessages(activeConv.id)
             startPolling(activeConv.id)
         } else {
             stopPolling()

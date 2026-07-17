@@ -7,6 +7,7 @@ const translations = {
             testimonials: 'Testimonials',
             contact: 'Contact',
             blog: 'Blog',
+            coaches: 'Coaches',
             community: 'Community',
             getStarted: 'Get Started',
             register: 'Register',
@@ -68,8 +69,8 @@ const translations = {
             perMonth: '/mo',
         },
         testimonials: {
-            label: 'Testimonials',
-            title: 'Real results',
+            label: 'Reviews',
+            title: 'What our users say',
         },
         cta: {
             title: 'Ready to transform?',
@@ -118,6 +119,7 @@ const translations = {
             testimonials: 'Testimonios',
             contact: 'Contacto',
             blog: 'Blog',
+            coaches: 'Entrenadores',
             community: 'Comunidad',
             getStarted: 'Comenzar',
             register: 'Registrarse',
@@ -180,7 +182,7 @@ const translations = {
         },
         testimonials: {
             label: 'Testimonios',
-            title: 'Resultados reales',
+            title: 'Lo que dicen nuestros usuarios',
         },
         cta: {
             title: '¿Listo para transformarte?',

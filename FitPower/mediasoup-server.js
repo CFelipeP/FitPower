@@ -49,11 +49,6 @@ createWorker({
     process.exit(1)
 })
 
-function jwtPayload(token) {
-    try {
-        return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    } catch { return null }
-}
 
 async function verifyToken(token) {
     try {
@@ -73,7 +68,7 @@ const server = createServer((req, res) => {
 
 const wss = new WebSocketServer({ server })
 
-wss.on('connection', (ws, req) => {
+wss.on('connection', (ws) => {
     ws.user = null
     ws.roomId = null
 
@@ -169,7 +164,6 @@ async function handleSignaling(ws, msg) {
                 console.log(`[Mediasoup] room ${roomId} created`)
             }
 
-            const peer = room.addPeer(ws.user.id, ws)
             ws.send(JSON.stringify({
                 type: 'room_joined',
                 peerId: ws.user.id,

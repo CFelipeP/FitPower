@@ -5,8 +5,8 @@ CREATE TABLE IF NOT EXISTS video_library (
   file_path VARCHAR(500) NOT NULL,
   thumbnail_url VARCHAR(500),
   category ENUM('exercise_demo','coach_feedback','coaching_session','educational') DEFAULT 'exercise_demo',
-  exercise_id INT NULL,
-  coach_id INT NULL,
+  exercise_id INT UNSIGNED NULL,
+  coach_id INT UNSIGNED NULL,
   duration_seconds INT DEFAULT 0,
   file_size_bytes BIGINT DEFAULT 0,
   mime_type VARCHAR(100),
@@ -19,10 +19,10 @@ CREATE TABLE IF NOT EXISTS video_library (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS video_feedback (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  coach_id INT NOT NULL,
-  client_id INT NOT NULL,
-  workout_log_id INT NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  coach_id INT UNSIGNED NOT NULL,
+  client_id INT UNSIGNED NOT NULL,
+  workout_log_id INT UNSIGNED NULL,
   video_url VARCHAR(500) NOT NULL,
   notes TEXT,
   is_viewed TINYINT(1) DEFAULT 0,

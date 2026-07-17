@@ -148,8 +148,8 @@ export default function Login() {
             const user = await login(loginEmail, loginPassword)
             const dashboards = { admin: '/admin/dashboard', coach: '/coach/dashboard', client: '/client/dashboard' }
             navigate(dashboards[user?.role] || '/client/dashboard')
-        } catch {
-            setLoginError(true)
+        } catch (e) {
+            setLoginError(e.message || true)
             setLoginLoading(false)
         }
     }
@@ -481,8 +481,8 @@ export default function Login() {
                                         <div className="login-error-banner">
                                             <AlertTriangle size={20} className="login-error-icon" />
                                             <div>
-                                                <div className="login-error-title">Invalid credentials</div>
-                                                <div className="login-error-desc">The email or password you entered is incorrect. Please try again.</div>
+                                                <div className="login-error-title">Error</div>
+                                                <div className="login-error-desc">{typeof loginError === 'string' ? loginError : 'The email or password you entered is incorrect. Please try again.'}</div>
                                             </div>
                                         </div>
                                     )}

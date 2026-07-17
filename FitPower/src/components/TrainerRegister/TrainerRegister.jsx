@@ -9,8 +9,9 @@ import {
     HeartPulse, Target, Accessibility, Baby,
     Camera, Pencil, MapPin, Building2,
     MonitorSmartphone, Heart, Globe,
-    DollarSign, Users, ShieldCheck, Video,
-    Link as LinkIcon, Clock as ClockIcon
+    DollarSign, Users, ShieldCheck,
+    Link as LinkIcon, Clock as ClockIcon,
+    Lock
 } from 'lucide-react'
 import './TrainerRegister.css'
 
@@ -29,7 +30,9 @@ export default function TrainerRegister() {
     const [dob, setDob] = useState('')
     const [gender, setGender] = useState('')
     const [photoPreview, setPhotoPreview] = useState('')
-    const [touched1, setTouched1] = useState({ firstName: false, lastName: false, email: false, phone: false, dob: false, gender: false })
+    const [password, setPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
+    const [touched1, setTouched1] = useState({ firstName: false, lastName: false, email: false, phone: false, dob: false, gender: false, password: false, confirmPassword: false })
 
     // Step 2: Credentials
     const [certType, setCertType] = useState('')
@@ -64,6 +67,7 @@ export default function TrainerRegister() {
     const certInputRef = useRef(null)
 
     const validateEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
+    const validatePassword = (val) => val.length >= 6
 
     const handlePhotoChange = (e) => {
         const file = e.target.files[0]
@@ -97,7 +101,7 @@ export default function TrainerRegister() {
 
     // Step 1 → 2
     const handleToStep2 = () => {
-        const t = { firstName: true, lastName: true, email: true, phone: true, dob: true, gender: true }
+        const t = { firstName: true, lastName: true, email: true, phone: true, dob: true, gender: true, password: true, confirmPassword: true }
         setTouched1(t)
         const v1 = firstName.trim().length >= 1
         const v2 = lastName.trim().length >= 1
@@ -105,7 +109,10 @@ export default function TrainerRegister() {
         const v4 = phone.trim().length >= 6
         const v5 = !!dob
         const v6 = !!gender
-        if (v1 && v2 && v3 && v4 && v5 && v6) goToStep(2)
+        const v7 = validatePassword(password)
+        const v8 = password === confirmPassword
+        if (!v8 && v7) { showToast('Passwords do not match'); return }
+        if (v1 && v2 && v3 && v4 && v5 && v6 && v7 && v8) goToStep(2)
     }
 
     // Step 2 → 3
@@ -131,7 +138,7 @@ export default function TrainerRegister() {
             const data = await apiFetch('/trainers', {
                 method: 'POST',
                 body: JSON.stringify({
-                    firstName, lastName, email, phone,
+                    firstName, lastName, email, phone, password,
                     dateOfBirth: dob, gender,
                     experience, bio, philosophy,
                     instagram, youtube, website,
@@ -142,18 +149,13 @@ export default function TrainerRegister() {
                     agreeTerms, agreePrivacy,
                 }),
             })
-            if (!data.success) {
-                showToast(data.message || 'Error registering as trainer')
-                setSubmitting(false)
-                return
-            }
-            if (data.data?.token) {
-                localStorage.setItem('token', data.data.token)
+            if (data?.token) {
+                localStorage.setItem('token', data.token)
                 localStorage.setItem('role', 'coach')
             }
             setShowSuccess(true)
-        } catch {
-            showToast('Server connection error')
+        } catch (e) {
+            showToast(e.message || 'Server connection error')
         } finally {
             setSubmitting(false)
         }
@@ -358,6 +360,36 @@ export default function TrainerRegister() {
                                                 />
                                                 <Mail size={18} className="tr-input-icon" />
                                                 {touched1.email && !validateEmail(email) && <div className="tr-field-error visible">Valid email required</div>}
+                                            </div>
+
+                                            {/* Password */}
+                                            <div className="tr-name-grid">
+                                                <div className="tr-field">
+                                                    <input
+                                                        type="password"
+                                                        className={`tr-input ${touched1.password ? (validatePassword(password) ? 'success' : 'error') : ''}`}
+                                                        placeholder="Password"
+                                                        value={password}
+                                                        onChange={(e) => setPassword(e.target.value)}
+                                                        onBlur={() => setTouched1((p) => ({ ...p, password: true }))}
+                                                        autoComplete="new-password"
+                                                    />
+                                                    <Lock size={18} className="tr-input-icon" />
+                                                    {touched1.password && !validatePassword(password) && <div className="tr-field-error visible">Min 6 characters</div>}
+                                                </div>
+                                                <div className="tr-field">
+                                                    <input
+                                                        type="password"
+                                                        className={`tr-input ${touched1.confirmPassword ? (password === confirmPassword && confirmPassword ? 'success' : 'error') : ''}`}
+                                                        placeholder="Confirm password"
+                                                        value={confirmPassword}
+                                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                                        onBlur={() => setTouched1((p) => ({ ...p, confirmPassword: true }))}
+                                                        autoComplete="new-password"
+                                                    />
+                                                    <Lock size={18} className="tr-input-icon" />
+                                                    {touched1.confirmPassword && confirmPassword && password !== confirmPassword && <div className="tr-field-error visible">Passwords do not match</div>}
+                                                </div>
                                             </div>
 
                                             {/* Phone */}
@@ -779,7 +811,7 @@ export default function TrainerRegister() {
                                                     'Submit Application'
                                                 )}
                                             </button>
-                                            <p className="tr-review-note">Typical review time: 3–5 business days</p>
+                                            <p className="tr-review-note">You're all set! Start building your coaching profile now.</p>
                                         </div>
                                     )}
                                 </div>
@@ -791,9 +823,9 @@ export default function TrainerRegister() {
                                     <div className="tr-success-check">
                                         <Check size={40} className="tr-success-icon" />
                                     </div>
-                                    <h1 className="tr-title" style={{ textAlign: 'center' }}>Application received</h1>
+                                    <h1 className="tr-title" style={{ textAlign: 'center' }}>Welcome to FitPower!</h1>
                                     <p className="tr-subtitle tr-subtitle-center">
-                                        Thank you for applying to FitPower. Our team will review your credentials and get back to you within 3–5 business days.
+                                        Your coach profile is now active. Start setting up your programs, availability, and connect with clients right away.
                                     </p>
                                     <div className="tr-success-cards">
                                         <div className="tr-success-card">
@@ -803,16 +835,16 @@ export default function TrainerRegister() {
                                             <span className="tr-success-card-text">Confirmation email sent to your address</span>
                                         </div>
                                         <div className="tr-success-card">
+                                            <div className="tr-success-card-icon tr-success-card-icon-green">
+                                                <Award size={12} />
+                                            </div>
+                                            <span className="tr-success-card-text">Your profile is live and visible to clients</span>
+                                        </div>
+                                        <div className="tr-success-card">
                                             <div className="tr-success-card-icon tr-success-card-icon-yellow">
                                                 <ClockIcon size={12} />
                                             </div>
-                                            <span className="tr-success-card-text">Review period: 3–5 business days</span>
-                                        </div>
-                                        <div className="tr-success-card">
-                                            <div className="tr-success-card-icon tr-success-card-icon-green">
-                                                <Video size={12} />
-                                            </div>
-                                            <span className="tr-success-card-text">If approved, you'll be invited to an onboarding call</span>
+                                            <span className="tr-success-card-text">Start configuring your coaching services now</span>
                                         </div>
                                     </div>
                                     <a href="/coach/dashboard" className="tr-btn-primary btn-shine tr-btn-success">

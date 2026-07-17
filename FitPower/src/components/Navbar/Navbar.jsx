@@ -94,6 +94,7 @@ export default function Navbar() {
                         {links.map(link => (
                             <Link key={link.label} to={link.to} className="nav-role-link">{t(`nav.${link.label.toLowerCase()}`)}</Link>
                         ))}
+                        <Link to="/coaches">{t('nav.coaches')}</Link>
                         <Link to="/forum">{t('nav.community')}</Link>
                         <Link to="/blog">{t('nav.blog')}</Link>
                     </div>
@@ -102,8 +103,8 @@ export default function Navbar() {
                         <a href="/#programs">{t('nav.programs')}</a>
                         <a href="/#features">{t('nav.features')}</a>
                         <a href="/#pricing">{t('nav.pricing')}</a>
-                        <a href="/#testimonials">{t('nav.testimonials')}</a>
                         <a href="/#contact">{t('nav.contact')}</a>
+                        <Link to="/coaches">{t('nav.coaches')}</Link>
                         <Link to="/blog">{t('nav.blog')}</Link>
                         <Link to="/forum">{t('nav.community')}</Link>
                     </div>
@@ -187,6 +188,7 @@ export default function Navbar() {
                             </Link>
                         ))}
                         <div className="mobile-divider"></div>
+                        <Link to="/coaches" className="mobile-link" onClick={handleLinkClick}>{t('nav.coaches')}</Link>
                         <Link to="/forum" className="mobile-link" onClick={handleLinkClick}>{t('nav.community')}</Link>
                         <Link to="/blog" className="mobile-link" onClick={handleLinkClick}>{t('nav.blog')}</Link>
                     </>
@@ -195,8 +197,8 @@ export default function Navbar() {
                         <a href="/#programs" className="mobile-link" onClick={handleLinkClick}>{t('nav.programs')}</a>
                         <a href="/#features" className="mobile-link" onClick={handleLinkClick}>{t('nav.features')}</a>
                         <a href="/#pricing" className="mobile-link" onClick={handleLinkClick}>{t('nav.pricing')}</a>
-                        <a href="/#testimonials" className="mobile-link" onClick={handleLinkClick}>{t('nav.testimonials')}</a>
                         <a href="/#contact" className="mobile-link" onClick={handleLinkClick}>{t('nav.contact')}</a>
+                        <Link to="/coaches" className="mobile-link" onClick={handleLinkClick}>{t('nav.coaches')}</Link>
                         <Link to="/blog" className="mobile-link" onClick={handleLinkClick}>{t('nav.blog')}</Link>
                         <Link to="/forum" className="mobile-link" onClick={handleLinkClick}>{t('nav.community')}</Link>
                     </>

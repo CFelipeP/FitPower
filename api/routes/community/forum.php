@@ -162,6 +162,46 @@ function lockTopic(string $id): void {
     success(null, $newStatus === 'locked' ? 'Tema bloqueado' : 'Tema desbloqueado');
 }
 
+function adminListTopics(): void {
+    requireRole('admin', 'moderator');
+    $db = getDB();
+    $page = max(1, (int)($_GET['page'] ?? 1));
+    $perPage = min(50, max(1, (int)($_GET['perPage'] ?? 20)));
+    $offset = ($page - 1) * $perPage;
+    $search = $_GET['search'] ?? '';
+
+    $where = "WHERE 1=1";
+    $params = [];
+    if ($search) {
+        $where .= " AND (t.title LIKE ? OR t.content LIKE ?)";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+    }
+
+    $countStmt = $db->prepare("SELECT COUNT(*) FROM forum_topics t $where");
+    $countStmt->execute($params);
+    $total = (int)$countStmt->fetchColumn();
+
+    $stmt = $db->prepare("
+        SELECT t.*, CONCAT(u.first_name, ' ', u.last_name) as author_name,
+               (SELECT COUNT(*) FROM forum_replies WHERE topic_id = t.id) as reply_count
+        FROM forum_topics t
+        JOIN users u ON u.id = t.user_id
+        $where
+        ORDER BY t.created_at DESC
+        LIMIT $perPage OFFSET $offset
+    ");
+    $stmt->execute($params);
+    $topics = $stmt->fetchAll();
+
+    success([
+        'topics' => $topics,
+        'total' => $total,
+        'page' => $page,
+        'perPage' => $perPage,
+    ]);
+}
+
 function adminDeleteTopic(string $id): void {
     requireRole('admin', 'moderator');
     $db = getDB();

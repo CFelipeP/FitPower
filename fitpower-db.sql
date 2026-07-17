@@ -1453,7 +1453,7 @@ CREATE TABLE `trainers` (
   `terms_accepted` tinyint(1) NOT NULL DEFAULT '0',
   `privacy_accepted` tinyint(1) NOT NULL DEFAULT '0',
   `marketing_optin` tinyint(1) NOT NULL DEFAULT '0',
-  `status` enum('pending','approved','rejected','suspended') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `status` enum('pending','approved','rejected','suspended') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'approved',
   `avg_rating` decimal(2,1) NOT NULL DEFAULT '0.0',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1671,4 +1671,25 @@ CREATE TABLE `refresh_tokens` (
   UNIQUE KEY `token` (`token`),
   KEY `user_id` (`user_id`),
   CONSTRAINT `refresh_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------
+-- Client Notes table for coach notes on clients
+-- ----------------------------------------------------
+
+DROP TABLE IF EXISTS `client_notes`;
+CREATE TABLE `client_notes` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `coach_id` int unsigned NOT NULL,
+  `client_id` int unsigned NOT NULL,
+  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `content` text COLLATE utf8mb4_unicode_ci,
+  `category` enum('general','nutrition','training','progress','health') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'general',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_coach_client` (`coach_id`,`client_id`),
+  KEY `idx_client` (`client_id`),
+  CONSTRAINT `client_notes_ibfk_1` FOREIGN KEY (`coach_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `client_notes_ibfk_2` FOREIGN KEY (`client_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

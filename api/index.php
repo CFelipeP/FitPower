@@ -28,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 set_exception_handler(function (Throwable $e) {
+    error_log('API Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     http_response_code(500);
     header('Content-Type: application/json');
     echo json_encode([
@@ -214,6 +215,27 @@ route('/trainers/{id}', ['method' => 'PUT', 'handler' => function($p) {
 route('/trainers/{id}', ['method' => 'DELETE', 'handler' => function($p) {
     require __DIR__ . '/routes/users/trainers.php';
     deleteTrainer($p['id']);
+}]);
+
+// --- Public Coach Catalog Routes ---
+route('/public/trainers', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/users/public_trainers.php';
+    publicListTrainers();
+}]);
+
+route('/public/trainers/specializations', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/users/public_trainers.php';
+    publicListSpecializations();
+}]);
+
+route('/public/trainers/{id}', ['method' => 'GET', 'handler' => function($p) {
+    require __DIR__ . '/routes/users/public_trainers.php';
+    publicGetTrainer($p['id']);
+}]);
+
+route('/public/testimonials', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/users/public_trainers.php';
+    publicListTestimonials();
 }]);
 
 // --- Client Routes (for coach) ---
@@ -463,6 +485,17 @@ route('/paypal/webhook', ['method' => 'POST', 'handler' => function() {
     handlePayPalWebhook();
 }]);
 
+// --- Virtual Wallet Routes ---
+route('/wallet/create-subscription', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/finance/wallet.php';
+    createWalletSubscription();
+}]);
+
+route('/wallet/webhook', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/finance/wallet.php';
+    handleWalletWebhook();
+}]);
+
 // --- Chat Routes ---
 route('/conversations', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/chat/chat.php';
@@ -572,6 +605,51 @@ route('/photos', ['method' => 'POST', 'handler' => function() {
 route('/photos/{id}', ['method' => 'DELETE', 'handler' => function($p) {
     require __DIR__ . '/routes/health/photos.php';
     deletePhoto($p);
+}]);
+
+// --- Profile Photo Upload ---
+route('/upload/profile-photo', ['method' => 'POST', 'handler' => function() {
+    $auth = requireAuth();
+    $userId = $auth['sub'];
+
+    if (empty($_FILES['photo'])) {
+        error('No se envió ninguna imagen', 422);
+    }
+
+    $file = $_FILES['photo'];
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        error('Error al subir la imagen', 500);
+    }
+
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    $allowed = ['jpg', 'jpeg', 'png'];
+    if (!in_array($ext, $allowed, true)) {
+        error('Formato no permitido. Use jpg, jpeg o png', 422);
+    }
+
+    $dir = UPLOAD_DIR . '/profiles';
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+
+    $filename = $userId . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+    $dest = $dir . '/' . $filename;
+
+    if (!move_uploaded_file($file['tmp_name'], $dest)) {
+        error('Error al guardar la imagen', 500);
+    }
+
+    $photoUrl = 'uploads/profiles/' . $filename;
+
+    // Update user photo in DB
+    $db = getDB();
+    $db->prepare("UPDATE users SET photo = ? WHERE id = ?")->execute([$photoUrl, $userId]);
+
+    $baseUrl = rtrim(APP_URL, '/');
+    success([
+        'photo' => $photoUrl,
+        'photoUrl' => $baseUrl . '/' . $photoUrl,
+    ], 'Foto actualizada');
 }]);
 
 // --- Admin User Management Routes ---
@@ -1075,6 +1153,56 @@ route('/admin/notifications/broadcast', ['method' => 'POST', 'handler' => functi
     broadcastNotification();
 }]);
 
+// --- Admin Media Routes ---
+route('/admin/media', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/admin/media.php';
+    adminListMedia();
+}]);
+
+route('/admin/media', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/admin/media.php';
+    adminUploadMedia();
+}]);
+
+route('/admin/media/{id}', ['method' => 'DELETE', 'handler' => function($p) {
+    require __DIR__ . '/routes/admin/media.php';
+    adminDeleteMedia($p['id']);
+}]);
+
+// --- Admin Settings Routes ---
+route('/admin/settings', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/admin/settings.php';
+    adminGetSettings();
+}]);
+
+route('/admin/settings', ['method' => 'PUT', 'handler' => function() {
+    require __DIR__ . '/routes/admin/settings.php';
+    adminUpdateSettings();
+}]);
+
+// --- Admin Flagged Reports Routes ---
+route('/admin/flagged-reports', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/admin/flagged_reports.php';
+    adminListFlaggedReports();
+}]);
+
+route('/admin/flagged-reports/{id}', ['method' => 'PUT', 'handler' => function($p) {
+    require __DIR__ . '/routes/admin/flagged_reports.php';
+    adminUpdateFlaggedReport($p['id']);
+}]);
+
+// --- Admin Sessions Routes ---
+route('/admin/sessions', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/admin/sessions.php';
+    adminListSessions();
+}]);
+
+// --- Admin Security Routes ---
+route('/admin/security', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/admin/security.php';
+    adminSecurityMetrics();
+}]);
+
 // --- Coach Client Detail Routes ---
 route('/coach/clients/{id}/checkins', ['method' => 'GET', 'handler' => function($p) {
     require __DIR__ . '/routes/users/coach.php';
@@ -1119,6 +1247,21 @@ route('/coach/clients/{id}/routines', ['method' => 'POST', 'handler' => function
 route('/coach/client/{id}/daily-summary', ['method' => 'GET', 'handler' => function($p) {
     require __DIR__ . '/routes/users/coach.php';
     getClientDailySummary($p['id']);
+}]);
+
+route('/coach/clients/{id}/notes', ['method' => 'GET', 'handler' => function($p) {
+    require __DIR__ . '/routes/users/coach.php';
+    getClientNotes($p['id']);
+}]);
+
+route('/coach/clients/{id}/notes', ['method' => 'POST', 'handler' => function($p) {
+    require __DIR__ . '/routes/users/coach.php';
+    createClientNote($p['id']);
+}]);
+
+route('/coach/notes/{id}', ['method' => 'DELETE', 'handler' => function($p) {
+    require __DIR__ . '/routes/users/coach.php';
+    deleteClientNote($p['id']);
 }]);
 
 // --- Coach Stripe & Finance Routes ---
@@ -1196,6 +1339,11 @@ route('/recipes/{id}', ['method' => 'DELETE', 'handler' => function($p) {
 }]);
 
 // --- Admin Forum Management Routes ---
+route('/admin/forum/topics', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/community/forum.php';
+    adminListTopics();
+}]);
+
 route('/admin/forum/topics/{id}/pin', ['method' => 'PUT', 'handler' => function($p) {
     require __DIR__ . '/routes/community/forum.php';
     pinTopic($p['id']);

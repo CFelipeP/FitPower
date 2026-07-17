@@ -223,6 +223,17 @@ function adminDashboard(): void {
         ['label' => 'Coach Approval Rate', 'value' => '100%', 'pct' => 100, 'cls' => 'purple'],
     ];
 
+    // Security data
+    $activeSessionsSec = (int)$db->query("SELECT COUNT(*) FROM users WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) AND status = 'active'")->fetchColumn();
+    $blockedAttemptsSec = (int)$db->query("SELECT COUNT(*) FROM login_throttle WHERE locked_until IS NOT NULL AND locked_until >= DATE_SUB(NOW(), INTERVAL 7 DAY)")->fetchColumn();
+    $warningsSec = (int)$db->query("SELECT COUNT(*) FROM admin_audit_log WHERE action IN ('suspicious_login', 'failed_access', 'permission_denied') AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetchColumn();
+    $adminCountSec = (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'active'")->fetchColumn();
+    $verifyRateSec = $totalUsers > 0 ? round((int)$db->query("SELECT COUNT(*) FROM users WHERE email_verified_at IS NOT NULL")->fetchColumn() / $totalUsers * 100) : 100;
+    $secScore = 'A+';
+    if ($verifyRateSec < 50 || $blockedAttemptsSec > 100) $secScore = 'B';
+    if ($verifyRateSec < 30 || $blockedAttemptsSec > 500) $secScore = 'C';
+    if ($blockedAttemptsSec > 1000) $secScore = 'D';
+
     success([
         'userName' => $userName,
         'kpis' => [
@@ -244,6 +255,13 @@ function adminDashboard(): void {
         'supportTickets' => $tickets,
         'activities' => $activities,
         'infrastructure' => $infrastructure,
+        'security' => [
+            'score' => $secScore,
+            'activeSessions' => $activeSessionsSec,
+            'warnings' => $warningsSec,
+            'blockedAttempts' => $blockedAttemptsSec,
+            'adminCount' => $adminCountSec,
+        ],
     ]);
 }
 
@@ -357,6 +375,7 @@ function adminAnalyticsDetailed(): void {
 function coachDashboard(): void {
     $auth = requireRole('coach', 'admin');
     $db = getDB();
+    $analyticsDays = min(365, max(7, (int)($_GET['days'] ?? 30)));
 
     $userStmt = $db->prepare("SELECT first_name, last_name FROM users WHERE id = ?");
     $userStmt->execute([$auth['sub']]);
@@ -445,13 +464,13 @@ function coachDashboard(): void {
 
     // Clients progress
     $clientStmt = $db->prepare("
-        SELECT u.id, u.first_name, u.last_name, MAX(up.progress) as progress
+        SELECT u.id, u.first_name, u.last_name, u.photo, up.progress,
+               p.name as program_name
         FROM user_programs up
         JOIN users u ON u.id = up.user_id
         JOIN programs p ON p.id = up.program_id
         WHERE p.trainer_id = ? AND up.status = 'active'
-        GROUP BY u.id
-        ORDER BY progress DESC LIMIT 5
+        ORDER BY up.progress DESC LIMIT 5
     ");
     $clientStmt->execute([$trainerId]);
     $clients = [];
@@ -460,42 +479,47 @@ function coachDashboard(): void {
         $cls = $pct >= 80 ? 'green' : ($pct >= 40 ? 'yellow' : 'red');
         $clients[] = [
             'name' => $c['first_name'] . ' ' . $c['last_name'],
+            'photo' => $c['photo'] ?? '',
             'count' => $pct . '%',
             'countCls' => $cls,
             'pct' => $pct,
             'barCls' => $cls,
-            'detail' => 'Program progress',
+            'detail' => $c['program_name'] . ' — ' . $pct . '% complete',
             'seed' => (string)$c['id'],
         ];
     }
 
     // Programs
     $progStmt = $db->prepare("
-        SELECT id, name, enrollments, weeks, sessions_per_week
-        FROM programs WHERE trainer_id = ? AND status = 'active' ORDER BY enrollments DESC
+        SELECT p.id, p.name, p.enrollments, p.weeks, p.sessions_per_week,
+               (SELECT COUNT(*) FROM user_programs up WHERE up.program_id = p.id AND up.started_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY)) as recent
+        FROM programs p WHERE p.trainer_id = ? AND p.status = 'active' ORDER BY p.enrollments DESC
     ");
-    $progStmt->execute([$trainerId]);
+    $progStmt->execute([$analyticsDays, $trainerId]);
     $icons = ['Flame', 'Dumbbell', 'Heart', 'Zap'];
     $iconCls = ['orange', 'blue', 'purple', 'green'];
     $programs = [];
     foreach ($progStmt as $i => $p) {
+        $totalEnrollments = (int)$p['enrollments'];
+        $recentEnrollments = (int)$p['recent'];
+        $changePct = $totalEnrollments > 0 ? '+' . round($recentEnrollments / $totalEnrollments * 100) . '%' : '0%';
         $programs[] = [
             'name' => $p['name'],
             'detail' => $p['enrollments'] . ' clients · ' . ($p['weeks'] ?? 12) . ' weeks · ' . ($p['sessions_per_week'] ?? 4) . 'x/week',
-            'change' => '+12%',
+            'change' => $changePct,
             'cls' => 'up',
             'icon' => $icons[$i % count($icons)],
             'iconCls' => $iconCls[$i % count($iconCls)],
         ];
     }
 
-    // Completion rate (2 queries → 1)
+    // Completion rate (filtered by analytics days)
     $compRow = $db->prepare("
         SELECT
-            (SELECT COUNT(*) FROM sessions WHERE trainer_id = ? AND status = 'completed' AND date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as completed,
-            (SELECT COUNT(*) FROM sessions WHERE trainer_id = ? AND date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) as total_sess
+            (SELECT COUNT(*) FROM sessions WHERE trainer_id = ? AND status = 'completed' AND date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)) as completed,
+            (SELECT COUNT(*) FROM sessions WHERE trainer_id = ? AND date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)) as total_sess
     ");
-    $compRow->execute([$trainerId, $trainerId]);
+    $compRow->execute([$trainerId, $analyticsDays, $trainerId, $analyticsDays]);
     $compData = $compRow->fetch();
     $completed = (int)$compData['completed'];
     $totalSess = (int)$compData['total_sess'];
@@ -504,7 +528,7 @@ function coachDashboard(): void {
     // Reviews / Feedback
     $reviewStmt = $db->prepare("
         SELECT r.rating, r.comment, r.created_at,
-               CONCAT(u.first_name, ' ', u.last_name) as user_name, u.id as user_id
+               CONCAT(u.first_name, ' ', u.last_name) as user_name, u.id as user_id, u.photo as user_photo
         FROM reviews r
         JOIN users u ON u.id = r.user_id
         WHERE r.trainer_id = ?
@@ -522,6 +546,7 @@ function coachDashboard(): void {
             'text' => $r['comment'] ?? 'Great session!',
             'date' => date('M j, Y', strtotime($r['created_at'])),
             'seed' => (string)$r['user_id'],
+            'photo' => $r['user_photo'] ?? '',
             'tags' => [],
         ];
         $feedback[] = [
@@ -530,6 +555,7 @@ function coachDashboard(): void {
             'text' => $r['comment'] ?? 'Great session!',
             'meta' => date('M j, Y', strtotime($r['created_at'])),
             'seed' => (string)$r['user_id'],
+            'photo' => $r['user_photo'] ?? '',
         ];
     }
     if (!$reviews) {
@@ -539,10 +565,14 @@ function coachDashboard(): void {
 
     // Full client roster
     $rosterStmt = $db->prepare("
-        SELECT DISTINCT u.id, u.first_name, u.last_name, up.progress
+        SELECT DISTINCT u.id, u.first_name, u.last_name, u.photo, up.progress,
+               p.name as program_name,
+               COALESCE(sp.name, 'No Plan') as plan_name
         FROM user_programs up
         JOIN users u ON u.id = up.user_id
         JOIN programs p ON p.id = up.program_id
+        LEFT JOIN user_subscriptions us ON us.user_id = u.id AND us.status = 'active'
+        LEFT JOIN subscription_plans sp ON sp.id = us.plan_id
         WHERE p.trainer_id = ? AND up.status = 'active'
         ORDER BY u.first_name LIMIT 20
     ");
@@ -555,9 +585,9 @@ function coachDashboard(): void {
         $dotCls = $pct >= 80 ? 'green' : ($pct >= 40 ? 'yellow' : 'red');
         $clientRoster[] = [
             'name' => $c['first_name'] . ' ' . $c['last_name'],
-            'seed' => (string)$c['id'],
-            'tier' => 'Active',
-            'prog' => 'Program',
+            'photo' => $c['photo'] ?? '',
+            'tier' => $c['plan_name'] === 'No Plan' ? 'Free' : $c['plan_name'],
+            'prog' => $c['program_name'],
             'progCls' => 'orange',
             'status' => $status,
             'statusCls' => $statusCls,
@@ -607,7 +637,7 @@ function coachDashboard(): void {
     }
 
 
-    // Earnings totals (5 queries → 1)
+    // Earnings totals
     $earnRow = $db->query("
         SELECT
             (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed') as earnings_total,
@@ -622,6 +652,17 @@ function coachDashboard(): void {
     $prodRev = (int)$earnRow['prod_rev'];
     $pendingPayout = (int)$earnRow['pending_payout'];
 
+    // Calculate MoM growth from payments
+    $growthRow = $db->query("
+        SELECT
+            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed' AND created_at >= DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH, '%Y-%m-01')) as this_month,
+            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed' AND created_at >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01') AND created_at < DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH, '%Y-%m-01')) as last_month
+    ")->fetch();
+    $thisMonth = (float)$growthRow['this_month'];
+    $lastMonth = (float)$growthRow['last_month'];
+    $growthPct = $lastMonth > 0 ? round(($thisMonth - $lastMonth) / $lastMonth * 100) : 0;
+    $growthText = ($growthPct >= 0 ? '+' : '') . $growthPct . '% MoM';
+
     $totalEarnings = $subRev + $coachRev + $prodRev ?: 1;
 
     $earningsBreakdown = [
@@ -632,6 +673,7 @@ function coachDashboard(): void {
 
     success([
         'userName' => $userName,
+        'analyticsDays' => $analyticsDays,
         'kpis' => [
             'activeClients' => $clientCount,
             'todaySessions' => $todayCount,
@@ -650,7 +692,7 @@ function coachDashboard(): void {
         'earnings' => [
             'breakdown' => $earningsBreakdown,
             'total' => '$' . number_format($earningsTotal),
-            'growth' => '+22% MoM',
+            'growth' => $growthText,
             'pendingPayout' => '$' . number_format($pendingPayout),
             'sessionsDelivered' => array_sum($weekCounts),
         ],
