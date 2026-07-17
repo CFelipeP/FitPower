@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
-import { Search, Filter, X, Check, Ban, Trash2 } from 'lucide-react'
+import { Search, Filter, X, Check, Ban, Trash2, AlertTriangle } from 'lucide-react'
 
 export default function AdminUsers() {
     const { showToast } = useToast()
@@ -14,6 +14,7 @@ export default function AdminUsers() {
     const [selected, setSelected] = useState([])
     const [userModalOpen, setUserModalOpen] = useState(false)
     const [selectedUser, setSelectedUser] = useState(null)
+    const [confirmAction, setConfirmAction] = useState(null)
     const debounceRef = useRef(null)
 
     const fetchUsers = useCallback((p = 1, s = '', r = '', st = '') => {
@@ -68,9 +69,8 @@ export default function AdminUsers() {
     }
 
     const suspendUser = async (id) => {
-        if (!confirm('Suspend this user?')) return
-        try { await apiFetch(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'suspended' }) }); showToast('User suspended'); fetchUsers(page, search, roleFilter, statusFilter) }
-        catch (e) { showToast(e.message || 'Error') }
+        const user = users.find(u => u.id === id) || selectedUser
+        setConfirmAction({ type: 'suspend', user })
     }
 
     const activateUser = async (id) => {
@@ -79,9 +79,27 @@ export default function AdminUsers() {
     }
 
     const deleteUser = async (id) => {
-        if (!confirm('¿Eliminar este usuario permanentemente? Esta acción no se puede deshacer.')) return
-        try { await apiFetch(`/admin/users/${id}`, { method: 'DELETE' }); showToast('User deleted'); fetchUsers(page, search, roleFilter, statusFilter) }
-        catch (e) { showToast(e.message || 'Error') }
+        const user = users.find(u => u.id === id) || selectedUser
+        setConfirmAction({ type: 'delete', user })
+    }
+
+    const executeConfirmAction = async () => {
+        if (!confirmAction) return
+        const { type, user } = confirmAction
+        try {
+            if (type === 'delete') {
+                await apiFetch(`/admin/users/${user.id}`, { method: 'DELETE' })
+                showToast('User deleted')
+            } else if (type === 'suspend') {
+                const newStatus = user.status === 'suspended' ? 'active' : 'suspended'
+                await apiFetch(`/admin/users/${user.id}`, { method: 'PUT', body: JSON.stringify({ status: newStatus }) })
+                showToast('User ' + (newStatus === 'suspended' ? 'suspended' : 'activated'))
+            }
+            setConfirmAction(null)
+            setUserModalOpen(false)
+            setSelectedUser(null)
+            fetchUsers(page, search, roleFilter, statusFilter)
+        } catch (e) { showToast(e.message || 'Error'); setConfirmAction(null) }
     }
 
     const totalPages = Math.ceil(total / 20)
@@ -196,6 +214,55 @@ export default function AdminUsers() {
                     )}
                 </div>
             </div>
+
+            {confirmAction && (
+                <div className="ad-modal-overlay ad-modal-open" onClick={(e) => { if (e.target === e.currentTarget) setConfirmAction(null) }}>
+                    <div className="ad-modal-content" style={{ maxWidth: 420, textAlign: 'center' }}>
+                        {confirmAction.type === 'delete' ? (
+                            <>
+                                <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(239,68,68,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                                    <AlertTriangle size={32} color="#ef4444" />
+                                </div>
+                                <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>Eliminar usuario</h3>
+                                <p style={{ color: '#a3a3a3', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+                                    ¿Eliminar permanentemente a <strong style={{ color: '#fff' }}>{confirmAction.user?.firstName} {confirmAction.user?.lastName}</strong> ({confirmAction.user?.email})?<br />
+                                    <span style={{ color: '#ef4444', fontSize: 13 }}>Esta acción no se puede deshacer.</span>
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(245,158,11,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                                    <AlertTriangle size={32} color="#f59e0b" />
+                                </div>
+                                <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>
+                                    {confirmAction.user?.status === 'suspended' ? 'Reactivar' : 'Suspender'} usuario
+                                </h3>
+                                <p style={{ color: '#a3a3a3', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+                                    ¿{confirmAction.user?.status === 'suspended' ? 'Reactivar' : 'Suspender'} a <strong style={{ color: '#fff' }}>{confirmAction.user?.firstName} {confirmAction.user?.lastName}</strong>?
+                                    {confirmAction.user?.status !== 'suspended' && <><br /><span style={{ color: '#f59e0b', fontSize: 13 }}>El usuario no podrá acceder a la plataforma.</span></>}
+                                </p>
+                            </>
+                        )}
+                        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                            <button className="ad-btn ad-btn-secondary" onClick={() => setConfirmAction(null)}>Cancelar</button>
+                            <button
+                                className="ad-btn"
+                                style={{
+                                    background: confirmAction.type === 'delete' ? '#dc2626' : undefined,
+                                    color: '#fff',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6
+                                }}
+                                onClick={executeConfirmAction}
+                            >
+                                {confirmAction.type === 'delete' && <Trash2 size={14} />}
+                                {confirmAction.type === 'delete' ? 'Eliminar' : confirmAction.user?.status === 'suspended' ? 'Reactivar' : 'Suspender'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
