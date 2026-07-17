@@ -130,7 +130,13 @@ export default function VideoCall({ roomId, onClose, onError }) {
 
         let stream
         if (!navigator.mediaDevices) {
-            throw new Error('Media devices not available')
+            const msg = window.location.protocol === 'https:'
+                ? 'Los dispositivos de media no están disponibles en este navegador'
+                : 'Las videollamadas requieren HTTPS. Accede via https://'
+            setConnError(msg)
+            setConnecting(false)
+            onError?.(msg)
+            return
         }
         try {
             stream = await navigator.mediaDevices.getUserMedia({
