@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
-import { Search, Filter, X, Check, Ban } from 'lucide-react'
+import { Search, Filter, X, Check, Ban, Trash2 } from 'lucide-react'
 
 export default function AdminUsers() {
     const { showToast } = useToast()
@@ -78,6 +78,12 @@ export default function AdminUsers() {
         catch (e) { showToast(e.message || 'Error') }
     }
 
+    const deleteUser = async (id) => {
+        if (!confirm('¿Eliminar este usuario permanentemente? Esta acción no se puede deshacer.')) return
+        try { await apiFetch(`/admin/users/${id}`, { method: 'DELETE' }); showToast('User deleted'); fetchUsers(page, search, roleFilter, statusFilter) }
+        catch (e) { showToast(e.message || 'Error') }
+    }
+
     const totalPages = Math.ceil(total / 20)
 
     return (
@@ -134,6 +140,7 @@ export default function AdminUsers() {
                                     {u.status === 'suspended'
                                         ? <button className="ad-btn ad-btn-primary ad-btn-xs" onClick={() => activateUser(u.id)}>Activate</button>
                                         : <button className="ad-btn ad-btn-danger ad-btn-xs" onClick={() => suspendUser(u.id)}>Suspend</button>}
+                                    <button className="ad-btn ad-btn-danger ad-btn-xs" style={{ marginLeft: 4, background: '#991b1b' }} onClick={() => deleteUser(u.id)} title="Delete user"><Trash2 size={12} /></button>
                                 </td>
                             </tr>
                         ))}
@@ -182,6 +189,7 @@ export default function AdminUsers() {
                                 {selectedUser.status === 'suspended'
                                     ? <button className="ad-btn ad-btn-primary" onClick={() => { activateUser(selectedUser.id); setUserModalOpen(false) }}>Activate User</button>
                                     : <button className="ad-btn ad-btn-danger" onClick={() => { suspendUser(selectedUser.id); setUserModalOpen(false) }}>Suspend User</button>}
+                                <button className="ad-btn ad-btn-danger" style={{ background: '#991b1b' }} onClick={() => { deleteUser(selectedUser.id); setUserModalOpen(false) }}><Trash2 size={14} /> Delete</button>
                                 <button className="ad-btn ad-btn-secondary" onClick={() => { setUserModalOpen(false); setSelectedUser(null) }}><X size={16} /></button>
                             </div>
                         </>

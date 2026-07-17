@@ -673,6 +673,11 @@ route('/admin/users/{id}', ['method' => 'PUT', 'handler' => function($p) {
     adminUpdateUser($p['id']);
 }]);
 
+route('/admin/users/{id}', ['method' => 'DELETE', 'handler' => function($p) {
+    require __DIR__ . '/routes/users/users.php';
+    adminDeleteUser($p['id']);
+}]);
+
 route('/admin/coaches', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/users/users.php';
     adminListCoaches();

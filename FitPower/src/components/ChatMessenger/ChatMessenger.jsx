@@ -6,7 +6,7 @@ import './ChatMessenger.css'
 
 const WS_URL = import.meta.env.VITE_WS_URL || (() => {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${protocol}//${location.hostname}:5180`
+  return `${protocol}//${location.host}/ws/chat`
 })()
 const POLL_INTERVAL = 15000
 const EMOJIS = ['😀','😎','🔥','💪','❤️','👍','🎉','💯','😂','😍','🙌','👏','✨','🤝','💀','👀','😅','🥹','😤','🙏','💥','⚡','🔥','💪','🏆','🥇','🎯','💡','🎵','🎶','💜','🌟','⭐','🌈','🫶']

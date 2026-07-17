@@ -5,7 +5,7 @@ import './VideoCall.css'
 
 const WS_URL = import.meta.env.VITE_MEDIASOUP_WS_URL || (() => {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${protocol}//${location.hostname}:5181`
+  return `${protocol}//${location.host}/ws/mediasoup`
 })()
 
 let wsIdCounter = 0
