@@ -613,3 +613,33 @@ function deleteUser(string $id): void {
 
     success(null, 'Usuario suspendido');
 }
+
+function adminDeleteUser(string $id): void {
+    $auth = requireRole('admin');
+    $db = getDB();
+
+    if ((int)$id === (int)$auth['sub']) {
+        error('No puedes eliminar tu propia cuenta', 403);
+    }
+
+    $stmt = $db->prepare("SELECT id, email, role FROM users WHERE id = ?");
+    $stmt->execute([$id]);
+    $targetUser = $stmt->fetch();
+
+    if (!$targetUser) {
+        error('Usuario no encontrado', 404);
+    }
+
+    if ($targetUser['role'] === 'admin') {
+        $adminCount = (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'active'")->fetchColumn();
+        if ($adminCount <= 1) {
+            error('No puedes eliminar al único administrador activo del sistema', 409);
+        }
+    }
+
+    $db->prepare("DELETE FROM users WHERE id = ?")->execute([$id]);
+
+    logAdminAction($auth['sub'], 'delete_user', 'user', (int)$id, ['email' => $targetUser['email'] ?? '']);
+
+    success(null, 'Usuario eliminado permanentemente');
+}
