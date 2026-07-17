@@ -546,16 +546,16 @@ function adminApproveCoach(string $id): void {
 
     logAdminAction($auth['sub'], 'approve_coach', 'user', (int)$id, null);
 
-    $db->prepare("INSERT INTO notifications (user_id, type, title, message, icon, link, created_at) VALUES (?, 'account', 'Coach aprobado', ?, 'Award', '/coach/dashboard', NOW())")->execute([(int)$id, '¡Felicidades! Tu perfil de coach ha sido aprobado.']);
+    $db->prepare("INSERT INTO notifications (user_id, type, title, message, icon, link, created_at) VALUES (?, 'account', 'Coach Approved', ?, 'Award', '/coach/dashboard', NOW())")->execute([(int)$id, 'Congratulations! Your coach profile has been approved.']);
 
-    success(null, 'Coach ' . ($status === 'approved' ? 'aprobado' : ($status === 'rejected' ? 'rechazado' : 'suspendido')));
+    success(null, 'Coach ' . ($status === 'approved' ? 'approved' : ($status === 'rejected' ? 'rejected' : 'suspended')));
 }
 
 function adminBatchSuspend(): void {
     $auth = requireRole('admin');
     $input = getJsonInput();
     $ids = $input['ids'] ?? [];
-    if (empty($ids)) error('Debe incluir IDs de usuarios', 422);
+    if (empty($ids)) error('Must include user IDs', 422);
     $db = getDB();
     $stmt = $db->prepare("UPDATE users SET status = 'suspended' WHERE id = ? AND id != ?");
     $count = 0;
@@ -563,14 +563,14 @@ function adminBatchSuspend(): void {
         $stmt->execute([(int)$id, $auth['sub']]);
         $count += $stmt->rowCount();
     }
-    success(['affected' => $count], "$count usuarios suspendidos");
+    success(['affected' => $count], "$count users suspended");
 }
 
 function adminBatchActivate(): void {
     $auth = requireRole('admin');
     $input = getJsonInput();
     $ids = $input['ids'] ?? [];
-    if (empty($ids)) error('Debe incluir IDs de usuarios', 422);
+    if (empty($ids)) error('Must include user IDs', 422);
     $db = getDB();
     $stmt = $db->prepare("UPDATE users SET status = 'active' WHERE id = ?");
     $count = 0;
@@ -578,7 +578,7 @@ function adminBatchActivate(): void {
         $stmt->execute([(int)$id]);
         $count += $stmt->rowCount();
     }
-    success(['affected' => $count], "$count usuarios activados");
+    success(['affected' => $count], "$count users activated");
 }
 
 function deleteUser(string $id): void {
@@ -586,7 +586,7 @@ function deleteUser(string $id): void {
     $db = getDB();
 
     if ((int)$id === (int)$auth['sub']) {
-        error('No puedes suspender tu propia cuenta', 403);
+        error('You cannot suspend your own account', 403);
     }
 
     $stmt = $db->prepare("SELECT id, email, role FROM users WHERE id = ?");
@@ -594,24 +594,24 @@ function deleteUser(string $id): void {
     $targetUser = $stmt->fetch();
 
     if (!$targetUser) {
-        error('Usuario no encontrado', 404);
+        error('User not found', 404);
     }
 
     // Prevent suspending the last active admin
     if ($targetUser['role'] === 'admin') {
         $adminCount = (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'active'")->fetchColumn();
         if ($adminCount <= 1) {
-            error('No puedes suspender al único administrador activo del sistema', 409);
+            error('Cannot suspend the only active admin', 409);
         }
     }
 
     $db->prepare("UPDATE users SET status = 'suspended' WHERE id = ?")->execute([$id]);
 
-    $db->prepare("INSERT INTO notifications (user_id, type, title, message, icon, link, created_at) VALUES (?, 'account', 'Cuenta suspendida', ?, 'Shield', '/client/dashboard', NOW())")->execute([(int)$id, 'Tu cuenta ha sido suspendida. Contacta al soporte para más información.']);
+    $db->prepare("INSERT INTO notifications (user_id, type, title, message, icon, link, created_at) VALUES (?, 'account', 'Account Suspended', ?, 'Shield', '/client/dashboard', NOW())")->execute([(int)$id, 'Your account has been suspended. Contact support for more information.']);
 
     logAdminAction($auth['sub'], 'suspend_user', 'user', (int)$id, ['email' => $targetUser['email'] ?? '']);
 
-    success(null, 'Usuario suspendido');
+    success(null, 'User suspended');
 }
 
 function adminDeleteUser(string $id): void {
@@ -619,7 +619,7 @@ function adminDeleteUser(string $id): void {
     $db = getDB();
 
     if ((int)$id === (int)$auth['sub']) {
-        error('No puedes eliminar tu propia cuenta', 403);
+        error('You cannot delete your own account', 403);
     }
 
     $stmt = $db->prepare("SELECT id, email, role FROM users WHERE id = ?");
@@ -627,13 +627,13 @@ function adminDeleteUser(string $id): void {
     $targetUser = $stmt->fetch();
 
     if (!$targetUser) {
-        error('Usuario no encontrado', 404);
+        error('User not found', 404);
     }
 
     if ($targetUser['role'] === 'admin') {
         $adminCount = (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'active'")->fetchColumn();
         if ($adminCount <= 1) {
-            error('No puedes eliminar al único administrador activo del sistema', 409);
+            error('Cannot delete the only active admin', 409);
         }
     }
 
@@ -643,14 +643,14 @@ function adminDeleteUser(string $id): void {
         if (str_contains($e->getMessage(), 'foreign key constraint') || str_contains($e->getMessage(), 'a foreign key constraint fails')) {
             $db->prepare("UPDATE users SET status = 'suspended' WHERE id = ?")->execute([$id]);
             logAdminAction($auth['sub'], 'suspend_user', 'user', (int)$id, ['email' => $targetUser['email'] ?? '', 'reason' => 'has_related_data']);
-            success(null, 'El usuario tiene datos asociados y fue suspendido en su lugar');
+            success(null, 'User has associated data and was suspended instead');
         }
-        error('Error al eliminar usuario: ' . $e->getMessage(), 500);
+        error('Error deleting user: ' . $e->getMessage(), 500);
     }
 
     logAdminAction($auth['sub'], 'delete_user', 'user', (int)$id, ['email' => $targetUser['email'] ?? '']);
 
-    success(null, 'Usuario eliminado permanentemente');
+    success(null, 'User permanently deleted');
 }
 
 function adminBatchDelete(): void {
@@ -693,5 +693,5 @@ function adminBatchDelete(): void {
         }
     }
 
-    success(['deleted' => $deleted, 'skipped' => $skipped], "$deleted usuarios eliminados" . ($skipped ? ", $skipped suspendidos (tenían datos asociados)" : ''));
+    success(['deleted' => $deleted, 'skipped' => $skipped], "$deleted users deleted" . ($skipped ? ", $skipped suspended (had associated data)" : ''));
 }
