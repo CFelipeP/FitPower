@@ -637,7 +637,16 @@ function adminDeleteUser(string $id): void {
         }
     }
 
-    $db->prepare("DELETE FROM users WHERE id = ?")->execute([$id]);
+    try {
+        $db->prepare("DELETE FROM users WHERE id = ?")->execute([$id]);
+    } catch (\PDOException $e) {
+        if (str_contains($e->getMessage(), 'foreign key constraint') || str_contains($e->getMessage(), 'a foreign key constraint fails')) {
+            $db->prepare("UPDATE users SET status = 'suspended' WHERE id = ?")->execute([$id]);
+            logAdminAction($auth['sub'], 'suspend_user', 'user', (int)$id, ['email' => $targetUser['email'] ?? '', 'reason' => 'has_related_data']);
+            success(null, 'El usuario tiene datos asociados y fue suspendido en su lugar');
+        }
+        error('Error al eliminar usuario: ' . $e->getMessage(), 500);
+    }
 
     logAdminAction($auth['sub'], 'delete_user', 'user', (int)$id, ['email' => $targetUser['email'] ?? '']);
 
@@ -647,7 +656,7 @@ function adminDeleteUser(string $id): void {
 function adminBatchDelete(): void {
     $auth = requireRole('admin');
     $db = getDB();
-    $body = getJsonBody();
+    $body = getJsonInput();
     $ids = $body['ids'] ?? [];
 
     if (empty($ids) || !is_array($ids)) {
@@ -669,10 +678,20 @@ function adminBatchDelete(): void {
             $adminCount = (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'active'")->fetchColumn();
             if ($adminCount <= 1) { $skipped++; continue; }
         }
-        $db->prepare("DELETE FROM users WHERE id = ?")->execute([$u['id']]);
-        logAdminAction($auth['sub'], 'delete_user', 'user', (int)$u['id'], ['email' => $u['email'] ?? '', 'batch' => true]);
-        $deleted++;
+        try {
+            $db->prepare("DELETE FROM users WHERE id = ?")->execute([$u['id']]);
+            logAdminAction($auth['sub'], 'delete_user', 'user', (int)$u['id'], ['email' => $u['email'] ?? '', 'batch' => true]);
+            $deleted++;
+        } catch (\PDOException $e) {
+            if (str_contains($e->getMessage(), 'foreign key constraint') || str_contains($e->getMessage(), 'a foreign key constraint fails')) {
+                $db->prepare("UPDATE users SET status = 'suspended' WHERE id = ?")->execute([$u['id']]);
+                logAdminAction($auth['sub'], 'suspend_user', 'user', (int)$u['id'], ['email' => $u['email'] ?? '', 'batch' => true, 'reason' => 'has_related_data']);
+                $skipped++;
+            } else {
+                $skipped++;
+            }
+        }
     }
 
-    success(['deleted' => $deleted, 'skipped' => $skipped], "$deleted usuarios eliminados" . ($skipped ? ", $skipped omitidos" : ''));
+    success(['deleted' => $deleted, 'skipped' => $skipped], "$deleted usuarios eliminados" . ($skipped ? ", $skipped suspendidos (tenían datos asociados)" : ''));
 }
