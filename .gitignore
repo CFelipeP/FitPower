@@ -5,6 +5,9 @@ api/.env
 FitPower/.env
 deploy/.env.production
 
+# SSL certificates
+ssl/
+
 # Dependencies
 node_modules/
 api/vendor/
