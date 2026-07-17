@@ -643,3 +643,36 @@ function adminDeleteUser(string $id): void {
 
     success(null, 'Usuario eliminado permanentemente');
 }
+
+function adminBatchDelete(): void {
+    $auth = requireRole('admin');
+    $db = getDB();
+    $body = getJsonBody();
+    $ids = $body['ids'] ?? [];
+
+    if (empty($ids) || !is_array($ids)) {
+        error('No users selected', 400);
+    }
+
+    $ids = array_map('intval', $ids);
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+    $stmt = $db->prepare("SELECT id, email, role FROM users WHERE id IN ($placeholders)");
+    $stmt->execute($ids);
+    $users = $stmt->fetchAll();
+
+    $deleted = 0;
+    $skipped = 0;
+    foreach ($users as $u) {
+        if ((int)$u['id'] === (int)$auth['sub']) { $skipped++; continue; }
+        if ($u['role'] === 'admin') {
+            $adminCount = (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'active'")->fetchColumn();
+            if ($adminCount <= 1) { $skipped++; continue; }
+        }
+        $db->prepare("DELETE FROM users WHERE id = ?")->execute([$u['id']]);
+        logAdminAction($auth['sub'], 'delete_user', 'user', (int)$u['id'], ['email' => $u['email'] ?? '', 'batch' => true]);
+        $deleted++;
+    }
+
+    success(['deleted' => $deleted, 'skipped' => $skipped], "$deleted usuarios eliminados" . ($skipped ? ", $skipped omitidos" : ''));
+}
