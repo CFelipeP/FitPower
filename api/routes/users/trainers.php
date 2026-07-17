@@ -179,7 +179,7 @@ function createTrainer(): void {
         'lastName' => 'required|string|min:1|max:100',
         'email' => 'required|email',
         'phone' => 'required|string|min:6',
-        'password' => 'required|string|min:6',
+        'password' => 'required|string|min:8|max:255',
     ];
 
     $errors = validate($input, $rules);

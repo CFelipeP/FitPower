@@ -584,6 +584,7 @@ export default function ChatMessenger() {
                                 onChange={handleInputChange}
                                 onKeyDown={handleKeyDown}
                                 rows={1}
+                                maxLength={2000}
                             />
                             <button className="cm-send-btn" onClick={handleSend} disabled={!newMsg.trim() || sending}>
                                 <Send size={18} />

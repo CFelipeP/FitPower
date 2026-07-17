@@ -123,6 +123,18 @@ export default function ProfileEditModal({ profileForm, setProfileForm, profileF
             showToast('Session expired')
             return
         }
+        if (!profileForm.firstName?.trim()) {
+            showToast('First name is required')
+            return
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileForm.email)) {
+            showToast('Invalid email address')
+            return
+        }
+        if (profileForm.trainingDays && (Number(profileForm.trainingDays) < 1 || Number(profileForm.trainingDays) > 7)) {
+            showToast('Training days must be between 1 and 7')
+            return
+        }
         setProfileFormSaving(true)
         setSavingToast('Saving...')
         try {

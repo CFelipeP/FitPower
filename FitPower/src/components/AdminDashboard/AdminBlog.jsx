@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
 import { FileText, Plus, X, Eye, Archive } from 'lucide-react'
+import DOMPurify from 'dompurify'
 
 const emptyForm = { title: '', slug: '', content: '', excerpt: '', cover_image: '', category: '', tags: '', status: 'draft' }
 
@@ -108,7 +109,7 @@ export default function AdminBlog() {
                         <h3 className="ad-modal-title">Preview: {form.title}</h3>
                         <button className="ad-modal-close" onClick={() => setPreviewOpen(false)}><X /></button>
                     </div>
-                    <div dangerouslySetInnerHTML={{ __html: form.content }} style={{ color: '#d4d4d4', fontSize: 14, lineHeight: 1.7 }} />
+                    <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(form.content) }} style={{ color: '#d4d4d4', fontSize: 14, lineHeight: 1.7 }} />
                 </div>
             </div>
         </div>

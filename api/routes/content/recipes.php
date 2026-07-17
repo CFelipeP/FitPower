@@ -35,7 +35,13 @@ function listRecipes(): void {
 function createRecipe(): void {
     $auth = requireAuth();
     $input = getJsonInput();
-    $rules = ['name' => 'required|string|min:1|max:255'];
+    $rules = [
+        'name' => 'required|string|min:1|max:255',
+        'calories' => 'sometimes|numeric|min:0|max:10000',
+        'protein' => 'sometimes|numeric|min:0|max:500',
+        'carbs' => 'sometimes|numeric|min:0|max:500',
+        'fat' => 'sometimes|numeric|min:0|max:500',
+    ];
     $errors = validate($input, $rules);
     if ($errors) error('Error de validación', 422, $errors);
     $db = getDB();

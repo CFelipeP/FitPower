@@ -41,15 +41,19 @@ function submitContact(): void {
         try {
             if (file_exists(__DIR__ . '/../../helpers/mailer.php')) {
                 require_once __DIR__ . '/../../helpers/mailer.php';
-                $subject = 'New Contact Message from ' . $input['firstName'];
+                $subject = 'New Contact Message from ' . htmlspecialchars($input['firstName'], ENT_QUOTES, 'UTF-8');
+                $safeName = htmlspecialchars($input['firstName'], ENT_QUOTES, 'UTF-8');
+                $safeEmail = htmlspecialchars($input['email'], ENT_QUOTES, 'UTF-8');
+                $safeSubject = htmlspecialchars($input['subject'], ENT_QUOTES, 'UTF-8');
+                $safeMessage = htmlspecialchars($input['message'], ENT_QUOTES, 'UTF-8');
                 $html = "
                 <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;'>
                     <h2>New Contact Message</h2>
-                    <p><strong>Name:</strong> {$input['firstName']}</p>
-                    <p><strong>Email:</strong> {$input['email']}</p>
-                    <p><strong>Subject:</strong> {$input['subject']}</p>
+                    <p><strong>Name:</strong> {$safeName}</p>
+                    <p><strong>Email:</strong> {$safeEmail}</p>
+                    <p><strong>Subject:</strong> {$safeSubject}</p>
                     <p><strong>Message:</strong></p>
-                    <blockquote style='border-left: 4px solid #FFD600; padding: 10px 20px; margin: 0;'>{$input['message']}</blockquote>
+                    <blockquote style='border-left: 4px solid #FFD600; padding: 10px 20px; margin: 0;'>{$safeMessage}</blockquote>
                 </div>";
                 sendEmail($admin['email'], $subject, $html);
             }
