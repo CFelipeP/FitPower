@@ -4,14 +4,12 @@ RUN apt-get update && apt-get install -y \
     libpng-dev libjpeg-dev libfreetype6-dev \
     libzip-dev unzip git curl \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) gd pdo_mysql mbstring zip
+    && docker-php-ext-install -j$(nproc) gd pdo_mysql mbstring zip \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/api
-COPY . .
-
-RUN composer install --no-interaction --optimize-autoloader --no-dev
 
 RUN mkdir -p uploads/videos uploads/video-feedback && chmod -R 775 uploads
 
