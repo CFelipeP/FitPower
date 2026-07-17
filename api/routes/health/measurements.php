@@ -45,10 +45,21 @@ function saveMeasurements(): void {
         'rightArmCm' => 'right_arm_cm', 'leftThighCm' => 'left_thigh_cm', 'rightThighCm' => 'right_thigh_cm',
         'leftCalfCm' => 'left_calf_cm', 'rightCalfCm' => 'right_calf_cm',
     ];
+    $ranges = [
+        'weightKg' => [20, 300], 'bodyFatPct' => [1, 60],
+        'waistCm' => [10, 200], 'hipCm' => [10, 200], 'chestCm' => [10, 200],
+        'leftArmCm' => [10, 80], 'rightArmCm' => [10, 80],
+        'leftThighCm' => [10, 120], 'rightThighCm' => [10, 120],
+        'leftCalfCm' => [10, 80], 'rightCalfCm' => [10, 80],
+    ];
     foreach ($fieldMap as $inputKey => $dbCol) {
         if (isset($input[$inputKey])) {
+            $val = (float)$input[$inputKey];
+            if (isset($ranges[$inputKey]) && ($val < $ranges[$inputKey][0] || $val > $ranges[$inputKey][1])) {
+                error("Invalid value for $inputKey: must be between {$ranges[$inputKey][0]} and {$ranges[$inputKey][1]}", 422);
+            }
             $sets[] = "$dbCol = ?";
-            $params[] = $input[$inputKey];
+            $params[] = $val;
         }
     }
     if (empty($sets)) error('No hay campos para guardar', 400);

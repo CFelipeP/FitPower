@@ -214,6 +214,8 @@ export default function NutritionTracker() {
               <input
                 className="nt-form-input"
                 type="number"
+                min="0"
+                max="10000"
                 value={editForm.caloriesConsumed}
                 onChange={e => handleEditChange('caloriesConsumed', e.target.value)}
               />
@@ -224,6 +226,8 @@ export default function NutritionTracker() {
                 <input
                   className="nt-form-input"
                   type="number"
+                  min="0"
+                  max="500"
                   value={editForm.proteinCurrent}
                   onChange={e => handleEditChange('proteinCurrent', e.target.value)}
                 />
@@ -233,6 +237,8 @@ export default function NutritionTracker() {
                 <input
                   className="nt-form-input"
                   type="number"
+                  min="0"
+                  max="500"
                   value={editForm.carbsCurrent}
                   onChange={e => handleEditChange('carbsCurrent', e.target.value)}
                 />
@@ -242,6 +248,8 @@ export default function NutritionTracker() {
                 <input
                   className="nt-form-input"
                   type="number"
+                  min="0"
+                  max="500"
                   value={editForm.fatCurrent}
                   onChange={e => handleEditChange('fatCurrent', e.target.value)}
                 />

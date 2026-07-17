@@ -67,7 +67,12 @@ export default function TrainerRegister() {
     const certInputRef = useRef(null)
 
     const validateEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
-    const validatePassword = (val) => val.length >= 6
+    const validatePassword = (val) => val.length >= 8
+    const formatPhoneSV = (val) => {
+        const digits = val.replace(/\D/g, '').slice(0, 8)
+        if (digits.length > 4) return digits.slice(0, 4) + '-' + digits.slice(4)
+        return digits
+    }
 
     const handlePhotoChange = (e) => {
         const file = e.target.files[0]
@@ -106,7 +111,7 @@ export default function TrainerRegister() {
         const v1 = firstName.trim().length >= 1
         const v2 = lastName.trim().length >= 1
         const v3 = validateEmail(email)
-        const v4 = phone.trim().length >= 6
+        const v4 = phone.replace(/\D/g, '').length === 8
         const v5 = !!dob
         const v6 = !!gender
         const v7 = validatePassword(password)
@@ -375,7 +380,7 @@ export default function TrainerRegister() {
                                                         autoComplete="new-password"
                                                     />
                                                     <Lock size={18} className="tr-input-icon" />
-                                                    {touched1.password && !validatePassword(password) && <div className="tr-field-error visible">Min 6 characters</div>}
+                                                    {touched1.password && !validatePassword(password) && <div className="tr-field-error visible">Min 8 characters</div>}
                                                 </div>
                                                 <div className="tr-field">
                                                     <input
@@ -396,15 +401,16 @@ export default function TrainerRegister() {
                                             <div className="tr-field">
                                                 <input
                                                     type="tel"
-                                                    className={`tr-input ${touched1.phone ? (phone.trim().length >= 6 ? 'success' : 'error') : ''}`}
-                                                    placeholder="Phone number"
+                                                    className={`tr-input ${touched1.phone ? (phone.replace(/\D/g, '').length === 8 ? 'success' : 'error') : ''}`}
+                                                    placeholder="XXXX-XXXX"
                                                     value={phone}
-                                                    onChange={(e) => setPhone(e.target.value)}
+                                                    onChange={(e) => setPhone(formatPhoneSV(e.target.value))}
                                                     onBlur={() => setTouched1((p) => ({ ...p, phone: true }))}
                                                     autoComplete="tel"
+                                                    maxLength={9}
                                                 />
                                                 <Phone size={18} className="tr-input-icon" />
-                                                {touched1.phone && phone.trim().length < 6 && <div className="tr-field-error visible">Required</div>}
+                                                {touched1.phone && phone.replace(/\D/g, '').length !== 8 && <div className="tr-field-error visible">Enter 8 digits (e.g. 7012-3456)</div>}
                                             </div>
 
                                             {/* DOB + Gender */}
@@ -693,7 +699,7 @@ export default function TrainerRegister() {
                                                         <User size={18} className="tr-input-icon" />
                                                     </div>
                                                     <div className="tr-field">
-                                                        <input type="tel" className="tr-input" placeholder="Phone" value={emergPhone} onChange={(e) => setEmergPhone(e.target.value)} />
+                                                        <input type="tel" className="tr-input" placeholder="XXXX-XXXX" value={emergPhone} onChange={(e) => setEmergPhone(formatPhoneSV(e.target.value))} maxLength={9} />
                                                         <Phone size={18} className="tr-input-icon" />
                                                     </div>
                                                     <div className="tr-field">

@@ -8,6 +8,12 @@ import {
 } from 'lucide-react'
 import './CoachDashboard.css'
 
+function formatPhoneSV(val) {
+    const digits = val.replace(/\D/g, '').slice(0, 8)
+    if (digits.length > 4) return digits.slice(0, 4) + '-' + digits.slice(4)
+    return digits
+}
+
 const StarDisplay = ({ rating }) => (
     <div style={{ display: 'flex', gap: 2 }}>
         {[1, 2, 3, 4, 5].map(i => (
@@ -343,7 +349,7 @@ export default function CoachProfilePage() {
                                 </div>
                                 <div style={{ ...s.field, marginTop: 16 }}>
                                     <label style={s.label}><Phone size={12} style={{ marginRight: 4 }} /> Phone</label>
-                                    <input style={s.input} value={form.phone} onChange={handleChange('phone')} placeholder="+1 234 567 890" />
+                                    <input style={s.input} type="tel" value={form.phone} onChange={(e) => handleChange('phone')({ target: { value: formatPhoneSV(e.target.value) } })} placeholder="XXXX-XXXX" maxLength={9} />
                                 </div>
                                 <div style={{ ...s.field, marginTop: 16 }}>
                                     <label style={s.label}><Camera size={12} style={{ marginRight: 4 }} /> Photo URL</label>
@@ -442,7 +448,7 @@ export default function CoachProfilePage() {
                                     </div>
                                     <div style={s.field}>
                                         <label style={s.label}>Phone</label>
-                                        <input style={s.input} value={form.emergencyPhone} onChange={handleChange('emergencyPhone')} />
+                                        <input style={s.input} type="tel" value={form.emergencyPhone} onChange={(e) => handleChange('emergencyPhone')({ target: { value: formatPhoneSV(e.target.value) } })} placeholder="XXXX-XXXX" maxLength={9} />
                                     </div>
                                 </div>
                                 <div style={{ ...s.field, marginTop: 16 }}>
