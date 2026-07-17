@@ -8,7 +8,7 @@ import {
     X, Zap, LayoutDashboard, Users, Dumbbell, CalendarDays,
     CreditCard, BarChart3, Video, FileText, Image as ImageIcon,
     MessageCircle, AlertTriangle, Settings, Shield,
-    Search, Bell, ChevronDown, AlertCircle,
+    Search, Bell, ChevronDown, AlertCircle, Trash2,
     UserPlus, Download, DollarSign, TrendingUp, ArrowRight,
     Flame, Heart, Target, Ban, LogOut, User,
     Plus, Activity, Award, Star, Ticket, BookOpen,
@@ -405,7 +405,8 @@ export default function AdminDashboard() {
                                             <td><span className="ad-time">{u.registered ? new Date(u.registered).toLocaleDateString() : '-'}</span></td>
                                             <td>
                                                 <button className="ad-btn ad-btn-secondary ad-btn-xs" style={{marginRight:4}} onClick={(e) => { e.stopPropagation(); handleUserRowClick(u) }}>View</button>
-                                                {u.status !== 'suspended' && <button className="ad-btn ad-btn-danger ad-btn-xs" onClick={(e) => { e.stopPropagation(); if (confirm(`Suspend ${u.firstName} ${u.lastName}?`)) apiFetch('/admin/users/'+u.id, { method: 'PUT', body: JSON.stringify({ status: 'suspended' }) }).then(() => { showToast('User suspended'); fetchUsers(usersPage, usersSearch) }) }}>Suspend</button>}
+                                                {u.status !== 'suspended' && <button className="ad-btn ad-btn-danger ad-btn-xs" style={{marginRight:4}} onClick={(e) => { e.stopPropagation(); if (confirm(`Suspend ${u.firstName} ${u.lastName}?`)) apiFetch('/admin/users/'+u.id, { method: 'PUT', body: JSON.stringify({ status: 'suspended' }) }).then(() => { showToast('User suspended'); fetchUsers(usersPage, usersSearch) }) }}>Suspend</button>}
+                                                <button className="ad-btn ad-btn-danger ad-btn-xs" style={{background:'#991b1b'}} onClick={(e) => { e.stopPropagation(); if (confirm(`Eliminar permanentemente a ${u.firstName} ${u.lastName}? Esta acción no se puede deshacer.`)) apiFetch('/admin/users/'+u.id, { method: 'DELETE' }).then(() => { showToast('User deleted'); fetchUsers(usersPage, usersSearch) }).catch(err => showToast(err.message || 'Error')) }}><Trash2 size={12} /></button>
                                             </td>
                                         </tr>
                                     ))}
@@ -1256,6 +1257,13 @@ export default function AdminDashboard() {
                         }}>
                             Change Role
                         </button>
+                        <button className="ad-btn ad-btn-danger" style={{ background: '#991b1b' }} onClick={() => {
+                            if (confirm(`Eliminar permanentemente a ${selectedUser?.firstName} ${selectedUser?.lastName}? Esta acción no se puede deshacer.`)) {
+                                apiFetch('/admin/users/' + selectedUser?.id, { method: 'DELETE' })
+                                    .then(() => { showToast('User deleted'); closeModal(); fetchUsers(usersPage, usersSearch) })
+                                    .catch(err => showToast(err.message || 'Error'))
+                            }
+                        }}><Trash2 size={14} /> Delete</button>
                         <button className="ad-btn ad-btn-secondary" style={{ flex: '0', padding: '12px 16px' }} onClick={() => { closeModal(); }}>
                             <X size={16} />
                         </button>
