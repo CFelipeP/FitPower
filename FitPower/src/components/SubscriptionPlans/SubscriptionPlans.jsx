@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, X, Loader2, Crown, AlertCircle, ArrowLeftRight } from 'lucide-react'
-import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
-import PayPalSubscribeButton from '../Pricing/PayPalSubscribeButton'
 import './SubscriptionPlans.css'
 
 export default function SubscriptionPlans({ standalone = false }) {
@@ -13,10 +11,8 @@ export default function SubscriptionPlans({ standalone = false }) {
     const [subscription, setSubscription] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
-    const [subscribing, setSubscribing] = useState(null)
     const [cancelling, setCancelling] = useState(false)
     const navigate = useNavigate()
-    const { showToast } = useToast()
     const { isAuthenticated } = useAuth()
 
     useEffect(() => {
@@ -36,27 +32,12 @@ export default function SubscriptionPlans({ standalone = false }) {
         return () => { cancelled = true }
     }, [isAuthenticated])
 
-    const handleSubscribe = async (planId) => {
+    const handleSubscribe = (planId) => {
         if (!isAuthenticated) {
             navigate('/login')
             return
         }
-        setSubscribing(planId)
-        try {
-            const data = await apiFetch('/stripe/create-checkout', {
-                method: 'POST',
-                body: JSON.stringify({ plan_id: planId, billing: isYearly ? 'yearly' : 'monthly' })
-            })
-            if (data.url) {
-                window.location.assign(data.url)
-            } else {
-                showToast('Could not create checkout session')
-            }
-        } catch (err) {
-            showToast(err.message || 'Failed to start checkout')
-        } finally {
-            setSubscribing(null)
-        }
+        navigate(`/checkout?plan_id=${planId}&billing=${isYearly ? 'yearly' : 'monthly'}`)
     }
 
     const handleCancel = async () => {
@@ -64,31 +45,15 @@ export default function SubscriptionPlans({ standalone = false }) {
         try {
             await apiFetch('/stripe/cancel-subscription', { method: 'POST' })
             setSubscription(null)
-            showToast('Subscription cancelled')
         } catch (err) {
-            showToast(err.message || 'Failed to cancel')
+            alert(err.message || 'Failed to cancel')
         } finally {
             setCancelling(false)
         }
     }
 
-    const handleSwitch = async (planId) => {
-        setSubscribing(planId)
-        try {
-            const data = await apiFetch('/stripe/create-checkout', {
-                method: 'POST',
-                body: JSON.stringify({ plan_id: planId, billing: isYearly ? 'yearly' : 'monthly' })
-            })
-            if (data.url) {
-                window.location.assign(data.url)
-            } else {
-                showToast('Could not create checkout session')
-            }
-        } catch (err) {
-            showToast(err.message || 'Failed to switch plan')
-        } finally {
-            setSubscribing(null)
-        }
+    const handleSwitch = (planId) => {
+        navigate(`/checkout?plan_id=${planId}&billing=${isYearly ? 'yearly' : 'monthly'}`)
     }
 
     const activePlanId = subscription?.plan_id || subscription?.plan?.id || null
@@ -186,11 +151,9 @@ export default function SubscriptionPlans({ standalone = false }) {
                                 <button
                                     className={`sp-btn ${plan.popular ? 'sp-btn-primary' : 'sp-btn-secondary'}`}
                                     onClick={() => isCurrent ? null : isActive ? handleSwitch(plan.id) : handleSubscribe(plan.id)}
-                                    disabled={subscribing === plan.id || isCurrent}
+                                    disabled={isCurrent}
                                 >
-                                    {subscribing === plan.id ? (
-                                        <><Loader2 size={16} className="spin" /> Processing…</>
-                                    ) : isCurrent ? (
+                                    {isCurrent ? (
                                         <>Current Plan</>
                                     ) : isActive ? (
                                         <><ArrowLeftRight size={16} /> Switch to {plan.name}</>
@@ -198,13 +161,6 @@ export default function SubscriptionPlans({ standalone = false }) {
                                         <>💳 Subscribe</>
                                     )}
                                 </button>
-                                {!isCurrent && (
-                                    <PayPalSubscribeButton
-                                        planId={plan.id}
-                                        billing={isYearly ? 'yearly' : 'monthly'}
-                                        onSuccess={() => window.location.href = '/payment/success'}
-                                    />
-                                )}
                             </div>
                         </div>
                     )

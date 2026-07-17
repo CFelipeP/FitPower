@@ -4,22 +4,31 @@ require_once __DIR__ . '/config.php';
 header('Content-Type: text/plain');
 echo "Running migrations...\n\n";
 
-$db = getDB();
+$dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+$db = new PDO($dsn, DB_USER, DB_PASS, [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES => false,
+    PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+]);
+
 $migrationsDir = __DIR__ . '/database/migrations';
 
-$db->exec("CREATE TABLE IF NOT EXISTS migrations (
+$s = $db->query("CREATE TABLE IF NOT EXISTS migrations (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     migration VARCHAR(255) NOT NULL UNIQUE,
     batch INT UNSIGNED NOT NULL DEFAULT 1,
     executed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+$s->closeCursor();
 
-$ranStmt = $db->query("SELECT migration FROM migrations");
-$ranMigrations = $ranStmt->fetchAll(PDO::FETCH_COLUMN);
+$s = $db->query("SELECT migration FROM migrations");
+$ranMigrations = $s->fetchAll(PDO::FETCH_COLUMN);
+$s->closeCursor();
 
-$batchStmt = $db->query("SELECT MAX(batch) FROM migrations");
-$maxBatch = (int)$batchStmt->fetchColumn();
-$newBatch = $maxBatch + 1;
+$s = $db->query("SELECT COALESCE(MAX(batch), 0) FROM migrations");
+$newBatch = (int)$s->fetchColumn() + 1;
+$s->closeCursor();
 
 $files = glob($migrationsDir . '/*.sql');
 sort($files);
@@ -38,13 +47,13 @@ foreach ($files as $file) {
     try {
         $sql = file_get_contents($file);
         $statements = array_filter(array_map('trim', explode(';', $sql)));
-        $allOk = true;
-        foreach ($statements as $stmt) {
-            if (empty($stmt)) continue;
+        foreach ($statements as $_stmt) {
+            if (empty($_stmt)) continue;
             try {
-                $db->exec($stmt);
+                $s = $db->query($_stmt);
+                $s->closeCursor();
             } catch (PDOException $e) {
-                if (str_contains($e->getMessage(), 'Duplicate column') || str_contains($e->getMessage(), 'already exists')) {
+                if (str_contains($e->getMessage(), 'Duplicate column') || str_contains($e->getMessage(), 'already exists') || str_contains($e->getMessage(), 'Duplicate key name')) {
                     continue;
                 }
                 throw $e;
@@ -56,7 +65,7 @@ foreach ($files as $file) {
         $migrationCount++;
         echo "OK\n";
     } catch (Exception $e) {
-        if (str_contains($e->getMessage(), 'Duplicate column') || str_contains($e->getMessage(), 'already exists')) {
+        if (str_contains($e->getMessage(), 'Duplicate column') || str_contains($e->getMessage(), 'already exists') || str_contains($e->getMessage(), 'Duplicate key name')) {
             try {
                 $db->prepare("INSERT INTO migrations (migration, batch) VALUES (?, ?)")
                     ->execute([$name, $newBatch]);

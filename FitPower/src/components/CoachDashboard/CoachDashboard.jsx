@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
@@ -11,7 +11,7 @@ import {
     Flame, Heart, UserX, LogOut, User,
     Download, DollarSign, Activity, Clock
 } from 'lucide-react'
-import ProfileModal from '../ProfileModal/ProfileModal'
+import CoachProfilePage from './CoachProfilePage'
 import NotificationsDropdown from '../NotificationsDropdown/NotificationsDropdown'
 import ProgramsManager from '../ProgramsManager/ProgramsManager'
 import ChatMessenger from '../ChatMessenger/ChatMessenger'
@@ -19,6 +19,7 @@ import CoachCalendar from '../CoachCalendar/CoachCalendar'
 import WorkoutBuilder from '../WorkoutBuilder/WorkoutBuilder'
 import LiveSessions from '../LiveSessions/LiveSessions'
 import Sidebar from '../Sidebar/Sidebar'
+import '../DashboardShared.css'
 import './CoachDashboard.css'
 import { Counter } from '../Counter'
 import DriverTour from '../DriverTour/DriverTour'
@@ -29,27 +30,9 @@ import ClientPhotos from './ClientPhotos'
 import ClientNutrition from './ClientNutrition'
 import AssignRoutine from './AssignRoutine'
 import ClientDailySummary from './ClientDailySummary'
+import ClientNotesPanel from './ClientNotesPanel'
+import CoachTrainingVideos from './CoachTrainingVideos'
 import SettingsPanel from '../Settings/Settings'
-
-const navItems = [
-    { section: 'Overview' },
-    { label: 'Dashboard', icon: LayoutDashboard, active: true },
-    { label: 'My Schedule', icon: CalendarDays },
-    { label: 'My Clients', icon: Users },
-    { label: 'Programs', icon: Dumbbell },
-    { label: 'Workout Builder', icon: ClipboardList },
-    { label: 'Client Analytics', icon: BarChart3 },
-    { section: 'Communication' },
-    { label: 'Messages', icon: MessageCircle, badge: 4 },
-    { label: 'Live Sessions', icon: Video },
-    { label: 'Client Notes', icon: FileText },
-    { section: 'Account' },
-    { label: 'Profile', icon: User },
-    { label: 'Earnings', icon: Wallet },
-    { label: 'Reviews', icon: Star },
-    { label: 'Settings', icon: Settings },
-    { label: 'Log Out', icon: LogOut },
-]
 
 const defaultWeekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const defaultWeekData = [75, 100, 50, 100, 75, 8, 8]
@@ -68,7 +51,6 @@ export default function CoachDashboard() {
     const { showToast } = useToast()
     const { logout: authLogout } = useAuth()
     const [notifOpen, setNotifOpen] = useState(false)
-    const [profileModalOpen, setProfileModalOpen] = useState(false)
     const [clientModalOpen, setClientModalOpen] = useState(false)
     const [selectedClient, setSelectedClient] = useState(null)
     const [activeNav, setActiveNav] = useState('Dashboard')
@@ -78,8 +60,15 @@ export default function CoachDashboard() {
     const [loading, setLoading] = useState(true)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
     const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
+    const [userPhoto, setUserPhoto] = useState('')
     const [selectedClientId, setSelectedClientId] = useState(null)
     const [clientView, setClientView] = useState(null)
+    const [unreadCount, setUnreadCount] = useState(0)
+    const [analyticsDays, setAnalyticsDays] = useState(30)
+    const [analyticsLoading, setAnalyticsLoading] = useState(false)
+    const [notesClientId, setNotesClientId] = useState(null)
+    const [searchQuery, setSearchQuery] = useState('')
+    const [searchOpen, setSearchOpen] = useState(false)
 
     useEffect(() => {
         const onResize = () => { if (window.innerWidth > 1024) setSidebarMobileOpen(false) }
@@ -111,12 +100,75 @@ export default function CoachDashboard() {
             .then(setData)
             .catch(() => showToast('Error loading data'))
             .finally(() => setLoading(false))
+        apiFetch('/auth/me')
+            .then(u => setUserPhoto(u.photo || ''))
+            .catch(() => {})
+        apiFetch('/notifications?unread=true')
+            .then(n => setUnreadCount(Array.isArray(n) ? n.length : 0))
+            .catch(() => {})
     }, [showToast])
+
+    const fetchAnalytics = useCallback((days) => {
+        setAnalyticsDays(days)
+        setAnalyticsLoading(true)
+        apiFetch(`/dashboard/coach?days=${days}`)
+            .then(setData)
+            .catch(() => showToast('Error loading analytics'))
+            .finally(() => setAnalyticsLoading(false))
+    }, [showToast])
+
+    const exportEarningsCSV = useCallback(() => {
+        if (!data?.earnings) return
+        const rows = [['Category', 'Amount', 'Percentage']]
+        ;(data.earnings.breakdown || []).forEach(e => {
+            rows.push([e.label, e.value, e.pct + '%'])
+        })
+        rows.push([])
+        rows.push(['Total', data.earnings.total, ''])
+        rows.push(['Growth', data.earnings.growth, ''])
+        rows.push(['Pending Payout', data.earnings.pendingPayout, ''])
+        rows.push([])
+        rows.push(['Recent Payouts'])
+        rows.push(['Date', 'Amount', 'Status'])
+        ;(data.recentPayouts || []).forEach(p => {
+            rows.push([p.date, p.amount, p.status])
+        })
+        const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `fitpower-earnings-${new Date().toISOString().slice(0,10)}.csv`
+        a.click()
+        URL.revokeObjectURL(url)
+        showToast('Earnings exported')
+    }, [data, showToast])
 
     const sessions = data?.sessions?.length ? data.sessions : []
     const weekDays = data?.weeklyVolume?.days || defaultWeekDays
     const weekData = data?.weeklyVolume?.data || defaultWeekData
     const weekValues = data?.weeklyVolume?.values || defaultWeekValues
+
+    const searchResults = searchQuery.trim().length >= 2 ? (() => {
+        const q = searchQuery.toLowerCase()
+        const results = []
+        ;(data?.clientRoster || []).forEach(c => {
+            if (c.name?.toLowerCase().includes(q) || c.prog?.toLowerCase().includes(q)) {
+                results.push({ type: 'client', label: c.name, sub: c.prog || 'No program', nav: 'My Clients' })
+            }
+        })
+        ;(data?.programs || []).forEach(p => {
+            if (p.name?.toLowerCase().includes(q) || p.detail?.toLowerCase().includes(q)) {
+                results.push({ type: 'program', label: p.name, sub: p.detail, nav: 'Programs' })
+            }
+        })
+        ;(data?.sessions || []).forEach(s => {
+            if (s.name?.toLowerCase().includes(q) || s.detail?.toLowerCase().includes(q)) {
+                results.push({ type: 'session', label: s.name, sub: `${s.time} ${s.ampm} — ${s.detail || ''}`, nav: 'My Schedule' })
+            }
+        })
+        return results.slice(0, 8)
+    })() : []
 
     const cursorDotRef = useRef(null)
     const cursorRingRef = useRef(null)
@@ -201,7 +253,7 @@ export default function CoachDashboard() {
             return
         }
         if (label === 'Profile') {
-            setProfileModalOpen(true)
+            setActiveNav('Profile')
             return
         }
         setActiveNav(label)
@@ -213,12 +265,30 @@ export default function CoachDashboard() {
             <div className="cd-cursor-ring" ref={cursorRingRef} />
 
             <Sidebar
-                items={navItems}
+                items={[
+                    { section: 'Overview' },
+                    { label: 'Dashboard', icon: LayoutDashboard, active: true },
+                    { label: 'My Schedule', icon: CalendarDays },
+                    { label: 'My Clients', icon: Users },
+                    { label: 'Programs', icon: Dumbbell },
+                    { label: 'Workout Builder', icon: ClipboardList },
+                    { label: 'Client Analytics', icon: BarChart3 },
+                    { section: 'Communication' },
+                    { label: 'Messages', icon: MessageCircle, badge: unreadCount || undefined },
+                    { label: 'Live Sessions', icon: Video },
+                    { label: 'Client Notes', icon: FileText },
+                    { label: 'Training Videos', icon: Video },
+                    { section: 'Account' },
+                    { label: 'Profile', icon: User },
+                    { label: 'Earnings', icon: Wallet },
+                    { label: 'Reviews', icon: Star },
+                    { label: 'Settings', icon: Settings },
+                    { label: 'Log Out', icon: LogOut },
+                ]}
                 activeNav={activeNav}
                 onNavClick={handleNavClick}
                 userName={data?.userName || 'Coach'}
-                userSubtitle="CERTIFIED COACH"
-                avatarUrl="https://picsum.photos/seed/coach-alex/80/80.jpg"
+                avatarUrl={userPhoto || ''}
                 role="coach"
                 collapsed={sidebarCollapsed}
                 onToggle={handleSidebarToggle}
@@ -266,17 +336,17 @@ export default function CoachDashboard() {
                     ) : (
                         <ClientList onSelectClient={(id) => { setSelectedClientId(id); setClientView('daily-summary') }} />
                     )
-                ) : activeNav === 'Settings' ? <SettingsPanel compact /> : activeNav === 'Client Analytics' ? (
+                ) : activeNav === 'Profile' ? <CoachProfilePage /> : activeNav === 'Settings' ? <SettingsPanel compact /> : activeNav === 'Client Analytics' ? (
                     <div className="cd-main-content" style={{padding:'24px'}}>
                         <div className="cd-content-header" style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}}>
                             <h1 style={{fontSize:24,fontWeight:700,display:'flex',alignItems:'center',gap:12}}><BarChart3 size={24} style={{color:'var(--power-500)'}} /> Client Analytics</h1>
                             <div className="ad-chart-tabs">
-                                {['7 Days','30 Days','90 Days'].map(tab => (
-                                    <button key={tab} className={'ad-chart-tab'+(tab==='30 Days'?' ad-tab-active':'')} onClick={() => showToast('Analytics for ' + tab)}>{tab}</button>
+                                {[7,30,90].map(days => (
+                                    <button key={days} className={'ad-chart-tab'+(analyticsDays===days?' ad-tab-active':'')} onClick={() => fetchAnalytics(days)}>{days} Days</button>
                                 ))}
                             </div>
                         </div>
-                        <div className="cd-grid-3" style={{marginBottom:24}}>
+                        <div className="cd-grid-3" style={{marginBottom:24, opacity: analyticsLoading ? 0.5 : 1, transition: 'opacity .3s'}}>
                             <div className="cd-card cd-kpi-card"><div className="cd-kpi-icon-box cd-blue"><BarChart3 /></div><div className="cd-kpi-value">{data?.kpis?.activeClients||0}</div><div className="cd-kpi-label">Total Clients</div></div>
                             <div className="cd-card cd-kpi-card"><div className="cd-kpi-icon-box cd-green"><TrendingUp /></div><div className="cd-kpi-value">{data?.kpis?.completionRate||0}%</div><div className="cd-kpi-label">Avg Completion</div></div>
                             <div className="cd-card cd-kpi-card"><div className="cd-kpi-icon-box cd-yellow"><Activity /></div><div className="cd-kpi-value">{data?.weeklyVolume?.total||0}</div><div className="cd-kpi-label">Sessions/Week</div></div>
@@ -299,7 +369,7 @@ export default function CoachDashboard() {
                                 <div className="cd-client-progress" style={{marginTop:16}}>
                                     {(data?.clientProgress||[]).slice(0,5).map((c,i)=>(
                                         <div key={i} className="cd-client-row">
-                                            <img loading="lazy" src={'https://picsum.photos/seed/'+(c.seed||i)+'/40/40.jpg'} alt="" className="cd-client-avatar" />
+                                            {c.photo ? <img loading="lazy" src={c.photo} alt="" className="cd-client-avatar" /> : <div className="cd-client-avatar cd-avatar-placeholder-sm">{(c.name||'?')[0]}</div>}
                                             <div className="cd-client-body">
                                                 <div className="cd-client-hdr"><span className="cd-client-name">{c.name}</span><span className={'cd-client-count cd-'+c.countCls}>{c.count}</span></div>
                                                 <div className="cd-progress-bar"><div className={'cd-progress-fill cd-'+c.barCls} style={{width:c.pct+'%'}} /></div>
@@ -313,27 +383,14 @@ export default function CoachDashboard() {
                 ) : activeNav === 'Live Sessions' ? (
                     <LiveSessions role="coach" />
                 ) : activeNav === 'Client Notes' ? (
-                    <div className="cd-main-content" style={{padding:'24px'}}>
-                        <div className="cd-content-header" style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}}>
-                            <h1 style={{fontSize:24,fontWeight:700,display:'flex',alignItems:'center',gap:12}}><FileText size={24} style={{color:'var(--power-500)'}} /> Client Notes</h1>
-                            <button className="cd-btn cd-btn-primary cd-btn-sm" onClick={() => showToast('New note feature coming soon')}><Plus size={16} /> New Note</button>
-                        </div>
-                        <div className="cd-card" style={{padding:0,overflow:'hidden'}}>
-                            {(data?.clientProgress || []).slice(0,4).map((c,i)=>(
-                                <div key={i} className="cd-prog-item" style={{borderBottom:'1px solid rgba(255,255,255,.05)',padding:'16px 20px',cursor:'pointer'}}>
-                                    <img loading="lazy" src={'https://picsum.photos/seed/'+(c.seed||i)+'/36/36.jpg'} alt="" style={{width:36,height:36,borderRadius:'50%',marginRight:12}} />
-                                    <div className="cd-prog-body" style={{flex:1}}><div className="cd-prog-name">{c.name}</div><div className="cd-prog-detail">Program progress · {c.pct}% complete</div></div>
-                                    <div style={{display:'flex',gap:4}}><span style={{padding:'2px 8px',borderRadius:4,background:'rgba(255,214,0,.1)',color:'var(--power-500)',fontSize:11,fontWeight:600}}>{c.count}</span></div>
-                                </div>
-                            ))}
-                            {(!data?.clientProgress?.length) && <p style={{color:'#737373',textAlign:'center',padding:'24px 0'}}>No client notes yet</p>}
-                        </div>
-                    </div>
+                    <ClientNotesPanel selectedClientId={notesClientId} onSelectClient={setNotesClientId} />
+                ) : activeNav === 'Training Videos' ? (
+                    <CoachTrainingVideos />
                 ) : activeNav === 'Earnings' ? (
                     <div className="cd-main-content" style={{padding:'24px'}}>
                         <div className="cd-content-header" style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}}>
                             <h1 style={{fontSize:24,fontWeight:700,display:'flex',alignItems:'center',gap:12}}><Wallet size={24} style={{color:'var(--power-500)'}} /> Earnings</h1>
-                            <button className="cd-btn cd-btn-secondary cd-btn-sm"><Download size={16} /> Export</button>
+                            <button className="cd-btn cd-btn-secondary cd-btn-sm" onClick={exportEarningsCSV}><Download size={16} /> Export</button>
                         </div>
                         <div className="cd-grid-3" style={{marginBottom:24}}>
                             <div className="cd-card cd-kpi-card"><div className="cd-kpi-icon-box cd-green"><DollarSign /></div><div className="cd-kpi-value">{data?.earnings?.total||'$0'}</div><div className="cd-kpi-label">Total Earnings</div></div>
@@ -380,7 +437,7 @@ export default function CoachDashboard() {
                                 <div key={i} style={{padding:'20px',borderBottom:'1px solid rgba(255,255,255,.05)'}}>
                                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
                                         <div style={{display:'flex',alignItems:'center',gap:12}}>
-                                            <img loading="lazy" src={'https://picsum.photos/seed/'+(r.seed||i)+'/40/40.jpg'} alt="" style={{width:40,height:40,borderRadius:'50%'}} />
+                                            {r.photo ? <img loading="lazy" src={r.photo} alt="" style={{width:40,height:40,borderRadius:'50%'}} /> : <div style={{width:40,height:40,borderRadius:'50%',background:'var(--power-500)',color:'#000',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:16}}>{(r.name||'?')[0]}</div>}
                                             <div><div style={{fontWeight:600}}>{r.name}</div><div style={{display:'flex',gap:2}}>{Array.from({length:5},(_,j)=>j<r.rating?<Star key={j} size={14} style={{fill:'var(--power-500)',color:'var(--power-500)'}} />:<Star key={j} size={14} style={{color:'#525252'}} />)}</div></div>
                                         </div>
                                         <span style={{color:'#737373',fontSize:13}}>{r.date}</span>
@@ -397,9 +454,39 @@ export default function CoachDashboard() {
                 <header className="cd-header">
                     <div className="cd-header-inner">
                         <div className="cd-header-left">
-                            <div className="cd-search-wrap">
+                            <div className="cd-search-wrap" style={{position:'relative'}}>
                                 <Search className="cd-search-icon" />
-                                <input type="text" placeholder="Search clients, programs, sessions..." className="cd-search-input" />
+                                <input
+                                    type="text"
+                                    placeholder="Search clients, programs, sessions..."
+                                    className="cd-search-input"
+                                    value={searchQuery}
+                                    onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true) }}
+                                    onFocus={() => setSearchOpen(true)}
+                                    onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
+                                />
+                                {searchOpen && searchResults.length > 0 && (
+                                    <div className="cd-search-dropdown">
+                                        {searchResults.map((r, i) => (
+                                            <div
+                                                key={i}
+                                                className="cd-search-result"
+                                                onClick={() => { setActiveNav(r.nav); setSearchQuery(''); setSearchOpen(false) }}
+                                            >
+                                                <span className="cd-search-type">{r.type}</span>
+                                                <div className="cd-search-result-info">
+                                                    <span className="cd-search-result-label">{r.label}</span>
+                                                    <span className="cd-search-result-sub">{r.sub}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {searchOpen && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+                                    <div className="cd-search-dropdown">
+                                        <div className="cd-search-empty">No results found</div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div className="cd-header-right">
@@ -412,11 +499,15 @@ export default function CoachDashboard() {
                                 onClick={(e) => { e.stopPropagation(); setNotifOpen(!notifOpen) }}
                             >
                                 <Bell />
-                                <span className="cd-notif-badge">4</span>
+                                {unreadCount > 0 && <span className="cd-notif-badge">{unreadCount}</span>}
                             </button>
                             <div className="cd-header-divider" />
-                            <button className="cd-header-profile" onClick={() => setProfileModalOpen(true)}>
-                                <img loading="lazy" src="https://picsum.photos/seed/coach-alex/80/80.jpg" alt="Coach" className="cd-header-avatar" />
+                            <button className="cd-header-profile" onClick={() => setActiveNav('Profile')}>
+                                {userPhoto ? (
+                                    <img loading="lazy" src={userPhoto} alt="Coach" className="cd-header-avatar" />
+                                ) : (
+                                    <div className="cd-header-avatar cd-avatar-placeholder-xs" style={{width:32,height:32,fontSize:13,border:'none'}}>{(data?.userName || 'C')[0]}</div>
+                                )}
                                 <span className="cd-header-name">{(data?.userName || 'Coach').split(' ')[0]}</span>
                                 <ChevronDown className="cd-header-chevron" />
                             </button>
@@ -438,7 +529,7 @@ export default function CoachDashboard() {
                             <div className="cd-card cd-welcome-card">
                                 <div>
                                     <p className="cd-welcome-label">Coach Control Panel</p>
-                                    <h1 className="cd-welcome-title">Good morning, {(data?.userName || 'Coach').split(' ')[0]} 👋</h1>
+                                    <h1 className="cd-welcome-title">{new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}, {(data?.userName || 'Coach').split(' ')[0]} 👋</h1>
                                     <p className="cd-welcome-desc">
                                         You have <span className="cd-highlight-yellow"><strong>{data?.kpis?.todaySessions || 0} sessions scheduled</strong></span> today.{' '}
                                         <span className="cd-highlight-white"><strong>{data?.kpis?.activeClients || 0} clients</strong></span> are actively following your programs.{' '}
@@ -536,7 +627,7 @@ export default function CoachDashboard() {
                                 <div className="cd-client-progress">
                                     {(data?.clientProgress || []).map((c, i) => (
                                         <div key={`${c.seed || i}-${c.name}`} className={'cd-client-row' + (c.flagged ? ' cd-flagged' : '')}>
-                                            <img loading="lazy" src={'https://picsum.photos/seed/' + c.seed + '/40/40.jpg'} alt="" className={'cd-client-avatar' + (c.dim ? ' cd-dim' : '')} />
+                                            {c.photo ? <img loading="lazy" src={c.photo} alt="" className={'cd-client-avatar' + (c.dim ? ' cd-dim' : '')} /> : <div className={'cd-client-avatar cd-avatar-placeholder-sm' + (c.dim ? ' cd-dim' : '')}>{(c.name||'?')[0]}</div>}
                                             <div className="cd-client-body">
                                                 <div className="cd-client-hdr">
                                                     <span className={'cd-client-name' + (c.dim ? ' cd-dim' : '')}>{c.name}</span>
@@ -594,7 +685,7 @@ export default function CoachDashboard() {
                                             </div>
                                             <div className="cd-prog-right">
                                                 <div className={'cd-prog-change cd-' + (p.cls || 'up')}>{p.change}</div>
-                                                <div className="cd-prog-sub">enrollment</div>
+                                                <div className="cd-prog-sub">{p.change} enrollment</div>
                                             </div>
                                         </div>
                                         )
@@ -639,7 +730,7 @@ export default function CoachDashboard() {
                             <div className="cd-card cd-roster">
                                 <div className="cd-section-hdr">
                                     <h3 className="cd-section-title-sm">Client Roster</h3>
-                                    <Link to="/coach/dashboard" className="cd-roster-link">View All {data?.kpis?.activeClients || 0} →</Link>
+                                    <button className="cd-roster-link" onClick={() => setActiveNav('My Clients')}>View All {data?.kpis?.activeClients || 0} →</button>
                                 </div>
                                 <table>
                                     <thead>
@@ -654,7 +745,7 @@ export default function CoachDashboard() {
                                             <tr key={`${c.seed || i}-${c.name}`} className="cd-client-row" style={{ borderRadius: 0, padding: 0, margin: 0, border: 'none' }} onClick={() => { setSelectedClient(c); setClientModalOpen(true) }}>
                                                 <td>
                                                     <div className="cd-client-cell">
-                                                        <img loading="lazy" src={'https://picsum.photos/seed/' + c.seed + '/30/30.jpg'} alt="" className={'cd-rost-avatar' + (c.dim ? ' cd-dim' : '')} />
+                                                        {c.photo ? <img loading="lazy" src={c.photo} alt="" className={'cd-rost-avatar' + (c.dim ? ' cd-dim' : '')} /> : <div className={'cd-rost-avatar cd-avatar-placeholder-xs' + (c.dim ? ' cd-dim' : '')}>{(c.name||'?')[0]}</div>}
                                                         <div>
                                                             <div className={'cd-rost-name' + (c.dim ? ' cd-dim' : '')}>{c.name}</div>
                                                             <div className="cd-rost-tier">{c.tier}</div>
@@ -683,7 +774,7 @@ export default function CoachDashboard() {
                                         <div key={f.name || i} className="cd-fb-card">
                                             <div className="cd-fb-hdr">
                                                 <div className="cd-fb-user">
-                                                    <img loading="lazy" src={'https://picsum.photos/seed/' + (f.seed || i) + '/30/30.jpg'} alt="" className="cd-fb-avatar" />
+                                                    {f.photo ? <img loading="lazy" src={f.photo} alt="" className="cd-fb-avatar" /> : <div className="cd-fb-avatar cd-avatar-placeholder-xs">{(f.name||'?')[0]}</div>}
                                                     <span className="cd-fb-name">{f.name}</span>
                                                 </div>
                                                 <StarRating filled={f.stars || 0} />
@@ -701,7 +792,7 @@ export default function CoachDashboard() {
                         <section className="cd-fade-d4">
                             <div className="cd-attn-hdr">
                                 <h3 className="cd-section-title">Attention Required</h3>
-                                <span className="cd-attn-hdr-sub"><span className="cd-attn-dot" /> 2 action items</span>
+                                <span className="cd-attn-hdr-sub"><span className="cd-attn-dot" /> {data?.attention?.length || 0} action item{(data?.attention?.length || 0) !== 1 ? 's' : ''}</span>
                             </div>
                             <div className="cd-attention-list">
                                 {(data?.attention || []).map((a, i) => (
@@ -736,7 +827,7 @@ export default function CoachDashboard() {
                         <button className="cd-modal-close" onClick={() => { setClientModalOpen(false); setSelectedClient(null) }}><X /></button>
                     </div>
                     <div className="cd-modal-profile">
-                        <img loading="lazy" src={'https://picsum.photos/seed/' + (selectedClient?.seed || 'user') + '/80/80.jpg'} alt="" className="cd-modal-avatar" />
+                        {selectedClient?.photo ? <img loading="lazy" src={selectedClient.photo} alt="" className="cd-modal-avatar" /> : <div className="cd-modal-avatar cd-avatar-placeholder-lg">{(selectedClient?.name||'?')[0]}</div>}
                         <div>
                             <div className="cd-modal-user-name">{selectedClient?.name || 'Client'}</div>
                             <div className="cd-modal-user-meta">{selectedClient?.tier || 'Active'}</div>
@@ -762,9 +853,6 @@ export default function CoachDashboard() {
                     </div>
                 </div>
             </div>
-            <ProfileModal isOpen={profileModalOpen} onClose={() => setProfileModalOpen(false)} onSaved={() => {
-                apiFetch('/dashboard/coach').then(setData)
-            }} />
             <DriverTour visible={activeNav === 'Dashboard'} />
         </div>
     )

@@ -428,3 +428,66 @@ function verifyCoachClient(int $coachUserId, int $clientUserId): void {
         if (!$chk2->fetch()) error('Cliente no encontrado', 404);
     }
 }
+
+function getClientNotes(string $id): void {
+    $auth = requireRole('coach', 'admin');
+    $db = getDB();
+    $userId = (int)$id;
+    if ($auth['role'] !== 'admin') {
+        verifyCoachClient($auth['sub'], $userId);
+    }
+    $coachId = $auth['sub'];
+    $stmt = $db->prepare("
+        SELECT cn.*, CONCAT(u.first_name, ' ', u.last_name) as coach_name
+        FROM client_notes cn
+        JOIN users u ON u.id = cn.coach_id
+        WHERE cn.coach_id = ? AND cn.client_id = ?
+        ORDER BY cn.created_at DESC
+    ");
+    $stmt->execute([$coachId, $userId]);
+    $result = array_map(function($n) {
+        return [
+            'id' => (int)$n['id'],
+            'title' => $n['title'],
+            'content' => $n['content'],
+            'category' => $n['category'],
+            'coachName' => $n['coach_name'],
+            'createdAt' => $n['created_at'],
+            'updatedAt' => $n['updated_at'],
+        ];
+    }, $stmt->fetchAll());
+    success($result);
+}
+
+function createClientNote(string $id): void {
+    $auth = requireRole('coach', 'admin');
+    $input = getJsonInput();
+    $rules = ['title' => 'required|max:255'];
+    $errors = validate($input, $rules);
+    if ($errors) error('Error de validación', 422, $errors);
+    $db = getDB();
+    $userId = (int)$id;
+    if ($auth['role'] !== 'admin') {
+        verifyCoachClient($auth['sub'], $userId);
+    }
+    $coachId = $auth['sub'];
+    $title = $input['title'];
+    $content = $input['content'] ?? null;
+    $category = in_array($input['category'] ?? '', ['general','nutrition','training','progress','health']) ? $input['category'] : 'general';
+    $db->prepare("INSERT INTO client_notes (coach_id, client_id, title, content, category) VALUES (?, ?, ?, ?, ?)")
+        ->execute([$coachId, $userId, $title, $content, $category]);
+    $noteId = (int)$db->lastInsertId();
+    success(['id' => $noteId, 'title' => $title, 'content' => $content, 'category' => $category], 'Nota creada', 201);
+}
+
+function deleteClientNote(string $id): void {
+    $auth = requireRole('coach', 'admin');
+    $db = getDB();
+    $noteId = (int)$id;
+    $coachId = $auth['sub'];
+    $stmt = $db->prepare("SELECT id FROM client_notes WHERE id = ? AND coach_id = ?");
+    $stmt->execute([$noteId, $coachId]);
+    if (!$stmt->fetch()) error('Nota no encontrada', 404);
+    $db->prepare("DELETE FROM client_notes WHERE id = ? AND coach_id = ?")->execute([$noteId, $coachId]);
+    success(null, 'Nota eliminada');
+}

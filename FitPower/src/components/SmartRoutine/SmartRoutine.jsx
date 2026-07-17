@@ -14,7 +14,7 @@ export default function SmartRoutine() {
         try {
             const data = await apiFetch('/routines/daily')
             setRoutine(data)
-        } catch (e) {
+        } catch {
             showToast('Error loading routine')
         }
     }, [showToast])

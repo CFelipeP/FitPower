@@ -1,0 +1,387 @@
+.coach-profile-page {
+    padding-top: 80px;
+    min-height: 100vh;
+}
+
+.coach-profile-banner {
+    height: 200px;
+    background: linear-gradient(135deg, var(--surface-800), var(--surface-900));
+    border-bottom: 1px solid var(--border);
+}
+
+.coach-profile-loading {
+    text-align: center;
+    padding: 40px 0;
+}
+
+.skeleton-banner {
+    height: 200px;
+    background: var(--surface-700);
+}
+
+.skeleton-avatar-large {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: var(--surface-600);
+    margin: -60px auto 20px;
+}
+
+.coach-profile-not-found {
+    text-align: center;
+    padding: 120px 20px;
+}
+
+.coach-profile-not-found h2 {
+    margin-bottom: 8px;
+    color: var(--text);
+}
+
+.coach-profile-not-found p {
+    color: var(--text-muted);
+    margin-bottom: 24px;
+}
+
+.coach-profile-content {
+    margin-top: -100px;
+    padding-bottom: 80px;
+}
+
+.coach-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+    margin-bottom: 24px;
+}
+
+.coach-back-link:hover {
+    color: var(--text);
+}
+
+.coach-profile-header {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+    margin-bottom: 48px;
+}
+
+.coach-profile-photo {
+    width: 160px;
+    height: 160px;
+    border-radius: 24px;
+    overflow: hidden;
+    border: 4px solid var(--surface-700);
+    flex-shrink: 0;
+    background: var(--surface-600);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.coach-profile-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.coach-profile-avatar {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--power-500);
+}
+
+.coach-profile-info {
+    flex: 1;
+}
+
+.coach-profile-name {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.coach-profile-rating {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.coach-rating-value {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.coach-rating-count {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.coach-profile-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 16px;
+}
+
+.coach-detail-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.coach-modality-badge {
+    text-transform: capitalize;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--power-500);
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+
+.coach-profile-specs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.coach-profile-langs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.coach-lang-tag {
+    background: var(--surface-600);
+    color: var(--text-muted);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+}
+
+.coach-profile-body {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 40px;
+    align-items: start;
+}
+
+.coach-section {
+    margin-bottom: 40px;
+}
+
+.coach-section h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.coach-bio {
+    color: var(--text-secondary);
+    line-height: 1.7;
+    white-space: pre-wrap;
+}
+
+.coach-philosophy {
+    background: var(--surface-700);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    position: relative;
+}
+
+.coach-philosophy svg {
+    color: var(--power-500);
+    opacity: 0.3;
+    margin-bottom: 8px;
+}
+
+.coach-philosophy p {
+    color: var(--text-secondary);
+    font-style: italic;
+    line-height: 1.7;
+}
+
+.coach-certs {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.coach-cert-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.coach-cert-item svg {
+    color: var(--power-500);
+    flex-shrink: 0;
+}
+
+.cert-id {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-left: auto;
+}
+
+.coach-programs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+}
+
+.coach-program-card {
+    background: var(--surface-700);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.coach-program-card h4 {
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.coach-program-card p {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+}
+
+.coach-program-diff {
+    display: inline-block;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--power-500);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    margin-bottom: 8px;
+}
+
+.coach-program-enrolls {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.coach-reviews {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.coach-review-item {
+    background: var(--surface-700);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.coach-review-header {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.coach-review-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--surface-600);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.coach-review-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.coach-review-name {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 0.9rem;
+}
+
+.coach-review-stars {
+    display: flex;
+    gap: 2px;
+    margin-top: 2px;
+}
+
+.coach-review-comment {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.coach-social-links {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.coach-spec-tag {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--power-500);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+
+.coach-social-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.coach-social-link:hover {
+    border-color: var(--power-500);
+    color: var(--text);
+}
+
+@media (max-width: 768px) {
+    .coach-profile-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    .coach-profile-details {
+        justify-content: center;
+    }
+    .coach-profile-specs,
+    .coach-profile-langs {
+        justify-content: center;
+    }
+    .coach-profile-body {
+        grid-template-columns: 1fr;
+    }
+}

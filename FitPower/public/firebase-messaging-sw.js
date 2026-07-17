@@ -1,14 +1,11 @@
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
-let firebaseInitialized = false;
-
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'FIREBASE_CONFIG') {
     const config = event.data.config;
     if (!config || !config.apiKey || !config.projectId) return;
     firebase.initializeApp(config);
-    firebaseInitialized = true;
     const messaging = firebase.messaging();
 
     messaging.onBackgroundMessage((payload) => {

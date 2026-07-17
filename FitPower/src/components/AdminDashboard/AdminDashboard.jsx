@@ -12,9 +12,10 @@ import {
     UserPlus, Download, DollarSign, TrendingUp, ArrowRight,
     Flame, Heart, Target, Ban, LogOut, User,
     Plus, Activity, Award, Star, Ticket, BookOpen,
-    Mail, Hash, Megaphone, Utensils
+    Mail, Hash, Megaphone, Utensils, Upload
 } from 'lucide-react'
-import ProfileModal from '../ProfileModal/ProfileModal'
+import '../ClientDashboard/ClientDashboard.css'
+import ProfileEditModal from '../ProfileModal/ProfileEditModal'
 import NotificationsDropdown from '../NotificationsDropdown/NotificationsDropdown'
 import ProgramsManager from '../ProgramsManager/ProgramsManager'
 import Sidebar from '../Sidebar/Sidebar'
@@ -79,6 +80,13 @@ export default function AdminDashboard() {
     const { logout: authLogout } = useAuth()
     const [notifOpen, setNotifOpen] = useState(false)
     const [profileModalOpen, setProfileModalOpen] = useState(false)
+    const [profileForm, setProfileForm] = useState({
+        firstName: '', lastName: '', email: '', photo: '',
+        fitnessLevel: '', primaryGoal: '', trainingDays: ''
+    })
+    const [profileFormLoading, setProfileFormLoading] = useState(false)
+    const [profileFormSaving, setProfileFormSaving] = useState(false)
+    const [userPhoto, setUserPhoto] = useState('')
     const [userModalOpen, setUserModalOpen] = useState(false)
     const [selectedUser, setSelectedUser] = useState(null)
     const [activeTab, setActiveTab] = useState('Monthly')
@@ -86,12 +94,14 @@ export default function AdminDashboard() {
     const [barAnimated, setBarAnimated] = useState(false)
     const [ringAnimated, setRingAnimated] = useState(false)
     const [data, setData] = useState(null)
-    const [sessionsData, setSessionsData] = useState([])
+    const [profileData, setProfileData] = useState(null)
+    const [profileLoading, setProfileLoading] = useState(false)
     const [articlesData, setArticlesData] = useState([])
     const [allUsers, setAllUsers] = useState([])
     const [usersTotal, setUsersTotal] = useState(0)
     const [usersPage, setUsersPage] = useState(1)
     const [usersSearch, setUsersSearch] = useState('')
+    const [activeNav, setActiveNav] = useState('Dashboard')
     const [subscriptionMetrics, setSubscriptionMetrics] = useState(null)
     const [loading, setLoading] = useState(true)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -100,6 +110,15 @@ export default function AdminDashboard() {
     const [replyTicketId, setReplyTicketId] = useState(null)
     const [replyMessage, setReplyMessage] = useState('')
     const [replySubmitting, setReplySubmitting] = useState(false)
+    const [liveSessions, setLiveSessions] = useState([])
+    const [liveSessionsLoading, setLiveSessionsLoading] = useState(false)
+    const [mediaAssets, setMediaAssets] = useState([])
+    const [mediaAssetsLoading, setMediaAssetsLoading] = useState(false)
+    const [flaggedReports, setFlaggedReports] = useState([])
+    const [flaggedReportsLoading, setFlaggedReportsLoading] = useState(false)
+    const [platformSettings, setPlatformSettings] = useState([])
+    const [platformSettingsLoading, setPlatformSettingsLoading] = useState(false)
+    const [auditLogEntries, setAuditLogEntries] = useState([])
 
     useEffect(() => {
         const onResize = () => { if (window.innerWidth > 1024) setSidebarMobileOpen(false) }
@@ -134,16 +153,41 @@ export default function AdminDashboard() {
             .then(setData)
             .catch(() => showToast('Error loading data'))
             .finally(() => setLoading(false))
+        apiFetch('/auth/me')
+            .then(u => setUserPhoto(u.photo || ''))
+            .catch(() => {})
     }, [showToast])
+
+    useEffect(() => {
+        if (activeNav === 'Profile') {
+            setProfileLoading(true)
+            apiFetch('/auth/me')
+                .then(setProfileData)
+                .catch(() => {})
+                .finally(() => setProfileLoading(false))
+        }
+    }, [activeNav])
 
     // Lazy-load tab-specific data only when tab is activated
     useEffect(() => {
         if (activeNav === 'Live Sessions') {
-            apiFetch('/sessions').then(setSessionsData).catch(() => {})
+            setLiveSessionsLoading(true)
+            apiFetch('/admin/sessions').then(r => setLiveSessions(r.sessions || r.data || [])).catch(() => {}).finally(() => setLiveSessionsLoading(false))
         } else if (activeNav === 'Articles' || activeNav === 'Blog') {
             apiFetch('/blog').then(r => setArticlesData(r.articles || [])).catch(() => {})
         } else if (activeNav === 'Billing & Subs') {
             apiFetch('/admin/subscriptions/metrics').then(setSubscriptionMetrics).catch(() => {})
+        } else if (activeNav === 'Media Assets') {
+            setMediaAssetsLoading(true)
+            apiFetch('/admin/media').then(r => setMediaAssets(r.assets || r.data || [])).catch(() => {}).finally(() => setMediaAssetsLoading(false))
+        } else if (activeNav === 'Flagged Reports') {
+            setFlaggedReportsLoading(true)
+            apiFetch('/admin/flagged-reports').then(r => setFlaggedReports(r.reports || r.data || [])).catch(() => {}).finally(() => setFlaggedReportsLoading(false))
+        } else if (activeNav === 'Configuration') {
+            setPlatformSettingsLoading(true)
+            apiFetch('/admin/settings').then(r => setPlatformSettings(Array.isArray(r) ? r : (r.data || []))).catch(() => {}).finally(() => setPlatformSettingsLoading(false))
+        } else if (activeNav === 'Security & Audit') {
+            apiFetch('/admin/audit-log?perPage=10').then(r => setAuditLogEntries(r.logs || [])).catch(() => {})
         }
     }, [activeNav])
 
@@ -240,9 +284,6 @@ export default function AdminDashboard() {
         return () => document.removeEventListener('click', handleClick)
     }, [notifOpen])
 
-    // ── Nav active state ──
-    const [activeNav, setActiveNav] = useState('Dashboard')
-
     const handleNavClick = useCallback((label) => {
         if (label === 'Log Out') {
             authLogout()
@@ -250,6 +291,7 @@ export default function AdminDashboard() {
             return
         }
         if (label === 'Profile') {
+            setActiveNav(label)
             setProfileModalOpen(true)
             return
         }
@@ -303,7 +345,7 @@ export default function AdminDashboard() {
                 onNavClick={handleNavClick}
                 userName={data?.userName || 'Carlos Rodríguez'}
                 userSubtitle="SUPER ADMIN"
-                avatarUrl="https://picsum.photos/seed/admin-carlos/80/80.jpg"
+                avatarUrl={userPhoto || `https://picsum.photos/seed/${data?.admin?.name || 'admin'}/80/80.jpg`}
                 role="admin"
                 collapsed={sidebarCollapsed}
                 onToggle={handleSidebarToggle}
@@ -388,38 +430,41 @@ export default function AdminDashboard() {
                         <div className="ad-section-grid ad-section-grid-2" style={{ padding: '24px' }}>
                             <div className="ad-dash-card">
                                 <h3 className="ad-section-title-sm">Today's Sessions</h3>
+                                {liveSessionsLoading ? (
+                                    <div style={{ padding: 24, textAlign: 'center', color: '#737373' }}>Loading...</div>
+                                ) : (
                                 <div className="ad-ticket-list" style={{ marginTop: 16 }}>
-                                    {(sessionsData.length ? sessionsData.filter(s => s.date === new Date().toISOString().slice(0,10)).slice(0,5) : []).length ? sessionsData.filter(s => s.date === new Date().toISOString().slice(0,10)).slice(0,5).map((s, i) => (
+                                    {liveSessions.filter(s => s.date === new Date().toISOString().slice(0,10)).slice(0,5).map((s, i) => (
                                         <div key={s.id || i} className="ad-ticket-item" style={{ cursor: 'default' }}>
                                             <div className="ad-ticket-top"><span style={{color:'var(--power-500)',fontWeight:600}}>{s.startTime?.slice(0,5) || '09:00'}</span><span className={'ad-status-badge ad-status-'+(s.status==='scheduled'?'pending':'active')}>{s.status}</span></div>
                                             <div className="ad-ticket-desc" style={{fontSize:15,fontWeight:500}}>{s.title}</div>
                                             <div className="ad-ticket-top" style={{marginBottom:0}}><span style={{color:'#737373',fontSize:13}}>{s.trainerName || 'Unassigned'} · {s.type === 'group' ? 'Group' : '1:1'} session</span></div>
                                         </div>
-                                    )) : [
-                                        {time:'09:00',title:'HIIT Morning Flow',coach:'Alex Rivera',status:'scheduled',type:'group'},
-                                        {time:'11:00',title:'Strength Training',coach:'Sarah Chen',status:'scheduled',type:'group'},
-                                        {time:'02:00',title:'Yoga Stretch',coach:'Emma Wilson',status:'scheduled',type:'group'},
-                                        {time:'04:00',title:'Boxing Basics',coach:'Mike Torres',status:'completed',type:'1:1'},
-                                    ].map((s, i) => (
-                                        <div key={i} className="ad-ticket-item" style={{ cursor: 'default' }}>
-                                            <div className="ad-ticket-top"><span style={{color:'var(--power-500)',fontWeight:600}}>{s.time}</span><span className={'ad-status-badge ad-status-'+(s.status==='completed'?'active':'pending')}>{s.status}</span></div>
-                                            <div className="ad-ticket-desc" style={{fontSize:15,fontWeight:500}}>{s.title}</div>
-                                            <div className="ad-ticket-top" style={{marginBottom:0}}><span style={{color:'#737373',fontSize:13}}>{s.coach} · {s.type} session</span></div>
-                                        </div>
                                     ))}
+                                    {liveSessions.filter(s => s.date === new Date().toISOString().slice(0,10)).length === 0 && (
+                                        <div style={{ padding: 24, textAlign: 'center', color: '#737373' }}>No sessions scheduled for today</div>
+                                    )}
                                 </div>
+                                )}
                             </div>
                             <div className="ad-dash-card">
                                 <h3 className="ad-section-title-sm">Upcoming (Next 7 Days)</h3>
+                                {liveSessionsLoading ? (
+                                    <div style={{ padding: 24, textAlign: 'center', color: '#737373' }}>Loading...</div>
+                                ) : (
                                 <div className="ad-ticket-list" style={{ marginTop: 16 }}>
-                                    {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d, di) => {
-                                        const count = sessionsData.length ? sessionsData.filter(s => new Date(s.date).getDay() === (di + 1) % 7).length : [3,4,2,5,3,2,1][di]
+                                    {Array.from({length:7}, (_, di) => {
+                                        const d = new Date(); d.setDate(d.getDate() + di)
+                                        const dateStr = d.toISOString().slice(0,10)
+                                        const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]
+                                        const count = liveSessions.filter(s => s.date === dateStr).length
                                         return (
-                                        <div key={d} className="ad-ticket-item" style={{cursor:'default'}}>
-                                            <div className="ad-ticket-top"><span style={{color:'#fff',fontWeight:500}}>{d}</span><span style={{color:'#737373',fontSize:13}}>{count} session{count !== 1 ? 's' : ''}</span></div>
+                                        <div key={dateStr} className="ad-ticket-item" style={{cursor:'default'}}>
+                                            <div className="ad-ticket-top"><span style={{color:'#fff',fontWeight:500}}>{dayName}</span><span style={{color:'#737373',fontSize:13}}>{count} session{count !== 1 ? 's' : ''}</span></div>
                                         </div>
                                     )})}
                                 </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -507,13 +552,8 @@ export default function AdminDashboard() {
                             <button className="ad-btn ad-btn-primary ad-btn-sm" onClick={() => showToast('New article editor')}><Plus size={16} /> New Article</button>
                         </div>
                         <div className="ad-dash-card" style={{margin:'24px'}}>
-                            {(articlesData.length ? articlesData : [
-                                {title:'10 Tips for Better Recovery',author_name:'Admin',published_at:'2026-03-15',status:'Published'},
-                                {title:'Nutrition for Muscle Gain',author_name:'Coach Sarah',published_at:'2026-03-12',status:'Published'},
-                                {title:'The Science of HIIT',author_name:'Admin',published_at:'2026-03-10',status:'Draft'},
-                                {title:'Building a Consistent Routine',author_name:'Coach Mike',published_at:'2026-03-08',status:'Published'},
-                                {title:'Understanding Macros',author_name:'Admin',published_at:'2026-03-05',status:'Published'},
-                            ]).map((a,i) => (
+                            {articlesData.length === 0 && <div style={{padding:24,textAlign:'center',color:'#737373'}}>No articles found</div>}
+                            {articlesData.map((a,i) => (
                                 <div key={a.id || i} className="ad-prog-item" style={{borderBottom:'1px solid rgba(255,255,255,.05)',padding:'16px 0',cursor:'pointer'}}>
                                     <div className="ad-prog-info" style={{flex:1}}><div className="ad-prog-name">{a.title}</div><div className="ad-prog-enroll">{a.author_name || 'Admin'} · {a.published_at?.slice(0,10) || 'N/A'}</div></div>
                                     <span className={'ad-status-badge ad-status-'+(a.status==='Published'||a.status==='published'?'active':'pending')} style={{marginRight:16}}>{a.status||'Published'}</span>
@@ -525,13 +565,42 @@ export default function AdminDashboard() {
                     <div className="ad-main-content">
                         <div className="ad-content-header">
                             <h1 className="ad-content-title"><ImageIcon size={24} /> Media Assets</h1>
-                            <button className="ad-btn ad-btn-primary ad-btn-sm" onClick={() => showToast('Upload media — select files')}><Plus size={16} /> Upload Media</button>
+                            <div className="ad-content-actions">
+                                <label className="ad-btn ad-btn-secondary ad-btn-sm" style={{cursor:'pointer'}}>
+                                    <Upload size={16} /> Upload File
+                                    <input type="file" style={{display:'none'}} onChange={async (e) => {
+                                    const file = e.target.files?.[0]; if (!file) return;
+                                    const formData = new FormData(); formData.append('file', file);
+                                    try {
+                                        const res = await fetch('/api/admin/media', { method: 'POST', body: formData, credentials: 'include' });
+                                        if (!res.ok) throw new Error('Upload failed');
+                                        showToast('File uploaded');
+                                        apiFetch('/admin/media').then(r => setMediaAssets(r.assets || r.data || [])).catch(() => {})
+                                    } catch (err) { showToast(err.message || 'Error uploading file') }
+                                }} />
+                                </label>
+                            </div>
                         </div>
                         <div className="ad-section-grid" style={{padding:'24px',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))'}}>
-                            {Array.from({length:12},(_,i)=>(
-                                <div key={i} className="ad-dash-card ad-kpi-card" style={{padding:'12px',cursor:'pointer',aspectRatio:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
-                                    <ImageIcon size={28} style={{color:'rgba(255,214,0,.4)',marginBottom:8}} />
-                                    <span style={{fontSize:12,color:'#737373',textAlign:'center'}}>asset_{i+1}.jpg</span>
+                            {mediaAssetsLoading ? (
+                                <div style={{gridColumn:'1/-1',padding:32,textAlign:'center',color:'#737373'}}>Loading...</div>
+                            ) : mediaAssets.length === 0 ? (
+                                <div style={{gridColumn:'1/-1',padding:32,textAlign:'center',color:'#737373'}}>No media assets found. Upload a file to get started.</div>
+                            ) : mediaAssets.map((a,i) => (
+                                <div key={a.id || i} className="ad-dash-card ad-kpi-card" style={{padding:'12px',cursor:'pointer',aspectRatio:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',position:'relative'}}>
+                                    {a.file_type === 'image' ? (
+                                        <img src={'/api/' + a.file_path} alt={a.file_name} style={{width:'100%',height:'60%',objectFit:'cover',borderRadius:6,marginBottom:8}} />
+                                    ) : a.file_type === 'video' ? (
+                                        <Video size={28} style={{color:'rgba(255,214,0,.4)',marginBottom:8}} />
+                                    ) : (
+                                        <FileText size={28} style={{color:'rgba(255,214,0,.4)',marginBottom:8}} />
+                                    )}
+                                    <span style={{fontSize:12,color:'#737373',textAlign:'center',wordBreak:'break-all'}}>{a.file_name}</span>
+                                    <button className="ad-btn ad-btn-danger ad-btn-xs" style={{position:'absolute',top:6,right:6,padding:'2px 6px',minWidth:'auto'}} onClick={async () => {
+                                        if (!confirm('Delete ' + a.file_name + '?')) return;
+                                        try { await apiFetch('/admin/media/' + a.id, { method: 'DELETE' }); showToast('Deleted'); apiFetch('/admin/media').then(r => setMediaAssets(r.assets || r.data || [])).catch(() => {}) }
+                                        catch (e) { showToast(e.message || 'Error') }
+                                    }}><X size={12} /></button>
                                 </div>
                             ))}
                         </div>
@@ -573,16 +642,31 @@ export default function AdminDashboard() {
                             <button className="ad-btn ad-btn-primary ad-btn-sm" onClick={() => showToast('Reviewing all flagged content')}><Shield size={16} /> Review All</button>
                         </div>
                         <div className="ad-dash-card" style={{margin:'24px'}}>
-                            {[
-                                {user:'User #2841',reason:'Inappropriate content in forum',date:'2h ago',status:'pending',priority:'High'},
-                                {user:'User #1723',reason:'Suspicious account activity',date:'5h ago',status:'reviewing',priority:'Critical'},
-                                {user:'User #3902',reason:'Spam messages in chat',date:'1d ago',status:'resolved',priority:'Medium'},
-                                {user:'User #451',reason:'Fake review submitted',date:'2d ago',status:'pending',priority:'Low'},
-                            ].map((r,i) => (
-                                <div key={i} className="ad-prog-item" style={{borderBottom:'1px solid rgba(255,255,255,.05)',padding:'16px 0',cursor:'pointer'}}>
-                                    <div className="ad-prog-info" style={{flex:1}}><div className="ad-prog-name">{r.user}</div><div className="ad-prog-enroll">{r.reason} · {r.date}</div></div>
-                                    <span className={'ad-status-badge ad-status-'+(r.status==='resolved'?'active':r.status==='reviewing'?'pending':'cancelled')} style={{marginRight:12}}>{r.status}</span>
-                                    <span style={{color:r.priority==='Critical'?'#ef4444':r.priority==='High'?'#f97316':'#737373',fontSize:12,fontWeight:600}}>{r.priority}</span>
+                            {flaggedReportsLoading ? (
+                                <div style={{padding:24,textAlign:'center',color:'#737373'}}>Loading...</div>
+                            ) : flaggedReports.length === 0 ? (
+                                <div style={{padding:24,textAlign:'center',color:'#737373'}}>No flagged reports found</div>
+                            ) : flaggedReports.map((r,i) => (
+                                <div key={r.id || i} className="ad-prog-item" style={{borderBottom:'1px solid rgba(255,255,255,.05)',padding:'16px 0',cursor:'pointer'}}>
+                                    <div className="ad-prog-info" style={{flex:1}}>
+                                        <div className="ad-prog-name">{r.reporterName || 'User #' + r.reporterId}</div>
+                                        <div className="ad-prog-enroll">{r.reason} · {r.contentType} #{r.contentId} · {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''}</div>
+                                    </div>
+                                    <span className={'ad-status-badge ad-status-'+(r.status==='action_taken'||r.status==='reviewed'?'active':r.status==='dismissed'?'cancelled':'pending')} style={{marginRight:12}}>{r.status}</span>
+                                    <div style={{display:'flex',gap:4}}>
+                                        {r.status === 'pending' && (
+                                            <>
+                                                <button className="ad-btn ad-btn-primary ad-btn-xs" onClick={async () => {
+                                                    try { await apiFetch('/admin/flagged-reports/' + r.id, { method: 'PUT', body: JSON.stringify({ status: 'reviewed' }) }); showToast('Marked as reviewed'); apiFetch('/admin/flagged-reports').then(r2 => setFlaggedReports(r2.reports || r2.data || [])).catch(() => {}) }
+                                                    catch (e) { showToast(e.message || 'Error') }
+                                                }}>Review</button>
+                                                <button className="ad-btn ad-btn-secondary ad-btn-xs" onClick={async () => {
+                                                    try { await apiFetch('/admin/flagged-reports/' + r.id, { method: 'PUT', body: JSON.stringify({ status: 'dismissed' }) }); showToast('Dismissed'); apiFetch('/admin/flagged-reports').then(r2 => setFlaggedReports(r2.reports || r2.data || [])).catch(() => {}) }
+                                                    catch (e) { showToast(e.message || 'Error') }
+                                                }}>Dismiss</button>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -591,18 +675,47 @@ export default function AdminDashboard() {
                     <div className="ad-main-content">
                         <div className="ad-content-header">
                             <h1 className="ad-content-title"><Settings size={24} /> Configuration</h1>
+                            <button className="ad-btn ad-btn-primary ad-btn-sm" onClick={async () => {
+                                const updated = {}
+                                document.querySelectorAll('[data-setting-key]').forEach(el => {
+                                    const key = el.getAttribute('data-setting-key')
+                                    const input = el.querySelector('input, select')
+                                    if (input) updated[key] = input.value
+                                })
+                                if (Object.keys(updated).length === 0) return
+                                try { await apiFetch('/admin/settings', { method: 'PUT', body: JSON.stringify(updated) }); showToast('Settings saved') }
+                                catch (e) { showToast(e.message || 'Error saving settings') }
+                            }}><Download size={16} /> Save Changes</button>
                         </div>
                         <div className="ad-section-grid ad-section-grid-2" style={{padding:'24px'}}>
-                            <div className="ad-dash-card"><h3 className="ad-section-title-sm">General Settings</h3>
-                                <div style={{marginTop:16,display:'flex',flexDirection:'column',gap:16}}>
-                                    {[{label:'Platform Name',value:'FitPower'},{label:'Support Email',value:'support@fitpower.app'},{label:'Default Language',value:'English (US)'},{label:'Timezone',value:'UTC-5 (Eastern)'}].map(s=><div key={s.label} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,.05)'}}><span style={{color:'#a3a3a3'}}>{s.label}</span><span style={{fontWeight:500}}>{s.value}</span></div>)}
+                            {platformSettingsLoading ? (
+                                <div style={{gridColumn:'1/-1',padding:32,textAlign:'center',color:'#737373'}}>Loading...</div>
+                            ) : (
+                                ['General', 'Limits'].map(section => (
+                                <div key={section} className="ad-dash-card">
+                                    <h3 className="ad-section-title-sm">{section === 'General' ? 'General Settings' : 'Platform Limits'}</h3>
+                                    <div style={{marginTop:16,display:'flex',flexDirection:'column',gap:16}}>
+                                        {platformSettings.filter(s => section === 'General' ? ['platform_name','support_email','default_language','timezone'].includes(s.key) : ['max_users','max_storage_gb','api_rate_limit','file_upload_max_mb'].includes(s.key)).map(s => (
+                                            <div key={s.key} data-setting-key={s.key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,.05)'}}>
+                                                <span style={{color:'#a3a3a3',fontSize:13}}>{s.description || s.key}</span>
+                                                {s.key === 'default_language' ? (
+                                                    <select className="ad-content-search" style={{width:'auto',minWidth:120,padding:'4px 8px',fontSize:13}} defaultValue={s.value}>
+                                                        <option value="es">Español</option>
+                                                        <option value="en">English (US)</option>
+                                                        <option value="pt">Português</option>
+                                                        <option value="fr">Français</option>
+                                                    </select>
+                                                ) : (
+                                                    <input className="ad-content-search" style={{width:'auto',maxWidth:180,padding:'4px 8px',fontSize:13,textAlign:'right'}} defaultValue={s.value} />
+                                                )}
+                                            </div>
+                                        ))}
+                                        {platformSettings.filter(s => section === 'General' ? ['platform_name','support_email','default_language','timezone'].includes(s.key) : ['max_users','max_storage_gb','api_rate_limit','file_upload_max_mb'].includes(s.key)).length === 0 && (
+                                            <div style={{color:'#737373',fontSize:13,textAlign:'center',padding:16}}>No settings available</div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="ad-dash-card"><h3 className="ad-section-title-sm">Platform Limits</h3>
-                                <div style={{marginTop:16,display:'flex',flexDirection:'column',gap:16}}>
-                                    {[{label:'Max Users',value:'10,000'},{label:'Max Storage',value:'50 GB'},{label:'API Rate Limit',value:'60 req/min'},{label:'File Upload Size',value:'25 MB'}].map(s=><div key={s.label} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,.05)'}}><span style={{color:'#a3a3a3'}}>{s.label}</span><span style={{fontWeight:500}}>{s.value}</span></div>)}
-                                </div>
-                            </div>
+                            )))}
                         </div>
                     </div>
                 ) : activeNav === 'Security & Audit' ? (
@@ -613,20 +726,76 @@ export default function AdminDashboard() {
                         </div>
                         <div className="ad-kpi-grid" style={{padding:'0 24px'}}>
                             <div className="ad-dash-card ad-kpi-card"><div className="ad-kpi-icon-box ad-green"><Shield /></div><div className="ad-kpi-value">{data?.security?.score || 'A+'}</div><div className="ad-kpi-label">Security Score</div></div>
-                            <div className="ad-dash-card ad-kpi-card"><div className="ad-kpi-icon-box ad-blue"><Users /></div><div className="ad-kpi-value">{data?.security?.activeSessions?.toLocaleString() || '—'}</div><div className="ad-kpi-label">Active Sessions</div></div>
-                            <div className="ad-dash-card ad-kpi-card"><div className="ad-kpi-icon-box ad-yellow"><AlertTriangle /></div><div className="ad-kpi-value">{data?.security?.warnings ?? '—'}</div><div className="ad-kpi-label">Warnings</div></div>
-                            <div className="ad-dash-card ad-kpi-card"><div className="ad-kpi-icon-box ad-red"><Ban /></div><div className="ad-kpi-value">{data?.security?.blockedAttempts ?? '—'}</div><div className="ad-kpi-label">Blocked Attempts</div></div>
+                            <div className="ad-dash-card ad-kpi-card"><div className="ad-kpi-icon-box ad-blue"><Users /></div><div className="ad-kpi-value">{(data?.security?.activeSessions || 0).toLocaleString()}</div><div className="ad-kpi-label">Active Sessions (24h)</div></div>
+                            <div className="ad-dash-card ad-kpi-card"><div className="ad-kpi-icon-box ad-yellow"><AlertTriangle /></div><div className="ad-kpi-value">{data?.security?.warnings ?? 0}</div><div className="ad-kpi-label">Warnings (30d)</div></div>
+                            <div className="ad-dash-card ad-kpi-card"><div className="ad-kpi-icon-box ad-red"><Ban /></div><div className="ad-kpi-value">{data?.security?.blockedAttempts ?? 0}</div><div className="ad-kpi-label">Blocked Attempts (7d)</div></div>
                         </div>
                         <div className="ad-dash-card" style={{margin:'24px'}}>
                             <h3 className="ad-section-title-sm">Recent Activity Log</h3>
                             <div className="ad-activity-list" style={{marginTop:16}}>
-                                {data?.activities?.length ? data.activities.map((a,i)=>(
+                                {auditLogEntries.length > 0 ? auditLogEntries.map((a,i)=>(
                                     <div key={i} className="ad-dash-card ad-activity-item" style={{margin:0,borderRadius:0,borderBottom:'1px solid rgba(255,255,255,.05)'}}>
-                                        <div className={'ad-activity-icon ad-'+a.iconClass}><Activity size={16} /></div>
-                                        <div className="ad-activity-body"><div className="ad-activity-line"><span className="ad-activity-text">{a.text}</span></div><div className="ad-activity-sub">{a.sub}</div></div>
-                                        <span className="ad-activity-time">{a.time}</span>
+                                        <div className="ad-activity-icon ad-blue"><Activity size={16} /></div>
+                                        <div className="ad-activity-body"><div className="ad-activity-line"><span className="ad-activity-text">{a.adminName}: {a.action} on {a.targetType} #{a.targetId}</span></div><div className="ad-activity-sub">{a.action}</div></div>
+                                        <span className="ad-activity-time">{a.createdAt ? new Date(a.createdAt).toLocaleString() : ''}</span>
                                     </div>
                                 )) : <div className="ad-dash-card" style={{padding:16,textAlign:'center',color:'#666'}}>No recent activity</div>}
+                            </div>
+                        </div>
+                    </div>
+                ) : activeNav === 'Profile' ? (
+                    <div className="ad-main-content">
+                        <div className="cl-profile-view">
+                            <div className="cl-content">
+                                <div className="cl-space">
+                                    {profileLoading ? (
+                                        <div className="ad-spinner" style={{ margin: '80px auto' }} />
+                                    ) : profileData ? (
+                                        <div className="cl-profile-page">
+                                            <div className="cl-profile-cover">
+                                                <div className="cl-profile-avatar-large">
+                                                    {profileData.photo ? (
+                                                        <img src={profileData.photo} alt="" />
+                                                    ) : (
+                                                        <span>{profileData.firstName?.[0]}{profileData.lastName?.[0]}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="cl-profile-info-section">
+                                                <div className="cl-profile-info-header">
+                                                    <div>
+                                                        <h1 className="cl-profile-name">{profileData.firstName} {profileData.lastName}</h1>
+                                                        <p className="cl-profile-email">{profileData.email}</p>
+                                                        <span className="cl-profile-role">{profileData.role}</span>
+                                                    </div>
+                                                    <button className="ad-btn ad-btn-primary" onClick={() => setProfileModalOpen(true)}>
+                                                        Edit Profile
+                                                    </button>
+                                                </div>
+                                                <div className="cl-profile-details-grid">
+                                                    <div className="ad-dash-card">
+                                                        <div className="cl-profile-detail-label">Fitness Level</div>
+                                                        <div className="cl-profile-detail-value">{profileData.fitnessLevel ? profileData.fitnessLevel.charAt(0).toUpperCase() + profileData.fitnessLevel.slice(1) : 'Not set'}</div>
+                                                    </div>
+                                                    <div className="ad-dash-card">
+                                                        <div className="cl-profile-detail-label">Primary Goal</div>
+                                                        <div className="cl-profile-detail-value">{profileData.primaryGoal ? profileData.primaryGoal.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Not set'}</div>
+                                                    </div>
+                                                    <div className="ad-dash-card">
+                                                        <div className="cl-profile-detail-label">Training Days / Week</div>
+                                                        <div className="cl-profile-detail-value">{profileData.trainingDays || 'Not set'}</div>
+                                                    </div>
+                                                    <div className="ad-dash-card">
+                                                        <div className="cl-profile-detail-label">Member Since</div>
+                                                        <div className="cl-profile-detail-value">{profileData.memberSince ? new Date(profileData.memberSince).toLocaleDateString() : '—'}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div style={{ height: 200 }} />
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -656,7 +825,7 @@ export default function AdminDashboard() {
                             <div className="ad-header-divider" />
                             <button onClick={() => setProfileModalOpen(true)} className="ad-header-profile">
                                 <img loading="lazy" 
-                                    src="https://picsum.photos/seed/admin-carlos/80/80.jpg"
+                                    src={userPhoto || 'https://picsum.photos/seed/admin/80/80.jpg'}
                                     alt="Admin"
                                     className="ad-header-avatar"
                                 />
@@ -720,6 +889,21 @@ export default function AdminDashboard() {
                                     <div className="ad-kpi-icon-box ad-red"><AlertCircle /></div>
                                     <div className="ad-kpi-value ad-kpi-red">{data?.kpis?.openTickets || 5}</div>
                                     <div className="ad-kpi-label">Open Tickets</div>
+                                </div>
+                                <div className="ad-dash-card ad-kpi-card">
+                                    <div className="ad-kpi-icon-box ad-purple"><Shield /></div>
+                                    <div className="ad-kpi-value">{data?.security?.score || 'A+'}</div>
+                                    <div className="ad-kpi-label">Security Score</div>
+                                </div>
+                                <div className="ad-dash-card ad-kpi-card">
+                                    <div className="ad-kpi-icon-box ad-blue"><Target /></div>
+                                    <div className="ad-kpi-value">{data?.infrastructure?.[1]?.value || '0%'}</div>
+                                    <div className="ad-kpi-label">Subscription Rate</div>
+                                </div>
+                                <div className="ad-dash-card ad-kpi-card">
+                                    <div className="ad-kpi-icon-box ad-green"><Award /></div>
+                                    <div className="ad-kpi-value">{data?.infrastructure?.[3]?.value || '100%'}</div>
+                                    <div className="ad-kpi-label">Coach Approval</div>
                                 </div>
                             </div>
                         </section>
@@ -794,7 +978,7 @@ export default function AdminDashboard() {
                                         </div>
                                     ))}
                                 </div>
-                                    <button className="ad-tier-link" onClick={() => setActiveNav('Programs')}>
+                                    <button className="ad-btn ad-btn-secondary ad-btn-sm" style={{marginTop:8,width:'100%',justifyContent:'center'}} onClick={() => setActiveNav('Programs')}>
                                         View Full Breakdown →
                                     </button>
                             </div>
@@ -1103,9 +1287,19 @@ export default function AdminDashboard() {
                     </div>
                 </div>
             </div>
-            <ProfileModal isOpen={profileModalOpen} onClose={() => setProfileModalOpen(false)} onSaved={() => {
-                apiFetch('/dashboard/admin').then(setData)
-            }} />
+            {profileModalOpen && <ProfileEditModal
+                profileForm={profileForm}
+                setProfileForm={setProfileForm}
+                profileFormLoading={profileFormLoading}
+                setProfileFormLoading={setProfileFormLoading}
+                profileFormSaving={profileFormSaving}
+                setProfileFormSaving={setProfileFormSaving}
+                onClose={() => setProfileModalOpen(false)}
+                onSaved={() => {
+                    apiFetch('/dashboard/admin').then(setData).catch(() => {})
+                    apiFetch('/auth/me').then(setProfileData).catch(() => {})
+                }}
+            />}
         </div>
     )
 }

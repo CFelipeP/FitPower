@@ -66,7 +66,7 @@ CREATE TABLE trainers (
     terms_accepted TINYINT(1) NOT NULL DEFAULT 0,
     privacy_accepted TINYINT(1) NOT NULL DEFAULT 0,
     marketing_optin TINYINT(1) NOT NULL DEFAULT 0,
-    status ENUM('pending','approved','rejected','suspended') NOT NULL DEFAULT 'pending',
+    status ENUM('pending','approved','rejected','suspended') NOT NULL DEFAULT 'approved',
     avg_rating DECIMAL(2,1) NOT NULL DEFAULT 0.0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

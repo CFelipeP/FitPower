@@ -19,8 +19,8 @@ const Marquee = lazy(() => import('./components/Marquee/Marquee.jsx'))
 const Programs = lazy(() => import('./components/Programs/Programs.jsx'))
 const Features = lazy(() => import('./components/Features/Features.jsx'))
 const Experience = lazy(() => import('./components/Experience/Experience.jsx'))
-const Pricing = lazy(() => import('./components/Pricing/Pricing.jsx'))
 const Testimonials = lazy(() => import('./components/Testimonials/Testimonials.jsx'))
+const Pricing = lazy(() => import('./components/Pricing/Pricing.jsx'))
 const CTA = lazy(() => import('./components/CTA/CTA.jsx'))
 const Contact = lazy(() => import('./components/Contact/Contact.jsx'))
 const Footer = lazy(() => import('./components/Footer/Footer.jsx'))
@@ -29,6 +29,8 @@ const Register = lazy(() => import('./components/Register/Register.jsx'))
 const TrainerRegister = lazy(() => import('./components/TrainerRegister/TrainerRegister.jsx'))
 const AdminDashboard = lazy(() => import('./components/AdminDashboard/AdminDashboard.jsx'))
 const CoachDashboard = lazy(() => import('./components/CoachDashboard/CoachDashboard.jsx'))
+const CoachCatalog = lazy(() => import('./components/CoachCatalog/CoachCatalog.jsx'))
+const CoachProfile = lazy(() => import('./components/CoachProfile/CoachProfile.jsx'))
 const ClientDashboard = lazy(() => import('./components/ClientDashboard/ClientDashboard.jsx'))
 const OnboardingWizard = lazy(() => import('./components/OnboardingWizard/OnboardingWizard.jsx'))
 const Forum = lazy(() => import('./components/Forum/Forum.jsx'))
@@ -38,6 +40,7 @@ const Leaderboard = lazy(() => import('./components/Leaderboard/Leaderboard.jsx'
 const Settings = lazy(() => import('./components/Settings/Settings.jsx'))
 const SubscriptionPlans = lazy(() => import('./components/SubscriptionPlans/SubscriptionPlans.jsx'))
 const PaymentResult = lazy(() => import('./components/PaymentResult/PaymentResult.jsx'))
+const CheckoutPage = lazy(() => import('./components/Checkout/CheckoutPage.jsx'))
 const NotFound = lazy(() => import('./components/NotFound/NotFound.jsx'))
 const AdminUsersPage = lazy(() => import('./components/AdminDashboard/AdminUsers.jsx'))
 const CoachClientCheckins = lazy(() => import('./components/CoachDashboard/ClientCheckins.jsx'))
@@ -56,8 +59,8 @@ function Home() {
             <Suspense fallback={null}><Programs /></Suspense>
             <Suspense fallback={null}><Features /></Suspense>
             <Suspense fallback={null}><Experience /></Suspense>
-            <Suspense fallback={null}><Pricing /></Suspense>
             <Suspense fallback={null}><Testimonials /></Suspense>
+            <Suspense fallback={null}><Pricing /></Suspense>
             <Suspense fallback={null}><CTA /></Suspense>
             <Suspense fallback={null}><Contact /></Suspense>
             <Suspense fallback={null}><Footer /></Suspense>
@@ -152,10 +155,13 @@ function App() {
                             <Route path="/blog/:slug" element={
                                 <Suspense fallback={<DashboardSkeleton />}><BlogArticle /></Suspense>
                             } />
+                            <Route path="/coaches" element={<Suspense fallback={<DashboardSkeleton />}><CoachCatalog /></Suspense>} />
+                            <Route path="/coaches/:id" element={<Suspense fallback={<DashboardSkeleton />}><CoachProfile /></Suspense>} />
                             <Route path="/leaderboard" element={<Leaderboard />} />
                             <Route path="/plans" element={<SubscriptionPlans standalone={true} />} />
                             <Route path="/payment/success" element={<PaymentResult />} />
                             <Route path="/payment/cancel" element={<PaymentResult />} />
+                            <Route path="/checkout" element={<CheckoutPage />} />
                             <Route path="*" element={<NotFound />} />
                         </Routes>
                     </Suspense>

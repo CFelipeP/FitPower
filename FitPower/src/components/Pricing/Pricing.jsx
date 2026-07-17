@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, X, Loader2 } from 'lucide-react'
-import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
 import { useI18n } from '../../context/I18nContext'
 import { apiFetch } from '../../lib/api'
-import PayPalSubscribeButton from './PayPalSubscribeButton'
 import './Pricing.css'
 
 export default function Pricing() {
@@ -13,10 +11,8 @@ export default function Pricing() {
     const [plans, setPlans] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
-    const [subscribing, setSubscribing] = useState(null)
     const sectionRef = useRef(null)
     const navigate = useNavigate()
-    const { showToast } = useToast()
     const { isAuthenticated } = useAuth()
     const { t } = useI18n()
 
@@ -93,41 +89,16 @@ export default function Pricing() {
                                 <div className="pricing-actions">
                                     <button
                                         className={`pricing-btn btn-shine ${plan.popular ? 'primary' : 'secondary'}`}
-                                        onClick={async () => {
+                                        onClick={() => {
                                             if (!isAuthenticated) {
                                                 navigate('/register')
                                                 return
                                             }
-                                            setSubscribing(plan.id)
-                                            try {
-                                                const data = await apiFetch('/stripe/create-checkout', {
-                                                    method: 'POST',
-                                                    body: JSON.stringify({ plan_id: plan.id, billing: isYearly ? 'yearly' : 'monthly' })
-                                                })
-                                                if (data.url) {
-                                                    window.location.assign(data.url)
-                                                } else {
-                                                    showToast('Could not create checkout session')
-                                                }
-                                            } catch (err) {
-                                                showToast(err.message || 'Failed to start checkout')
-                                            } finally {
-                                                setSubscribing(null)
-                                            }
+                                            navigate(`/checkout?plan_id=${plan.id}&billing=${isYearly ? 'yearly' : 'monthly'}`)
                                         }}
-                                        disabled={subscribing === plan.id}
                                     >
-                                        {subscribing === plan.id ? (
-                                            <><Loader2 size={16} className="spin" /> Processing…</>
-                                        ) : (
-                                            <>💳 {t('pricing.startFree')}</>
-                                        )}
+                                        💳 {t('pricing.startFree')}
                                     </button>
-                                    <PayPalSubscribeButton
-                                        planId={plan.id}
-                                        billing={isYearly ? 'yearly' : 'monthly'}
-                                        onSuccess={() => window.location.href = '/payment/success'}
-                                    />
                                 </div>
                             </div>
                         ))}

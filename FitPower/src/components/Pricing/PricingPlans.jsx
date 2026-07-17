@@ -1,37 +1,21 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../lib/api'
-import { useToast } from '../../context/ToastContext'
-import { Check, Loader } from 'lucide-react'
-import PayPalSubscribeButton from './PayPalSubscribeButton'
+import { Check } from 'lucide-react'
 
 export default function PricingPlans() {
-    const { showToast } = useToast()
     const [plans, setPlans] = useState([])
     const [loading, setLoading] = useState(true)
     const [billing, setBilling] = useState('monthly')
-    const [purchasing, setPurchasing] = useState(null)
 
     useEffect(() => {
         apiFetch('/plans').then(setPlans).catch(() => {}).finally(() => setLoading(false))
     }, [])
 
-    const handleSelectPlan = async (planId) => {
-        setPurchasing(planId)
-        try {
-            const res = await apiFetch('/stripe/create-checkout', {
-                method: 'POST',
-                body: JSON.stringify({ plan_id: planId, billing })
-            })
-            if (res.url && res.url.startsWith('https://')) {
-                window.location.assign(res.url)
-            } else {
-                showToast('Invalid redirect URL')
-            }
-        } catch (e) {
-            showToast(e.message || 'Error processing payment')
-        } finally {
-            setPurchasing(null)
-        }
+    const navigate = useNavigate()
+
+    const handleSelectPlan = (planId) => {
+        navigate(`/checkout?plan_id=${planId}&billing=${billing}`)
     }
 
     if (loading) return <div className="pricing-loading"><div className="skeleton-pulse" style={{height: 400}}></div></div>
@@ -60,15 +44,9 @@ export default function PricingPlans() {
                             <button
                                 className="pricing-card-btn"
                                 onClick={() => handleSelectPlan(plan.id)}
-                                disabled={purchasing === plan.id}
                             >
-                                {purchasing === plan.id ? <Loader size={16} className="spin" /> : 'Subscribe'}
+                                Subscribe
                             </button>
-                            <PayPalSubscribeButton
-                                planId={plan.id}
-                                billing={billing}
-                                onSuccess={() => window.location.href = '/payment/success'}
-                            />
                         </div>
                         <ul className="pricing-card-features">
                             {(plan.features || []).map((f, i) => (

@@ -3,8 +3,8 @@ import { apiFetch } from '../../lib/api'
 import {
     User, Calendar, CheckCircle, Target, Activity,
     Dumbbell, Apple, Camera, Award, TrendingUp,
-    ArrowRight, Star, Moon, Zap, Droplets, Flame,
-    Clock, Medal, Heart, ChevronRight, Bell,
+    Moon, Zap, Droplets, Flame,
+    Clock, Medal, Heart, Bell,
     CalendarCheck, Timer
 } from 'lucide-react'
 import './ClientDailySummary.css'
