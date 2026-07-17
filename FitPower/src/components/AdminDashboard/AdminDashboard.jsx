@@ -120,6 +120,7 @@ export default function AdminDashboard() {
     const [platformSettingsLoading, setPlatformSettingsLoading] = useState(false)
     const [auditLogEntries, setAuditLogEntries] = useState([])
     const [confirmDeleteUser, setConfirmDeleteUser] = useState(null)
+    const [confirmSuspendUser, setConfirmSuspendUser] = useState(null)
 
     useEffect(() => {
         const onResize = () => { if (window.innerWidth > 1024) setSidebarMobileOpen(false) }
@@ -406,7 +407,7 @@ export default function AdminDashboard() {
                                             <td><span className="ad-time">{u.registered ? new Date(u.registered).toLocaleDateString() : '-'}</span></td>
                                             <td>
                                                 <button className="ad-btn ad-btn-secondary ad-btn-xs" style={{marginRight:4}} onClick={(e) => { e.stopPropagation(); handleUserRowClick(u) }}>View</button>
-                                                {u.status !== 'suspended' && <button className="ad-btn ad-btn-danger ad-btn-xs" style={{marginRight:4}} onClick={(e) => { e.stopPropagation(); if (confirm(`Suspend ${u.firstName} ${u.lastName}?`)) apiFetch('/admin/users/'+u.id, { method: 'PUT', body: JSON.stringify({ status: 'suspended' }) }).then(() => { showToast('User suspended'); fetchUsers(usersPage, usersSearch) }) }}>Suspend</button>}
+                                                {u.status !== 'suspended' && <button className="ad-btn ad-btn-danger ad-btn-xs" style={{marginRight:4}} onClick={(e) => { e.stopPropagation(); setConfirmSuspendUser(u) }}>Suspend</button>}
                                                 <button className="ad-btn ad-btn-danger ad-btn-xs" style={{background:'#991b1b'}} onClick={(e) => { e.stopPropagation(); setConfirmDeleteUser(u) }}><Trash2 size={12} /></button>
                                             </td>
                                         </tr>
@@ -1241,11 +1242,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="ad-modal-actions">
                         <button className="ad-btn ad-btn-primary" onClick={() => {
-                            const newStatus = selectedUser?.status === 'suspended' ? 'active' : 'suspended'
-                            if (confirm(`${newStatus === 'suspended' ? 'Suspend' : 'Activate'} ${selectedUser?.firstName}?`)) {
-                                apiFetch('/admin/users/' + selectedUser?.id, { method: 'PUT', body: JSON.stringify({ status: newStatus }) })
-                                    .then(() => { showToast('User ' + (newStatus === 'suspended' ? 'suspended' : 'activated')); closeModal(); fetchUsers(usersPage, usersSearch) })
-                            }
+                            setConfirmSuspendUser(selectedUser)
                         }}>
                             {selectedUser?.status === 'suspended' ? 'Reactivate' : 'Suspend User'}
                         </button>
@@ -1324,6 +1321,34 @@ export default function AdminDashboard() {
                                     .catch(err => { showToast(err.message || 'Error'); setConfirmDeleteUser(null) })
                             }}><Trash2 size={14} /> Eliminar</button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {confirmSuspendUser && (
+                <div className="ad-modal-overlay ad-modal-open" onClick={(e) => { if (e.target === e.currentTarget) setConfirmSuspendUser(null) }}>
+                    <div className="ad-modal-content" style={{ maxWidth: 420, textAlign: 'center' }}>
+                        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(245,158,11,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                            <AlertTriangle size={32} color="#f59e0b" />
+                        </div>
+                        {(() => {
+                            const isSuspended = confirmSuspendUser?.status === 'suspended'
+                            return (<>
+                                <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>{isSuspended ? 'Reactivar' : 'Suspender'} usuario</h3>
+                                <p style={{ color: '#a3a3a3', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+                                    ¿{isSuspended ? 'Reactivar' : 'Suspender'} a <strong style={{ color: '#fff' }}>{confirmSuspendUser?.firstName} {confirmSuspendUser?.lastName}</strong>?
+                                    {isSuspended ? null : <><br /><span style={{ color: '#f59e0b', fontSize: 13 }}>El usuario no podrá acceder a la plataforma.</span></>}
+                                </p>
+                                <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                                    <button className="ad-btn ad-btn-secondary" onClick={() => setConfirmSuspendUser(null)}>Cancelar</button>
+                                    <button className="ad-btn ad-btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => {
+                                        const newStatus = isSuspended ? 'active' : 'suspended'
+                                        apiFetch('/admin/users/' + confirmSuspendUser.id, { method: 'PUT', body: JSON.stringify({ status: newStatus }) })
+                                            .then(() => { showToast('User ' + (newStatus === 'suspended' ? 'suspended' : 'activated')); setConfirmSuspendUser(null); closeModal(); fetchUsers(usersPage, usersSearch) })
+                                            .catch(err => { showToast(err.message || 'Error'); setConfirmSuspendUser(null) })
+                                    }}>{isSuspended ? 'Reactivar' : 'Suspender'}</button>
+                                </div>
+                            </>)
+                        })()}
                     </div>
                 </div>
             )}
