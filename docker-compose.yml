@@ -50,18 +50,39 @@ services:
     networks:
       - fitpower
 
-  node:
+  chat:
     image: node:20-alpine
     platform: linux/arm64
     working_dir: /app
     volumes:
       - ./FitPower:/app
-    command: sh -c "npm install --omit=dev && node mediasoup-server.js"
+    command: sh -c "npm install --omit=dev 2>/dev/null; node chat-server.js"
     ports:
       - "5180:5180"
+    environment:
+      API_BASE_URL: http://nginx:8080
+    depends_on:
+      - nginx
+    networks:
+      - fitpower
+
+  node:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+      platforms:
+        - linux/arm64
+    working_dir: /app
+    volumes:
+      - ./FitPower:/app
+    command: sh -c "npm install 2>/dev/null && node mediasoup-server.js"
+    ports:
       - "5181:5181"
     environment:
       MEDIASOUP_ANNOUNCED_IP: ${MEDIASOUP_IP}
+      API_BASE_URL: http://nginx:8080
+    depends_on:
+      - nginx
     networks:
       - fitpower
 
