@@ -119,6 +119,7 @@ export default function AdminDashboard() {
     const [platformSettings, setPlatformSettings] = useState([])
     const [platformSettingsLoading, setPlatformSettingsLoading] = useState(false)
     const [auditLogEntries, setAuditLogEntries] = useState([])
+    const [confirmDeleteUser, setConfirmDeleteUser] = useState(null)
 
     useEffect(() => {
         const onResize = () => { if (window.innerWidth > 1024) setSidebarMobileOpen(false) }
@@ -406,7 +407,7 @@ export default function AdminDashboard() {
                                             <td>
                                                 <button className="ad-btn ad-btn-secondary ad-btn-xs" style={{marginRight:4}} onClick={(e) => { e.stopPropagation(); handleUserRowClick(u) }}>View</button>
                                                 {u.status !== 'suspended' && <button className="ad-btn ad-btn-danger ad-btn-xs" style={{marginRight:4}} onClick={(e) => { e.stopPropagation(); if (confirm(`Suspend ${u.firstName} ${u.lastName}?`)) apiFetch('/admin/users/'+u.id, { method: 'PUT', body: JSON.stringify({ status: 'suspended' }) }).then(() => { showToast('User suspended'); fetchUsers(usersPage, usersSearch) }) }}>Suspend</button>}
-                                                <button className="ad-btn ad-btn-danger ad-btn-xs" style={{background:'#991b1b'}} onClick={(e) => { e.stopPropagation(); if (confirm(`Eliminar permanentemente a ${u.firstName} ${u.lastName}? Esta acción no se puede deshacer.`)) apiFetch('/admin/users/'+u.id, { method: 'DELETE' }).then(() => { showToast('User deleted'); fetchUsers(usersPage, usersSearch) }).catch(err => showToast(err.message || 'Error')) }}><Trash2 size={12} /></button>
+                                                <button className="ad-btn ad-btn-danger ad-btn-xs" style={{background:'#991b1b'}} onClick={(e) => { e.stopPropagation(); setConfirmDeleteUser(u) }}><Trash2 size={12} /></button>
                                             </td>
                                         </tr>
                                     ))}
@@ -1258,11 +1259,7 @@ export default function AdminDashboard() {
                             Change Role
                         </button>
                         <button className="ad-btn ad-btn-danger" style={{ background: '#991b1b' }} onClick={() => {
-                            if (confirm(`Eliminar permanentemente a ${selectedUser?.firstName} ${selectedUser?.lastName}? Esta acción no se puede deshacer.`)) {
-                                apiFetch('/admin/users/' + selectedUser?.id, { method: 'DELETE' })
-                                    .then(() => { showToast('User deleted'); closeModal(); fetchUsers(usersPage, usersSearch) })
-                                    .catch(err => showToast(err.message || 'Error'))
-                            }
+                            setConfirmDeleteUser(selectedUser)
                         }}><Trash2 size={14} /> Delete</button>
                         <button className="ad-btn ad-btn-secondary" style={{ flex: '0', padding: '12px 16px' }} onClick={() => { closeModal(); }}>
                             <X size={16} />
@@ -1308,6 +1305,28 @@ export default function AdminDashboard() {
                     apiFetch('/auth/me').then(setProfileData).catch(() => {})
                 }}
             />}
+            {confirmDeleteUser && (
+                <div className="ad-modal-overlay ad-modal-open" onClick={(e) => { if (e.target === e.currentTarget) setConfirmDeleteUser(null) }}>
+                    <div className="ad-modal-content" style={{ maxWidth: 420, textAlign: 'center' }}>
+                        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(239,68,68,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                            <AlertTriangle size={32} color="#ef4444" />
+                        </div>
+                        <h3 className="ad-modal-title" style={{ textAlign: 'center', marginBottom: 8 }}>Eliminar usuario</h3>
+                        <p style={{ color: '#a3a3a3', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+                            ¿Eliminar permanentemente a <strong style={{ color: '#fff' }}>{confirmDeleteUser.firstName} {confirmDeleteUser.lastName}</strong> ({confirmDeleteUser.email})?<br />
+                            <span style={{ color: '#ef4444', fontSize: 13 }}>Esta acción no se puede deshacer.</span>
+                        </p>
+                        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                            <button className="ad-btn ad-btn-secondary" onClick={() => setConfirmDeleteUser(null)}>Cancelar</button>
+                            <button className="ad-btn ad-btn-danger" style={{ background: '#dc2626', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => {
+                                apiFetch('/admin/users/' + confirmDeleteUser.id, { method: 'DELETE' })
+                                    .then(() => { showToast('User deleted'); setConfirmDeleteUser(null); closeModal(); fetchUsers(usersPage, usersSearch) })
+                                    .catch(err => { showToast(err.message || 'Error'); setConfirmDeleteUser(null) })
+                            }}><Trash2 size={14} /> Eliminar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
