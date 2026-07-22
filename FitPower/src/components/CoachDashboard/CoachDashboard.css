@@ -267,6 +267,8 @@
 
 .cd-kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 @media (min-width: 768px) { .cd-kpi-grid { grid-template-columns: repeat(4, 1fr); } }
+.cd-grid-5 { display: grid; grid-template-columns: 1fr; gap: 20px; }
+@media (min-width: 768px) { .cd-grid-5 { grid-template-columns: 2fr 3fr; } }
 
 .cd-day-label { font-size: 10px; color: #737373; margin-bottom: 8px; }
 .cd-day-label.cd-highlight { font-size: 10px; color: var(--power-500); margin-bottom: 8px; font-weight: 600; }
