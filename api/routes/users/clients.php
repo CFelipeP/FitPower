@@ -47,30 +47,20 @@ function getClientDetail(string $id): void {
     $userId = $auth['sub'];
     $db = getDB();
 
-    $trainerStmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
-    $trainerStmt->execute([$userId]);
-    $trainerId = $trainerStmt->fetchColumn();
-
-    if (!$trainerId) {
-        error('Perfil de entrenador no encontrado', 404);
-    }
-
-    $trainerId = (int)$trainerId;
-
     $stmt = $db->prepare("
         SELECT u.id, u.first_name, u.last_name, u.email, u.status, u.created_at, u.updated_at,
                u.fitness_level, u.primary_goal, u.training_days, u.photo,
                sp.name as plan_name, sp.price_monthly,
                up.progress, up.current_week, p.name as program_name
         FROM users u
-        JOIN user_programs up ON up.user_id = u.id
-        JOIN programs p ON p.id = up.program_id
+        LEFT JOIN user_programs up ON up.user_id = u.id
+        LEFT JOIN programs p ON p.id = up.program_id AND (up.status = 'active' OR up.status IS NULL)
         LEFT JOIN user_subscriptions us ON us.user_id = u.id AND us.status = 'active'
         LEFT JOIN subscription_plans sp ON sp.id = us.plan_id
-        WHERE u.id = ? AND p.trainer_id = ?
+        WHERE u.id = ?
         LIMIT 1
     ");
-    $stmt->execute([$id, $trainerId]);
+    $stmt->execute([$id]);
     $row = $stmt->fetch();
 
     if (!$row) {
