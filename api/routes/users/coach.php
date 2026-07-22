@@ -203,22 +203,24 @@ function getClientDailySummary(string $id): void {
     ] : null;
 
     // Goals with progress
-    $goalStmt = $db->prepare("SELECT * FROM goals WHERE user_id = ? ORDER BY created_at DESC LIMIT 10");
-    $goalStmt->execute([$userId]);
-    $goals = array_map(function($g) {
-        return [
-            'id' => (int)$g['id'],
-            'title' => $g['title'],
-            'description' => $g['description'],
-            'targetValue' => $g['target_value'] ? (float)$g['target_value'] : null,
-            'unit' => $g['unit'],
-            'currentValue' => $g['current_value'] ? (float)$g['current_value'] : null,
-            'progress' => $g['target_value'] ? min(100, round(($g['current_value'] ?? 0) / $g['target_value'] * 100)) : 0,
-            'startDate' => $g['start_date'],
-            'targetDate' => $g['target_date'],
-            'completed' => (bool)$g['completed'],
-        ];
-    }, $goalStmt->fetchAll());
+    try {
+        $goalStmt = $db->prepare("SELECT * FROM goals WHERE user_id = ? ORDER BY created_at DESC LIMIT 10");
+        $goalStmt->execute([$userId]);
+        $goals = array_map(function($g) {
+            return [
+                'id' => (int)$g['id'],
+                'title' => $g['title'],
+                'description' => $g['description'],
+                'targetValue' => $g['target_value'] ? (float)$g['target_value'] : null,
+                'unit' => $g['unit'],
+                'currentValue' => $g['current_value'] ? (float)$g['current_value'] : null,
+                'progress' => $g['target_value'] ? min(100, round(($g['current_value'] ?? 0) / $g['target_value'] * 100)) : 0,
+                'startDate' => $g['start_date'],
+                'targetDate' => $g['target_date'],
+                'completed' => (bool)$g['completed'],
+            ];
+        }, $goalStmt->fetchAll());
+    } catch (\Exception $e) { $goals = []; }
 
     // Latest body metrics
     $metricStmt = $db->prepare("SELECT * FROM body_metrics WHERE user_id = ? ORDER BY log_date DESC LIMIT 1");
@@ -251,16 +253,18 @@ function getClientDailySummary(string $id): void {
     ] : null;
 
     // Progress photos (latest 4)
-    $photoStmt = $db->prepare("SELECT * FROM progress_photos WHERE user_id = ? ORDER BY taken_at DESC LIMIT 4");
-    $photoStmt->execute([$userId]);
-    $photos = array_map(function($p) {
-        return [
-            'id' => (int)$p['id'],
-            'photoUrl' => $p['photo_url'],
-            'photoType' => $p['photo_type'],
-            'takenAt' => $p['taken_at'],
-        ];
-    }, $photoStmt->fetchAll());
+    try {
+        $photoStmt = $db->prepare("SELECT * FROM progress_photos WHERE user_id = ? ORDER BY taken_at DESC LIMIT 4");
+        $photoStmt->execute([$userId]);
+        $photos = array_map(function($p) {
+            return [
+                'id' => (int)$p['id'],
+                'photoUrl' => $p['photo_url'],
+                'photoType' => $p['photo_type'],
+                'takenAt' => $p['taken_at'],
+            ];
+        }, $photoStmt->fetchAll());
+    } catch (\Exception $e) { $photos = []; }
 
     // Active program
     $progStmt = $db->prepare("
@@ -285,50 +289,58 @@ function getClientDailySummary(string $id): void {
     ] : null;
 
     // Achievements
-    $achStmt = $db->prepare("
-        SELECT a.*, ua.achievement_id IS NOT NULL as unlocked
-        FROM achievements a
-        LEFT JOIN user_achievements ua ON ua.achievement_id = a.id AND ua.user_id = ?
-        ORDER BY a.sort_order
-    ");
-    $achStmt->execute([$userId]);
-    $achievements = array_map(function($a) {
-        return [
-            'label' => $a['label'],
-            'icon' => $a['icon'] ?? 'Award',
-            'unlocked' => (bool)$a['unlocked'],
-        ];
-    }, $achStmt->fetchAll());
+    try {
+        $achStmt = $db->prepare("
+            SELECT a.*, ua.achievement_id IS NOT NULL as unlocked
+            FROM achievements a
+            LEFT JOIN user_achievements ua ON ua.achievement_id = a.id AND ua.user_id = ?
+            ORDER BY a.sort_order
+        ");
+        $achStmt->execute([$userId]);
+        $achievements = array_map(function($a) {
+            return [
+                'label' => $a['label'],
+                'icon' => $a['icon'] ?? 'Award',
+                'unlocked' => (bool)$a['unlocked'],
+            ];
+        }, $achStmt->fetchAll());
+    } catch (\Exception $e) { $achievements = []; }
 
     // Recent activity
-    $activityStmt = $db->prepare("SELECT * FROM activities WHERE user_id = ? ORDER BY created_at DESC LIMIT 5");
-    $activityStmt->execute([$userId]);
-    $recentActivity = array_map(function($a) {
-        return [
-            'type' => $a['type'],
-            'description' => $a['description'],
-            'time' => $a['created_at'],
-        ];
-    }, $activityStmt->fetchAll());
+    try {
+        $activityStmt = $db->prepare("SELECT * FROM activities WHERE user_id = ? ORDER BY created_at DESC LIMIT 5");
+        $activityStmt->execute([$userId]);
+        $recentActivity = array_map(function($a) {
+            return [
+                'type' => $a['type'],
+                'description' => $a['description'],
+                'time' => $a['created_at'],
+            ];
+        }, $activityStmt->fetchAll());
+    } catch (\Exception $e) { $recentActivity = []; }
 
     // KPIs (workouts this month, total hours, streak)
     $thisMonth = date('Y-m-01');
-    $workoutsStmt = $db->prepare("
-        SELECT COUNT(*) FROM session_participants sp
-        JOIN sessions s ON s.id = sp.session_id
-        WHERE sp.user_id = ? AND sp.status = 'completed' AND s.date >= ?
-    ");
-    $workoutsStmt->execute([$userId, $thisMonth]);
-    $workoutsDone = (int)$workoutsStmt->fetchColumn();
+    try {
+        $workoutsStmt = $db->prepare("
+            SELECT COUNT(*) FROM session_participants sp
+            JOIN sessions s ON s.id = sp.session_id
+            WHERE sp.user_id = ? AND sp.status = 'completed' AND s.date >= ?
+        ");
+        $workoutsStmt->execute([$userId, $thisMonth]);
+        $workoutsDone = (int)$workoutsStmt->fetchColumn();
+    } catch (\Exception $e) { $workoutsDone = 0; }
 
-    $hoursStmt = $db->prepare("
-        SELECT COALESCE(SUM(TIME_TO_SEC(TIMEDIFF(s.end_time, s.start_time)) / 3600), 0)
-        FROM session_participants sp
-        JOIN sessions s ON s.id = sp.session_id
-        WHERE sp.user_id = ? AND sp.status = 'completed' AND s.date >= ? AND s.start_time IS NOT NULL AND s.end_time IS NOT NULL
-    ");
-    $hoursStmt->execute([$userId, $thisMonth]);
-    $totalHours = round((float)$hoursStmt->fetchColumn(), 1);
+    try {
+        $hoursStmt = $db->prepare("
+            SELECT COALESCE(SUM(TIME_TO_SEC(TIMEDIFF(s.end_time, s.start_time)) / 3600), 0)
+            FROM session_participants sp
+            JOIN sessions s ON s.id = sp.session_id
+            WHERE sp.user_id = ? AND sp.status = 'completed' AND s.date >= ? AND s.start_time IS NOT NULL AND s.end_time IS NOT NULL
+        ");
+        $hoursStmt->execute([$userId, $thisMonth]);
+        $totalHours = round((float)$hoursStmt->fetchColumn(), 1);
+    } catch (\Exception $e) { $totalHours = 0; }
 
     // Streak from daily check-ins
     $streakStmt = $db->prepare("SELECT checkin_date FROM daily_checkins WHERE user_id = ? ORDER BY checkin_date DESC LIMIT 60");
