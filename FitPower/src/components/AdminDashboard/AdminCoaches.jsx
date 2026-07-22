@@ -19,7 +19,7 @@ export default function AdminCoaches() {
         if (search) params.set('search', search)
         if (statusFilter) params.set('status', statusFilter)
         apiFetch(`/admin/coaches?${params}`)
-            .then(d => setCoaches(d.coaches || d.data || []))
+            .then(d => setCoaches(Array.isArray(d) ? d : (d.coaches || d.data || [])))
             .catch(() => showToast('Error loading coaches'))
     }, [search, statusFilter, showToast])
 
