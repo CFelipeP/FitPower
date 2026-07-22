@@ -2,7 +2,7 @@
 
 .cd-card {
     background: rgba(255, 255, 255, .02); border: 1px solid rgba(255, 255, 255, .05);
-    border-radius: 20px; padding: 24px; transition: border-color .3s;
+    border-radius: 16px; padding: 16px; transition: border-color .3s;
 }
 .cd-card:hover { border-color: rgba(255, 214, 0, .1); }
 
@@ -21,9 +21,9 @@
 .cd-btn-sm { padding: 8px 16px; font-size: 13px; }
 .cd-btn-sm svg { width: 16px; height: 16px; }
 
-.cd-kpi-card { text-align: center; padding: 20px; }
-.cd-kpi-icon-box { width: 48px; height: 48px; margin: 0 auto 12px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
-.cd-kpi-icon-box svg { width: 24px; height: 24px; }
+.cd-kpi-card { text-align: center; padding: 12px 8px; }
+.cd-kpi-icon-box { width: 36px; height: 36px; margin: 0 auto 6px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+.cd-kpi-icon-box svg { width: 18px; height: 18px; }
 .cd-kpi-icon-box.cd-blue { background: rgba(59, 130, 246, .1); }
 .cd-kpi-icon-box.cd-blue svg { color: #60a5fa; }
 .cd-kpi-icon-box.cd-green { background: rgba(34, 197, 94, .1); }
@@ -36,8 +36,8 @@
 .cd-kpi-icon-box.cd-purple svg { color: #a855f7; }
 .cd-kpi-icon-box.cd-red { background: rgba(239, 68, 68, .1); }
 .cd-kpi-icon-box.cd-red svg { color: #ef4444; }
-.cd-kpi-value { font-family: var(--font-display); font-weight: 700; font-size: 24px; color: #fff; }
-.cd-kpi-label { color: #737373; font-size: 11px; margin-top: 4px; }
+.cd-kpi-value { font-family: var(--font-display); font-weight: 700; font-size: 20px; color: #fff; }
+.cd-kpi-label { color: #737373; font-size: 11px; margin-top: 2px; }
 
 .cd-grid-3 { display: grid; grid-template-columns: 1fr; gap: 24px; }
 @media (min-width: 768px) { .cd-grid-3 { grid-template-columns: repeat(2, 1fr); } }
