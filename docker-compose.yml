@@ -49,6 +49,8 @@ services:
       - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - php
+      - chat
+      - node
     networks:
       - fitpower
 
@@ -61,8 +63,6 @@ services:
     command: sh -c "npm install --omit=dev 2>/dev/null; node chat-server.js"
     environment:
       API_BASE_URL: http://nginx:8080
-    depends_on:
-      - nginx
     networks:
       - fitpower
 
@@ -79,8 +79,6 @@ services:
     environment:
       MEDIASOUP_ANNOUNCED_IP: ${MEDIASOUP_IP}
       API_BASE_URL: http://nginx:8080
-    depends_on:
-      - nginx
     networks:
       - fitpower
 
