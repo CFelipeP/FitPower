@@ -51,6 +51,8 @@ export default function CoachDashboard() {
     const { showToast } = useToast()
     const { logout: authLogout } = useAuth()
     const [notifOpen, setNotifOpen] = useState(false)
+    const [profileOpen, setProfileOpen] = useState(false)
+    const profileBtnRef = useRef(null)
     const [clientModalOpen, setClientModalOpen] = useState(false)
     const [selectedClient, setSelectedClient] = useState(null)
     const [activeNav, setActiveNav] = useState('Dashboard')
@@ -241,10 +243,18 @@ export default function CoachDashboard() {
             ) {
                 setNotifOpen(false)
             }
+            if (
+                profileOpen &&
+                profileBtnRef.current &&
+                !profileBtnRef.current.contains(e.target) &&
+                !e.target.closest('.cd-profile-dropdown')
+            ) {
+                setProfileOpen(false)
+            }
         }
         document.addEventListener('click', handleClick)
         return () => document.removeEventListener('click', handleClick)
-    }, [notifOpen])
+    }, [notifOpen, profileOpen])
 
     const handleNavClick = (label) => {
         if (label === 'Log Out') {
@@ -502,15 +512,32 @@ export default function CoachDashboard() {
                                 {unreadCount > 0 && <span className="cd-notif-badge">{unreadCount}</span>}
                             </button>
                             <div className="cd-header-divider" />
-                            <button className="cd-header-profile" onClick={() => setActiveNav('Profile')}>
-                                {userPhoto ? (
-                                    <img loading="lazy" src={userPhoto} alt="Coach" className="cd-header-avatar" />
-                                ) : (
-                                    <div className="cd-header-avatar cd-avatar-placeholder-xs" style={{width:32,height:32,fontSize:13,border:'none'}}>{(data?.userName || 'C')[0]}</div>
+                            <div className="cd-profile-wrap">
+                                <button
+                                    ref={profileBtnRef}
+                                    className="cd-header-profile"
+                                    onClick={(e) => { e.stopPropagation(); setProfileOpen(!profileOpen) }}
+                                >
+                                    {userPhoto ? (
+                                        <img loading="lazy" src={userPhoto} alt="Coach" className="cd-header-avatar" />
+                                    ) : (
+                                        <div className="cd-header-avatar cd-avatar-placeholder-xs" style={{width:32,height:32,fontSize:13,border:'none'}}>{(data?.userName || 'C')[0]}</div>
+                                    )}
+                                    <span className="cd-header-name">{(data?.userName || 'Coach').split(' ')[0]}</span>
+                                    <ChevronDown className="cd-header-chevron" style={{ transform: profileOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
+                                </button>
+                                {profileOpen && (
+                                    <div className="cd-profile-dropdown">
+                                        <button className="cd-profile-dd-item" onClick={() => { setProfileOpen(false); setActiveNav('Profile') }}>
+                                            <User size={16} /> Edit Profile
+                                        </button>
+                                        <div className="cd-profile-dd-divider" />
+                                        <button className="cd-profile-dd-item cd-profile-dd-danger" onClick={() => { setProfileOpen(false); authLogout() }}>
+                                            <LogOut size={16} /> Log Out
+                                        </button>
+                                    </div>
                                 )}
-                                <span className="cd-header-name">{(data?.userName || 'Coach').split(' ')[0]}</span>
-                                <ChevronDown className="cd-header-chevron" />
-                            </button>
+                            </div>
                         </div>
                     </div>
                 </header>
