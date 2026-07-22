@@ -524,8 +524,8 @@ export default function CoachDashboard() {
 
                 <div className="cd-content">
                     <div className="cd-space">
-                        {/* ═══ WELCOME + KPIs ═══ */}
-                        <section className="cd-welcome-wrap cd-fade">
+                        {/* ═══ WELCOME ═══ */}
+                        <section className="cd-welcome-single cd-fade">
                             <div className="cd-card cd-welcome-card">
                                 <div>
                                     <p className="cd-welcome-label">Coach Control Panel</p>
@@ -545,27 +545,29 @@ export default function CoachDashboard() {
                                     </button>
                                 </div>
                             </div>
-                            <div className="cd-kpi-grid">
-                                    <div className="cd-card cd-kpi-card">
-                                        <div className="cd-kpi-icon-box cd-blue"><Users /></div>
-                                        <div className="cd-kpi-value"><Counter target={data?.kpis?.activeClients || 0} visible={countersVisible} /></div>
-                                        <div className="cd-kpi-label">Active Clients</div>
-                                    </div>
-                                    <div className="cd-card cd-kpi-card">
-                                        <div className="cd-kpi-icon-box cd-green"><CalendarCheck /></div>
-                                        <div className="cd-kpi-value">{data?.kpis?.todaySessions || 0}</div>
-                                        <div className="cd-kpi-label">Today's Sessions</div>
-                                    </div>
-                                    <div className="cd-card cd-kpi-card">
-                                        <div className="cd-kpi-icon-box cd-yellow"><TrendingUp /></div>
-                                        <div className="cd-kpi-value">{data?.kpis?.completionRate || 0}<span className="cd-kpi-label" style={{ fontSize: '16px', display: 'inline', margin: 0 }}>%</span></div>
-                                        <div className="cd-kpi-label">Completion Rate</div>
-                                    </div>
-                                    <div className="cd-card cd-kpi-card">
-                                        <div className="cd-kpi-icon-box cd-orange"><Star /></div>
-                                        <div className="cd-kpi-value">{data?.kpis?.avgRating || 0}</div>
-                                        <div className="cd-kpi-label">Avg. Rating</div>
-                                    </div>
+                        </section>
+
+                        {/* ═══ KPI CARDS ═══ */}
+                        <section className="cd-kpi-grid cd-fade-d1">
+                            <div className="cd-card cd-kpi-card">
+                                <div className="cd-kpi-icon-box cd-blue"><Users /></div>
+                                <div className="cd-kpi-value"><Counter target={data?.kpis?.activeClients || 0} visible={countersVisible} /></div>
+                                <div className="cd-kpi-label">Active Clients</div>
+                            </div>
+                            <div className="cd-card cd-kpi-card">
+                                <div className="cd-kpi-icon-box cd-green"><CalendarCheck /></div>
+                                <div className="cd-kpi-value">{data?.kpis?.todaySessions || 0}</div>
+                                <div className="cd-kpi-label">Today's Sessions</div>
+                            </div>
+                            <div className="cd-card cd-kpi-card">
+                                <div className="cd-kpi-icon-box cd-yellow"><TrendingUp /></div>
+                                <div className="cd-kpi-value">{data?.kpis?.completionRate || 0}<span className="cd-kpi-label" style={{ fontSize: '16px', display: 'inline', margin: 0 }}>%</span></div>
+                                <div className="cd-kpi-label">Completion Rate</div>
+                            </div>
+                            <div className="cd-card cd-kpi-card">
+                                <div className="cd-kpi-icon-box cd-orange"><Star /></div>
+                                <div className="cd-kpi-value">{data?.kpis?.avgRating || 0}</div>
+                                <div className="cd-kpi-label">Avg. Rating</div>
                             </div>
                         </section>
 
