@@ -144,6 +144,17 @@ function loginUser(): void {
     $db->prepare("INSERT INTO login_sessions (user_id, device_type, device_name, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)")
         ->execute([(int)$user['id'], $parsed['device_type'], $parsed['device_name'], $ip, $ua]);
 
+    $sessionId = (int)$db->lastInsertId();
+    $maxSessions = 3;
+    $db->prepare("
+        DELETE FROM login_sessions
+        WHERE user_id = ? AND id NOT IN (
+            SELECT id FROM (
+                SELECT id FROM login_sessions WHERE user_id = ? ORDER BY last_active DESC LIMIT ?
+            ) AS keep
+        )
+    ")->execute([(int)$user['id'], (int)$user['id'], $maxSessions]);
+
     success([
         'token' => $token,
         'refresh_token' => $refreshToken,
