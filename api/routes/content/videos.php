@@ -71,9 +71,10 @@ function uploadVideo(): void {
         error('Solo administradores y entrenadores pueden subir videos', 403);
     }
 
-    $title = $_POST['title'] ?? '';
+    $title = trim($_POST['title'] ?? '');
     if (!$title) {
-        error('El título es requerido', 422);
+        $originalName = $_FILES['video']['name'] ?? 'video';
+        $title = pathinfo($originalName, PATHINFO_FILENAME);
     }
 
     if (!isset($_FILES['video']) || $_FILES['video']['error'] !== UPLOAD_ERR_OK) {

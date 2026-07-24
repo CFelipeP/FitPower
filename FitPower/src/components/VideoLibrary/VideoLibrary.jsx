@@ -87,9 +87,9 @@ export default function VideoLibrary() {
     }
 
     function handleFile(file) {
-        const validTypes = ['video/mp4', 'video/webm']
+        const validTypes = ['video/mp4', 'video/webm', 'video/quicktime']
         if (!validTypes.includes(file.type)) {
-            showToast('Please upload MP4 or WebM video files')
+            showToast('Please upload MP4, WebM or MOV video files')
             return
         }
         setUploading(true)
@@ -231,7 +231,7 @@ export default function VideoLibrary() {
                 <Upload size={28} />
                 <p className="vl-dropzone-title">Drag & drop video files here</p>
                 <p className="vl-dropzone-text">Supports MP4 and WebM</p>
-                <input ref={fileInputRef} type="file" accept="video/mp4,video/webm" className="vl-hidden-input" onChange={handleFileInput} />
+                <input ref={fileInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" className="vl-hidden-input" onChange={handleFileInput} />
             </div>
 
             {uploading && (
