@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Video, Upload, Search, X, Film, Trash2, Play } from 'lucide-react'
+import { Video, Upload, Search, X, Film, Trash2, Play, Edit, Save } from 'lucide-react'
 import { apiFetch } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
@@ -18,6 +18,8 @@ export default function VideoLibrary() {
     const [category, setCategory] = useState('All')
     const [selected, setSelected] = useState(null)
     const [confirmDelete, setConfirmDelete] = useState(null)
+    const [editing, setEditing] = useState(null)
+    const [editForm, setEditForm] = useState({ title: '', description: '', category: '' })
     const [uploading, setUploading] = useState(false)
     const [uploadProgress, setUploadProgress] = useState(0)
     const [dragActive, setDragActive] = useState(false)
@@ -143,6 +145,26 @@ export default function VideoLibrary() {
         }
     }
 
+    function startEdit(v) {
+        setEditing(v)
+        setEditForm({ title: v.title || '', description: v.description || '', category: v.category || 'exercise_demo' })
+    }
+
+    async function handleUpdateVideo() {
+        if (!editing || !editForm.title.trim()) return
+        try {
+            await apiFetch(`/videos/${editing.id}`, {
+                method: 'PUT',
+                body: JSON.stringify(editForm),
+            })
+            showToast('Video updated')
+            setEditing(null)
+            loadVideos()
+        } catch {
+            showToast('Error updating video')
+        }
+    }
+
     async function handleSendFeedback() {
         if (!selectedClient || !feedbackText.trim() || !selected) return
         setFeedbackSending(true)
@@ -251,6 +273,7 @@ export default function VideoLibrary() {
                                 </div>
                                 <div className="vl-card-actions" onClick={e => e.stopPropagation()}>
                                     <button className="vl-action-btn" onClick={() => setSelected(v)}><Play size={12} /> Preview</button>
+                                    <button className="vl-action-btn vl-action-edit" onClick={() => startEdit(v)}><Edit size={12} /> Edit</button>
                                     <button className="vl-action-btn vl-action-del" onClick={() => { setConfirmDelete(v); setSelected(null) }}><Trash2 size={12} /> Delete</button>
                                 </div>
                             </div>
@@ -285,6 +308,36 @@ export default function VideoLibrary() {
                         <div className="vl-confirm-actions">
                             <button className="vl-btn vl-btn-ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
                             <button className="vl-btn vl-btn-danger" onClick={() => handleDeleteVideo(confirmDelete.id || confirmDelete._id)}>Delete</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {editing && (
+                <div className="vl-overlay" onClick={e => { if (e.target === e.currentTarget) setEditing(null) }}>
+                    <div className="vl-modal vl-edit-modal" onClick={e => e.stopPropagation()}>
+                        <button className="vl-modal-close" onClick={() => setEditing(null)}><X size={18} /></button>
+                        <div className="vl-edit-header">
+                            <Edit size={20} />
+                            <h3>Edit Video</h3>
+                        </div>
+                        <div className="vl-edit-body">
+                            <label className="vl-edit-label">Title</label>
+                            <input className="vl-edit-input" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} placeholder="Video title" />
+                            <label className="vl-edit-label">Description</label>
+                            <textarea className="vl-edit-textarea" value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} placeholder="Video description" rows={3} />
+                            <label className="vl-edit-label">Category</label>
+                            <select className="vl-edit-select" value={editForm.category} onChange={e => setEditForm({ ...editForm, category: e.target.value })}>
+                                {CATEGORIES.filter(c => c !== 'All').map(c => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="vl-edit-actions">
+                            <button className="vl-btn vl-btn-ghost" onClick={() => setEditing(null)}>Cancel</button>
+                            <button className="vl-btn vl-btn-primary" onClick={handleUpdateVideo} disabled={!editForm.title.trim()}>
+                                <Save size={14} /> Save
+                            </button>
                         </div>
                     </div>
                 </div>
