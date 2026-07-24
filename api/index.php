@@ -1108,6 +1108,11 @@ route('/auth/logout', ['method' => 'POST', 'handler' => function() {
     logoutUser();
 }]);
 
+route('/auth/public-stats', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/auth/auth.php';
+    publicStats();
+}]);
+
 // --- Coupon Update Route ---
 route('/admin/coupons/{id}', ['method' => 'PUT', 'handler' => function($p) {
     require __DIR__ . '/routes/finance/coupons.php';

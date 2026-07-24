@@ -37,6 +37,10 @@ export default function Login() {
     // Active sessions
     const [activeSessions, setActiveSessions] = useState([])
     const [sessionsLoading, setSessionsLoading] = useState(false)
+    const [emailRole, setEmailRole] = useState(null)
+
+    // Public stats
+    const [publicStats, setPublicStats] = useState({ workouts: 0, trainers: 0, clients: 0 })
 
     // Handle token from OAuth redirect
     useEffect(() => {
@@ -62,6 +66,14 @@ export default function Login() {
             navigate(dashboards[user?.role] || '/client/dashboard', { replace: true })
         }
     }, [initialized, isAuthenticated, currentView, user, navigate])
+
+    // Fetch public stats for left panel
+    useEffect(() => {
+        fetch('/api/auth/public-stats')
+            .then(r => r.json())
+            .then(d => { if (d.success && d.data) setPublicStats(d.data) })
+            .catch(() => {})
+    }, [])
 
     // Login form
     const [loginEmail, setLoginEmail] = useState('')
@@ -316,6 +328,7 @@ export default function Login() {
             })
             const data = await res.json()
             setActiveSessions(data.data?.sessions || [])
+            setEmailRole(data.data?.role || null)
         } catch {
             setActiveSessions([])
         }
@@ -385,24 +398,26 @@ export default function Login() {
                     </div>
 
                     {/* Stats Bar */}
+                    {emailRole !== 'coach' && (
                     <div className="login-left-stats">
                         <div className="login-stats-card">
                             <div className="login-stat">
-                                <div className="login-stat-value login-stat-value-accent">847</div>
+                                <div className="login-stat-value login-stat-value-accent">{publicStats.workouts || 0}</div>
                                 <div className="login-stat-label">Workouts<br />completed</div>
                             </div>
                             <div className="login-stat-divider"></div>
                             <div className="login-stat">
-                                <div className="login-stat-value">23</div>
-                                <div className="login-stat-label">Day<br />streak</div>
+                                <div className="login-stat-value">{publicStats.trainers || 0}</div>
+                                <div className="login-stat-label">Certified<br />trainers</div>
                             </div>
                             <div className="login-stat-divider"></div>
                             <div className="login-stat">
-                                <div className="login-stat-value">-8.2<span className="login-stat-unit">kg</span></div>
-                                <div className="login-stat-label">Total<br />progress</div>
+                                <div className="login-stat-value">{publicStats.clients || 0}</div>
+                                <div className="login-stat-label">Clients<br />joined</div>
                             </div>
                         </div>
                     </div>
+                    )}
 
                     <div className="login-left-decor-circle"></div>
                     <div className="login-left-decor-glow"></div>
@@ -494,7 +509,7 @@ export default function Login() {
                                     <button
                                         type="button"
                                         className="login-back-btn"
-                                        onClick={() => { showView(VIEWS.LOGIN_EMAIL); setLoginPassword(''); setActiveSessions([]); setLoginError(false) }}
+                                        onClick={() => { showView(VIEWS.LOGIN_EMAIL); setLoginPassword(''); setActiveSessions([]); setEmailRole(null); setLoginError(false) }}
                                     >
                                         <ArrowLeft size={16} /> Use another account
                                     </button>
