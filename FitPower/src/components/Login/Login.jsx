@@ -14,7 +14,8 @@ import {
 import './Login.css'
 
 const VIEWS = {
-    LOGIN: 'loginView',
+    LOGIN_EMAIL: 'loginEmailView',
+    LOGIN_PASS: 'loginPassView',
     FORGOT: 'forgotView',
     CODE: 'codeView',
     NEW_PASS: 'newPassView',
@@ -30,8 +31,12 @@ export default function Login() {
 
     // View
     const [currentView, setCurrentView] = useState(
-        searchParams.get('setup_password') === '1' ? VIEWS.SETUP_PASS : VIEWS.LOGIN
+        searchParams.get('setup_password') === '1' ? VIEWS.SETUP_PASS : VIEWS.LOGIN_EMAIL
     )
+
+    // Active sessions
+    const [activeSessions, setActiveSessions] = useState([])
+    const [sessionsLoading, setSessionsLoading] = useState(false)
 
     // Handle token from OAuth redirect
     useEffect(() => {
@@ -293,13 +298,30 @@ export default function Login() {
         setResetToken(null)
         setSetupPassword('')
         setSetupConfirm('')
-        showView(VIEWS.LOGIN)
+        showView(VIEWS.LOGIN_EMAIL)
     }
 
-    const devices = [
-        { icon: Monitor, name: 'MacBook Pro · Chrome', location: 'New York, US · Active now', active: true },
-        { icon: Smartphone, name: 'iPhone 15 · Safari', location: 'New York, US · 2 hours ago', active: false },
-    ]
+    const sessionIcons = { desktop: Monitor, mobile: Smartphone, tablet: Monitor }
+
+    const handleEmailContinue = async () => {
+        setLoginTouched({ email: true, password: false })
+        if (!validateEmail(loginEmail)) return
+
+        setSessionsLoading(true)
+        try {
+            const res = await fetch('/api/auth/sessions-by-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: loginEmail }),
+            })
+            const data = await res.json()
+            setActiveSessions(data.data?.sessions || [])
+        } catch {
+            setActiveSessions([])
+        }
+        setSessionsLoading(false)
+        showView(VIEWS.LOGIN_PASS)
+    }
 
     return (
         <div className="login-page noise grid-pattern">
@@ -406,11 +428,11 @@ export default function Login() {
                                 <ArrowLeft size={14} /> Back to home
                             </a>
 
-                            {/* LOGIN VIEW */}
-                            {currentView === VIEWS.LOGIN && (
+                            {/* LOGIN EMAIL STEP */}
+                            {currentView === VIEWS.LOGIN_EMAIL && (
                                 <div className="login-view-content">
                                     <h1 className="login-title">Log in</h1>
-                                    <p className="login-subtitle">Enter your credentials to access your account.</p>
+                                    <p className="login-subtitle">Enter your email to continue.</p>
 
                                     {/* Email */}
                                     <div className="login-field">
@@ -421,13 +443,94 @@ export default function Login() {
                                             value={loginEmail}
                                             onChange={(e) => setLoginEmail(e.target.value)}
                                             onBlur={() => setLoginTouched((p) => ({ ...p, email: true }))}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleEmailContinue()}
                                             autoComplete="email"
+                                            autoFocus
                                         />
                                         <Mail size={18} className="login-input-icon" />
                                         {loginTouched.email && !validateEmail(loginEmail) && (
                                             <div className="login-field-error visible">Please enter a valid email</div>
                                         )}
                                     </div>
+
+                                    {/* Error Banner */}
+                                    {loginError && (
+                                        <div className="login-error-banner">
+                                            <AlertTriangle size={20} className="login-error-icon" />
+                                            <div>
+                                                <div className="login-error-title">Error</div>
+                                                <div className="login-error-desc">{typeof loginError === 'string' ? loginError : 'Please enter a valid email address.'}</div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Continue Button */}
+                                    <button
+                                        type="button"
+                                        className="login-btn-primary btn-shine"
+                                        onClick={handleEmailContinue}
+                                        disabled={sessionsLoading}
+                                    >
+                                        {sessionsLoading ? (
+                                            <><span className="login-spinner"></span> Loading...</>
+                                        ) : (
+                                            'Continue'
+                                        )}
+                                    </button>
+
+                                    {/* Register Link */}
+                                    <p className="login-register-link">
+                                        Don't have an account?
+                                        <Link to="/register" className="login-register-link-accent">Sign up free</Link>
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* LOGIN PASSWORD STEP */}
+                            {currentView === VIEWS.LOGIN_PASS && (
+                                <div className="login-view-content">
+                                    <button
+                                        type="button"
+                                        className="login-back-btn"
+                                        onClick={() => { showView(VIEWS.LOGIN_EMAIL); setLoginPassword(''); setActiveSessions([]); setLoginError(false) }}
+                                    >
+                                        <ArrowLeft size={16} /> Use another account
+                                    </button>
+
+                                    <div className="login-email-badge">
+                                        <Mail size={16} />
+                                        <span>{loginEmail}</span>
+                                    </div>
+
+                                    <h1 className="login-title" style={{ fontSize: 22 }}>Welcome back</h1>
+                                    <p className="login-subtitle">Enter your password to sign in.</p>
+
+                                    {/* Active Sessions */}
+                                    {activeSessions.length > 0 && (
+                                        <div className="login-sessions">
+                                            <div className="login-sessions-header">
+                                                <span className="login-sessions-title">Active sessions</span>
+                                                <span className="login-sessions-count">{activeSessions.length} other device{activeSessions.length !== 1 ? 's' : ''}</span>
+                                            </div>
+                                            <div className="login-devices">
+                                                {activeSessions.map((d, i) => {
+                                                    const Icon = sessionIcons[d.deviceType] || Monitor
+                                                    return (
+                                                        <div key={i} className="login-device-item">
+                                                            <div className="login-device-icon">
+                                                                <Icon size={16} />
+                                                            </div>
+                                                            <div className="login-device-info">
+                                                                <div className="login-device-name">{d.deviceName}</div>
+                                                                <div className="login-device-location">{d.timeAgo}</div>
+                                                            </div>
+                                                            <span className="login-device-dot"></span>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Password */}
                                     <div className="login-field">
@@ -438,7 +541,9 @@ export default function Login() {
                                             value={loginPassword}
                                             onChange={(e) => setLoginPassword(e.target.value)}
                                             onBlur={() => setLoginTouched((p) => ({ ...p, password: true }))}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                                             autoComplete="current-password"
+                                            autoFocus
                                         />
                                         <Lock size={18} className="login-input-icon" />
                                         <button
@@ -482,7 +587,7 @@ export default function Login() {
                                             <AlertTriangle size={20} className="login-error-icon" />
                                             <div>
                                                 <div className="login-error-title">Error</div>
-                                                <div className="login-error-desc">{typeof loginError === 'string' ? loginError : 'The email or password you entered is incorrect. Please try again.'}</div>
+                                                <div className="login-error-desc">{typeof loginError === 'string' ? loginError : 'The password you entered is incorrect. Please try again.'}</div>
                                             </div>
                                         </div>
                                     )}
@@ -500,34 +605,6 @@ export default function Login() {
                                             'Log In'
                                         )}
                                     </button>
-
-                                    {/* Register Link */}
-                                    <p className="login-register-link">
-                                        Don't have an account?
-                                        <Link to="/register" className="login-register-link-accent">Sign up free</Link>
-                                    </p>
-
-                                    {/* Active Sessions */}
-                                    <div className="login-sessions">
-                                        <div className="login-sessions-header">
-                                            <span className="login-sessions-title">Active sessions</span>
-                                            <span className="login-sessions-count">2 devices</span>
-                                        </div>
-                                        <div className="login-devices">
-                                            {devices.map((d, i) => (
-                                                <div key={i} className="login-device-item">
-                                                    <div className="login-device-icon">
-                                                        <d.icon size={16} />
-                                                    </div>
-                                                    <div className="login-device-info">
-                                                        <div className="login-device-name">{d.name}</div>
-                                                        <div className="login-device-location">{d.location}</div>
-                                                    </div>
-                                                    <span className={`login-device-dot ${d.active ? 'active' : ''}`}></span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
                                 </div>
                             )}
 
@@ -537,7 +614,7 @@ export default function Login() {
                                     <button
                                         type="button"
                                         className="login-back-btn"
-                                        onClick={() => showView(VIEWS.LOGIN)}
+                                        onClick={() => showView(VIEWS.LOGIN_EMAIL)}
                                     >
                                         <ArrowLeft size={16} /> Back to login
                                     </button>

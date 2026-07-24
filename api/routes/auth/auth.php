@@ -139,6 +139,11 @@ function loginUser(): void {
     $token = generateJWT(['sub' => (int)$user['id'], 'role' => $role, 'tv' => (int)($user['token_version'] ?? 0)]);
     $refreshToken = generateRefreshToken((int)$user['id']);
 
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    $parsed = parseUserAgent($ua);
+    $db->prepare("INSERT INTO login_sessions (user_id, device_type, device_name, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)")
+        ->execute([(int)$user['id'], $parsed['device_type'], $parsed['device_name'], $ip, $ua]);
+
     success([
         'token' => $token,
         'refresh_token' => $refreshToken,
@@ -521,5 +526,68 @@ function revokeAllSessions(): void {
     $db = getDB();
     $db->prepare("UPDATE users SET token_version = token_version + 1 WHERE id = ?")->execute([$auth['sub']]);
     $db->prepare("UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND revoked = 0")->execute([$auth['sub']]);
-    success(null, 'Todas las sesiones han sido revocadas');
+    $db->prepare("DELETE FROM login_sessions WHERE user_id = ?")->execute([$auth['sub']]);
+    success(null, 'All sessions have been revoked');
+}
+
+function getSessionsByEmail(): void {
+    $input = getJsonInput();
+    $errors = validate($input, ['email' => 'required|email']);
+    if ($errors) error('Validation error', 422, $errors);
+
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+    $stmt->execute([$input['email']]);
+    $user = $stmt->fetch();
+
+    if (!$user) {
+        success(['sessions' => []]);
+        return;
+    }
+
+    $userId = (int)$user['id'];
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+
+    $stmt = $db->prepare("
+        SELECT id, device_type, device_name, ip_address, last_active, created_at
+        FROM login_sessions
+        WHERE user_id = ? AND (ip_address != ? OR user_agent != ?)
+        ORDER BY last_active DESC
+        LIMIT 10
+    ");
+    $stmt->execute([$userId, $ip, $ua]);
+    $sessions = array_map(function($s) {
+        $now = time();
+        $lastActive = strtotime($s['last_active']);
+        $diffMinutes = (int)(($now - $lastActive) / 60);
+        $timeAgo = $diffMinutes < 1 ? 'Active now'
+            : ($diffMinutes < 60 ? "$diffMinutes min ago"
+            : ($diffMinutes < 1440 ? intdiv($diffMinutes, 60) . "h ago"
+            : intdiv($diffMinutes, 1440) . "d ago"));
+        return [
+            'id' => (int)$s['id'],
+            'deviceType' => $s['device_type'],
+            'deviceName' => $s['device_name'],
+            'lastActive' => $s['last_active'],
+            'timeAgo' => $timeAgo,
+        ];
+    }, $stmt->fetchAll());
+
+    success(['sessions' => $sessions]);
+}
+
+function logoutUser(): void {
+    $auth = requireAuth();
+    $db = getDB();
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+
+    $db->prepare("DELETE FROM login_sessions WHERE user_id = ? AND ip_address = ? AND user_agent = ?")
+        ->execute([(int)$auth['sub'], $ip, $ua]);
+
+    $db->prepare("UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND revoked = 0")
+        ->execute([(int)$auth['sub']]);
+
+    success(null, 'Logged out successfully');
 }
