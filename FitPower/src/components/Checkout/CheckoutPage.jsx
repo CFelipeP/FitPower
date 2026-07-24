@@ -115,7 +115,15 @@ export default function CheckoutPage() {
                                 description={`${plan.name} - ${billing === 'yearly' ? 'Annual' : 'Monthly'}`}
                                 planId={plan.id}
                                 billing={billing}
-                                onSuccess={() => window.location.href = '/payment/success'}
+                                onSuccess={(res) => {
+                                    const params = new URLSearchParams({
+                                        plan_name: plan.name,
+                                        billing,
+                                        amount: price,
+                                        ...(res?.subscriptionId ? { subscription_id: res.subscriptionId } : {}),
+                                    })
+                                    window.location.href = `/payment/success?${params}`
+                                }}
                             />
 
                             <div className="co-secure">
