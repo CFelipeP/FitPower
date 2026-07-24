@@ -71,6 +71,7 @@ export default function WalletCheckout({ amount, description, planId, billing, o
         return () => {
             if (s.parentNode) s.parentNode.removeChild(s)
             delete window.handleWalletPayment
+            document.querySelectorAll('[data-vw-widget], [id^="vw-"], [class*="vw-"], [id*="virtual-wallet"]').forEach(el => el.remove())
             restore()
         }
     }, [id, planId, billing, onSuccess, showToast])
