@@ -61,10 +61,20 @@
 }
 
 .login-left-content,
+.login-left-content,
 .login-left-body,
 .login-left-stats {
     position: relative;
     z-index: 10;
+}
+
+.login-glass-card {
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 32px;
 }
 
 /* ── Logo ── */
