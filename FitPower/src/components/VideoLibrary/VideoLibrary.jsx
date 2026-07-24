@@ -31,7 +31,7 @@ export default function VideoLibrary() {
     const loadVideos = useCallback(async () => {
         try {
             const data = await apiFetch('/videos')
-            setVideos(data)
+            setVideos(Array.isArray(data) ? data : (data.videos || []))
         } catch {
             showToast('Error loading videos')
         } finally {
