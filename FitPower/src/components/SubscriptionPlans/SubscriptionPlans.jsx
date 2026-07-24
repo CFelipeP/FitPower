@@ -43,7 +43,7 @@ export default function SubscriptionPlans({ standalone = false }) {
     const handleCancel = async () => {
         setCancelling(true)
         try {
-            await apiFetch('/stripe/cancel-subscription', { method: 'POST' })
+            await apiFetch('/subscriptions/cancel', { method: 'POST' })
             setSubscription(null)
         } catch (err) {
             alert(err.message || 'Failed to cancel')
@@ -56,8 +56,8 @@ export default function SubscriptionPlans({ standalone = false }) {
         navigate(`/checkout?plan_id=${planId}&billing=${isYearly ? 'yearly' : 'monthly'}`)
     }
 
-    const activePlanId = subscription?.plan_id || subscription?.plan?.id || null
-    const activePlanName = subscription?.plan?.name || subscription?.plan_name || 'Active Plan'
+    const activePlanId = subscription?.planId || subscription?.plan_id || subscription?.plan?.id || null
+    const activePlanName = subscription?.planName || subscription?.plan?.name || subscription?.plan_name || 'Active Plan'
     const isActive = activePlanId !== null
 
     if (loading) {

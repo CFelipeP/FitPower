@@ -70,6 +70,7 @@ function getUserSubscription(): void {
 
     success([
         'id' => (int)$sub['id'],
+        'planId' => (int)$sub['plan_id'],
         'planName' => $sub['plan_name'],
         'billing' => $sub['billing'],
         'price' => $sub['billing'] === 'yearly' ? $sub['price_yearly'] : $sub['price_monthly'],
@@ -79,6 +80,21 @@ function getUserSubscription(): void {
     ]);
 }
 
+function cancelUserSubscription(): void {
+    $auth = requireAuth();
+    $db = getDB();
+
+    $stmt = $db->prepare("SELECT * FROM user_subscriptions WHERE user_id = ? AND status = 'active' ORDER BY starts_at DESC LIMIT 1");
+    $stmt->execute([$auth['sub']]);
+    $subscription = $stmt->fetch();
+
+    if (!$subscription) error('No active subscription found');
+
+    $db->prepare("UPDATE user_subscriptions SET status = 'cancelled', cancelled_at = NOW() WHERE id = ?")
+        ->execute([$subscription['id']]);
+
+    success(null, 'Subscription cancelled');
+}
 // --- Admin Subscription Management ---
 
 function adminListSubscriptions(): void {
