@@ -430,6 +430,11 @@ route('/subscriptions', ['method' => 'POST', 'handler' => function() {
     createSubscription();
 }]);
 
+route('/subscriptions/cancel', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/finance/subscriptions.php';
+    cancelUserSubscription();
+}]);
+
 route('/subscriptions/{id}/invoice', ['method' => 'GET', 'handler' => function($p) {
     require __DIR__ . '/helpers/invoice.php';
     $file = generateInvoicePdf((int)$p['id']);
@@ -1424,6 +1429,11 @@ route('/videos', ['method' => 'GET', 'handler' => function() {
 }]);
 
 route('/videos', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/content/videos.php';
+    uploadVideo();
+}]);
+
+route('/videos/upload', ['method' => 'POST', 'handler' => function() {
     require __DIR__ . '/routes/content/videos.php';
     uploadVideo();
 }]);
