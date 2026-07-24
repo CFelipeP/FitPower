@@ -165,39 +165,41 @@ export default function Register() {
                     </div>
 
                     <div className="register-left-body">
-                        <h2 className="register-left-heading">
-                            Your transformation<br />starts <span className="text-power text-glow">here</span>
-                        </h2>
-                        <p className="register-left-desc">
-                            Join 15,000+ athletes who train smarter, recover faster, and break plateaus with AI-powered programming.
-                        </p>
+                        <div className="login-glass-card">
+                            <h2 className="register-left-heading">
+                                Your transformation<br />starts <span className="text-power text-glow">here</span>
+                            </h2>
+                            <p className="register-left-desc">
+                                Join 15,000+ athletes who train smarter, recover faster, and break plateaus with AI-powered programming.
+                            </p>
 
-                        <div className="register-benefits">
-                            <div className="register-benefit-item">
-                                <div className="register-benefit-icon">
-                                    <ShieldCheck size={20} />
+                            <div className="register-benefits">
+                                <div className="register-benefit-item">
+                                    <div className="register-benefit-icon">
+                                        <ShieldCheck size={20} />
+                                    </div>
+                                    <div>
+                                        <div className="register-benefit-title">7-day free trial</div>
+                                        <div className="register-benefit-sub">No credit card required to start</div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <div className="register-benefit-title">7-day free trial</div>
-                                    <div className="register-benefit-sub">No credit card required to start</div>
+                                <div className="register-benefit-item">
+                                    <div className="register-benefit-icon">
+                                        <Brain size={20} />
+                                    </div>
+                                    <div>
+                                        <div className="register-benefit-title">AI-personalized from day one</div>
+                                        <div className="register-benefit-sub">Adapts to your level in real time</div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="register-benefit-item">
-                                <div className="register-benefit-icon">
-                                    <Brain size={20} />
-                                </div>
-                                <div>
-                                    <div className="register-benefit-title">AI-personalized from day one</div>
-                                    <div className="register-benefit-sub">Adapts to your level in real time</div>
-                                </div>
-                            </div>
-                            <div className="register-benefit-item">
-                                <div className="register-benefit-icon">
-                                    <XCircle size={20} />
-                                </div>
-                                <div>
-                                    <div className="register-benefit-title">Cancel anytime, no strings</div>
-                                    <div className="register-benefit-sub">No contracts, no hidden fees</div>
+                                <div className="register-benefit-item">
+                                    <div className="register-benefit-icon">
+                                        <XCircle size={20} />
+                                    </div>
+                                    <div>
+                                        <div className="register-benefit-title">Cancel anytime, no strings</div>
+                                        <div className="register-benefit-sub">No contracts, no hidden fees</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
