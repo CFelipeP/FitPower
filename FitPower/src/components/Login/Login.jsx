@@ -344,39 +344,41 @@ export default function Login() {
                     </div>
 
                     <div className="login-left-body">
-                        <h2 className="login-left-heading">
-                            Welcome<br /><span className="text-power text-glow">back</span>
-                        </h2>
-                        <p className="login-left-desc">
-                            Your programs, progress, and community are waiting. Pick up right where you left off.
-                        </p>
+                        <div className="login-glass-card">
+                            <h2 className="login-left-heading">
+                                Welcome<br /><span className="text-power text-glow">back</span>
+                            </h2>
+                            <p className="login-left-desc">
+                                Your programs, progress, and community are waiting. Pick up right where you left off.
+                            </p>
 
-                        <div className="login-benefits">
-                            <div className="login-benefit-item">
-                                <div className="login-benefit-icon">
-                                    <Activity size={20} />
+                            <div className="login-benefits">
+                                <div className="login-benefit-item">
+                                    <div className="login-benefit-icon">
+                                        <Activity size={20} />
+                                    </div>
+                                    <div>
+                                        <div className="login-benefit-title">Your streak continues</div>
+                                        <div className="login-benefit-sub">We kept your data safe while you were away</div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <div className="login-benefit-title">Your streak continues</div>
-                                    <div className="login-benefit-sub">We kept your data safe while you were away</div>
+                                <div className="login-benefit-item">
+                                    <div className="login-benefit-icon">
+                                        <BarChart3 size={20} />
+                                    </div>
+                                    <div>
+                                        <div className="login-benefit-title">Progress preserved</div>
+                                        <div className="login-benefit-sub">All your metrics, PRs, and history synced</div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="login-benefit-item">
-                                <div className="login-benefit-icon">
-                                    <BarChart3 size={20} />
-                                </div>
-                                <div>
-                                    <div className="login-benefit-title">Progress preserved</div>
-                                    <div className="login-benefit-sub">All your metrics, PRs, and history synced</div>
-                                </div>
-                            </div>
-                            <div className="login-benefit-item">
-                                <div className="login-benefit-icon">
-                                    <Sparkles size={20} />
-                                </div>
-                                <div>
-                                    <div className="login-benefit-title">New programs added</div>
-                                    <div className="login-benefit-sub">12 new routines since your last session</div>
+                                <div className="login-benefit-item">
+                                    <div className="login-benefit-icon">
+                                        <Sparkles size={20} />
+                                    </div>
+                                    <div>
+                                        <div className="login-benefit-title">New programs added</div>
+                                        <div className="login-benefit-sub">12 new routines since your last session</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
