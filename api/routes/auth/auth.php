@@ -547,16 +547,17 @@ function getSessionsByEmail(): void {
     if ($errors) error('Validation error', 422, $errors);
 
     $db = getDB();
-    $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+    $stmt = $db->prepare("SELECT id, role FROM users WHERE email = ?");
     $stmt->execute([$input['email']]);
     $user = $stmt->fetch();
 
     if (!$user) {
-        success(['sessions' => []]);
+        success(['sessions' => [], 'role' => null]);
         return;
     }
 
     $userId = (int)$user['id'];
+    $role = $user['role'] ?? 'client';
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
     $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
 
@@ -585,7 +586,7 @@ function getSessionsByEmail(): void {
         ];
     }, $stmt->fetchAll());
 
-    success(['sessions' => $sessions]);
+    success(['sessions' => $sessions, 'role' => $role]);
 }
 
 function logoutUser(): void {
@@ -601,4 +602,18 @@ function logoutUser(): void {
         ->execute([(int)$auth['sub']]);
 
     success(null, 'Logged out successfully');
+}
+
+function publicStats(): void {
+    $db = getDB();
+
+    $workouts = (int)$db->query("SELECT COUNT(*) FROM session_participants WHERE status = 'completed'")->fetchColumn();
+    $trainers = (int)$db->query("SELECT COUNT(*) FROM trainers WHERE status = 'approved'")->fetchColumn();
+    $clients = (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'client'")->fetchColumn();
+
+    success([
+        'workouts' => $workouts,
+        'trainers' => $trainers,
+        'clients' => $clients,
+    ]);
 }
