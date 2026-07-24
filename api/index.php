@@ -1098,6 +1098,16 @@ route('/auth/revoke-all-sessions', ['method' => 'PUT', 'handler' => function() {
     revokeAllSessions();
 }]);
 
+route('/auth/sessions-by-email', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/auth/auth.php';
+    getSessionsByEmail();
+}]);
+
+route('/auth/logout', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/auth/auth.php';
+    logoutUser();
+}]);
+
 // --- Coupon Update Route ---
 route('/admin/coupons/{id}', ['method' => 'PUT', 'handler' => function($p) {
     require __DIR__ . '/routes/finance/coupons.php';

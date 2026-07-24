@@ -85,6 +85,53 @@ function base64url_decode(string $data): string {
     return base64_decode(strtr($data, '-_', '+/'));
 }
 
+function parseUserAgent(string $ua): array {
+    $type = 'desktop';
+    $device = 'Unknown Device';
+    $os = '';
+
+    if (preg_match('/Mobile|Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i', $ua)) {
+        $type = 'mobile';
+    } elseif (preg_match('/iPad|Android(?!.*Mobile)|Tablet/i', $ua)) {
+        $type = 'tablet';
+    }
+
+    if (preg_match('/Windows/i', $ua)) $os = 'Windows';
+    elseif (preg_match('/Mac OS X/i', $ua)) $os = 'macOS';
+    elseif (preg_match('/iPhone|iPad/i', $ua)) $os = 'iOS';
+    elseif (preg_match('/Android/i', $ua)) $os = 'Android';
+    elseif (preg_match('/Linux/i', $ua)) $os = 'Linux';
+    elseif (preg_match('/CrOS/i', $ua)) $os = 'ChromeOS';
+
+    $browser = 'Browser';
+    if (preg_match('/Edg[e\/]/i', $ua)) $browser = 'Edge';
+    elseif (preg_match('/Chrome/i', $ua) && !preg_match('/Edg|OPR/i', $ua)) $browser = 'Chrome';
+    elseif (preg_match('/Firefox/i', $ua)) $browser = 'Firefox';
+    elseif (preg_match('/Safari/i', $ua) && !preg_match('/Chrome|Edg/i', $ua)) $browser = 'Safari';
+    elseif (preg_match('/OPR|Opera/i', $ua)) $browser = 'Opera';
+
+    if ($type === 'mobile') {
+        if (preg_match('/iPhone/i', $ua)) $device = 'iPhone';
+        elseif (preg_match('/Samsung/i', $ua)) $device = 'Samsung Galaxy';
+        elseif (preg_match('/Pixel/i', $ua)) $device = 'Google Pixel';
+        elseif (preg_match('/Android/i', $ua)) $device = 'Android Phone';
+        else $device = 'Mobile Device';
+    } elseif ($type === 'tablet') {
+        if (preg_match('/iPad/i', $ua)) $device = 'iPad';
+        else $device = 'Tablet';
+    } else {
+        if (preg_match('/Mac/i', $ua)) $device = 'Mac';
+        elseif (preg_match('/Windows/i', $ua)) $device = 'Windows PC';
+        elseif (preg_match('/Linux/i', $ua)) $device = 'Linux PC';
+        else $device = 'Computer';
+    }
+
+    return [
+        'device_type' => $type,
+        'device_name' => "$device · $browser" . ($os ? " on $os" : ''),
+    ];
+}
+
 function generateRefreshToken(int $userId): string {
     try {
         $db = getDB();
@@ -114,6 +161,9 @@ function refreshAccessToken(string $refreshToken): ?array {
         if (!$user) return null;
 
         $db->prepare("UPDATE refresh_tokens SET revoked = 1 WHERE id = ?")->execute([$row['id']]);
+
+        $db->prepare("UPDATE login_sessions SET last_active = NOW() WHERE user_id = ? AND ip_address = ?")
+            ->execute([(int)$row['user_id'], $_SERVER['REMOTE_ADDR'] ?? '']);
 
         $role = $user['role'] ?? 'client';
         $newAccessToken = generateJWT(['sub' => (int)$user['id'], 'role' => $role, 'tv' => (int)($user['token_version'] ?? 0)]);
