@@ -85,7 +85,7 @@ function handleWalletWebhook(): void {
             $userId = $input['user_id'] ?? null;
             $planId = $input['plan_id'] ?? null;
             $billing = $input['billing'] ?? 'monthly';
-            $amount = $input['amount'] ?? 0;
+            $amount = $input['amount'] ?? ($billing === 'yearly' ? $plan['price_yearly'] : $plan['price_monthly']);
 
             if (!$userId || !$planId) {
                 error('Missing user_id or plan_id', 400);
