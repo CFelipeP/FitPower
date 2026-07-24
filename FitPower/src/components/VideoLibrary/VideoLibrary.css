@@ -310,6 +310,7 @@
 }
 
 .vl-action-btn:hover { border-color: var(--power-500); color: var(--power-500); }
+.vl-action-edit:hover { border-color: rgba(96,165,250,.5); color: #60a5fa; }
 .vl-action-del:hover { border-color: rgba(239,68,68,.5); color: #f87171; }
 
 /* ── Loading ── */
@@ -601,3 +602,78 @@
 .vl-modal::-webkit-scrollbar { width: 6px; }
 .vl-modal::-webkit-scrollbar-track { background: transparent; }
 .vl-modal::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+
+/* ── Edit Modal ── */
+.vl-edit-modal {
+    max-width: 480px;
+    padding: 28px;
+}
+
+.vl-edit-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+
+.vl-edit-header svg { color: var(--power-500); }
+
+.vl-edit-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #f3f4f6;
+}
+
+.vl-edit-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vl-edit-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-top: 4px;
+}
+
+.vl-edit-input,
+.vl-edit-textarea,
+.vl-edit-select {
+    width: 100%;
+    background: #0a0a12;
+    border: 1px solid #2a2a35;
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: #eee;
+    font-size: 14px;
+    outline: none;
+    font-family: inherit;
+    transition: border-color .2s;
+    box-sizing: border-box;
+}
+
+.vl-edit-input:focus,
+.vl-edit-textarea:focus,
+.vl-edit-select:focus {
+    border-color: var(--power-500);
+}
+
+.vl-edit-textarea {
+    resize: vertical;
+    min-height: 72px;
+}
+
+.vl-edit-select {
+    cursor: pointer;
+}
+
+.vl-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}

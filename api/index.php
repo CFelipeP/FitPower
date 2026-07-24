@@ -1443,6 +1443,11 @@ route('/videos/{id}', ['method' => 'DELETE', 'handler' => function($p) {
     deleteVideo($p['id']);
 }]);
 
+route('/videos/{id}', ['method' => 'PUT', 'handler' => function($p) {
+    require __DIR__ . '/routes/content/videos.php';
+    updateVideo($p['id']);
+}]);
+
 // --- Strength Tracking Routes ---
 route('/workouts/calculate-1rm', ['method' => 'POST', 'handler' => function() {
     require __DIR__ . '/routes/content/strength.php';

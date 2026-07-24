@@ -184,6 +184,50 @@ function deleteVideo(string $id): void {
     success(null, 'Video eliminado');
 }
 
+function updateVideo(string $id): void {
+    $auth = requireAuth();
+    if (!in_array($auth['role'] ?? '', ['admin', 'coach'], true)) {
+        error('No tienes permisos para editar videos', 403);
+    }
+
+    $db = getDB();
+    $stmt = $db->prepare("SELECT * FROM video_library WHERE id = ?");
+    $stmt->execute([$id]);
+    $video = $stmt->fetch();
+
+    if (!$video) {
+        error('Video no encontrado', 404);
+    }
+
+    $input = getJsonInput();
+    $title = trim($input['title'] ?? '');
+    $description = trim($input['description'] ?? '');
+    $category = $input['category'] ?? $video['category'];
+    $isFeatured = isset($input['is_featured']) ? ($input['is_featured'] ? 1 : 0) : $video['is_featured'];
+    $tags = $input['tags'] ?? $video['tags'];
+
+    if ($title !== '') {
+        $validCategories = ['exercise_demo', 'coach_feedback', 'coaching_session', 'educational', 'exercise_demo'];
+        if (!in_array($category, $validCategories, true)) {
+            $category = $video['category'];
+        }
+
+        $stmt = $db->prepare(
+            "UPDATE video_library SET title = ?, description = ?, category = ?, is_featured = ?, tags = ? WHERE id = ?"
+        );
+        $stmt->execute([$title, $description, $category, $isFeatured, $tags, $id]);
+
+        success([
+            'id' => (int)$id,
+            'title' => $title,
+            'description' => $description,
+            'category' => $category,
+        ], 'Video actualizado');
+    } else {
+        error('El título es requerido', 422);
+    }
+}
+
 function createFeedback(): void {
     $auth = requireAuth();
     if (!in_array($auth['role'] ?? '', ['admin', 'coach'], true)) {
