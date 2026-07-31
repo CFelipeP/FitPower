@@ -9,7 +9,7 @@ import {
     BarChart3, Trophy, Users, MessageCircle, Target, Settings, Crown,
     Search, Bell, ChevronDown, Flame, Timer,
     Sunrise, Sun, Moon, Play, ArrowRight,
-    Award, Heart, LogOut, User, Cookie, Camera, Video, Calculator
+    Heart, LogOut, User, Cookie, Camera, Video, Calculator
 } from 'lucide-react'
 import ProfileEditModal from '../ProfileModal/ProfileEditModal'
 import NotificationsDropdown from '../NotificationsDropdown/NotificationsDropdown'
@@ -18,24 +18,20 @@ import WorkoutTracker from '../WorkoutTracker/WorkoutTracker'
 import NutritionTracker from '../NutritionTracker/NutritionTracker'
 import NutritionHistoryChart from '../NutritionHistoryChart/NutritionHistoryChart'
 import ProgressCharts from '../ProgressCharts/ProgressCharts'
-import ChatMessenger from '../ChatMessenger/ChatMessenger'
 import ExerciseLibrary from '../ExerciseLibrary/ExerciseLibrary'
 import DailyCheckin from '../DailyCheckin/DailyCheckin'
 import MealPlanner from '../MealPlanner/MealPlanner'
 import ProgressPhotos from '../ProgressPhotos/ProgressPhotos'
 import SmartRoutine from '../SmartRoutine/SmartRoutine'
-import Challenges from '../Challenges/Challenges'
-import Achievements from '../Achievements/Achievements'
 import Leaderboard from '../Leaderboard/Leaderboard'
 import SettingsPanel from '../Settings/Settings'
 import SocialFeed from '../SocialFeed/SocialFeed'
-import LiveSessions from '../LiveSessions/LiveSessions'
 import ClientTrainingVideos from './ClientTrainingVideos'
 import SubscriptionPlans from '../SubscriptionPlans/SubscriptionPlans'
-import ClientGoals from '../ClientGoals/ClientGoals'
 import WorkoutHeatmap from '../WorkoutHeatmap/WorkoutHeatmap'
 import TDEECalculator from '../TDEECalculator/TDEECalculator'
 import ProgressSlider from '../ProgressPhotos/ProgressSlider'
+import Achievements from '../Achievements/Achievements'
 
 import Sidebar from '../Sidebar/Sidebar'
 import '../DashboardShared.css'
@@ -51,19 +47,14 @@ const navSections = [
     { type: 'item', label: 'Progress', icon: BarChart3 },
     { type: 'heading', label: 'Health' },
     { type: 'item', label: 'Daily Check-in', icon: Heart },
-    { type: 'item', label: 'Goals', icon: Target },
     { type: 'item', label: 'Macro Calculator', icon: Calculator },
     { type: 'item', label: 'Meal Planner', icon: Utensils },
     { type: 'item', label: 'Progress Photos', icon: Camera },
     { type: 'heading', label: 'Community' },
-    { type: 'item', label: 'Messages', icon: MessageCircle, badge: 3 },
-    { type: 'item', label: 'Live Sessions', icon: Video },
     { type: 'item', label: 'Training Videos', icon: Video },
     { type: 'item', label: 'Social Feed', icon: Users },
     { type: 'item', label: 'Exercises', icon: Dumbbell },
     { type: 'item', label: 'Leaderboard', icon: Users },
-    { type: 'item', label: 'Achievements', icon: Award },
-    { type: 'item', label: 'Challenges', icon: Target },
     { type: 'heading', label: 'Account' },
     { type: 'item', label: 'Profile', icon: User },
     { type: 'item', label: 'Settings', icon: Settings },
@@ -112,15 +103,6 @@ export default function ClientDashboard() {
         window.addEventListener('resize', onResize)
         return () => window.removeEventListener('resize', onResize)
     }, [])
-
-    useEffect(() => {
-        if (activeNav === 'Messages') {
-            document.body.style.overflow = 'hidden'
-        } else {
-            document.body.style.overflow = ''
-        }
-        return () => { document.body.style.overflow = '' }
-    }, [activeNav])
 
     const handleSidebarToggle = useCallback(() => {
         if (window.innerWidth <= 1024) {
@@ -695,35 +677,22 @@ export default function ClientDashboard() {
             </div>
             {data?.metrics && <ProgressCharts data={data.metrics} />}
         </div>
-    ) : activeNav === 'Messages' ? (
-        <div className={`cl-messages-view ${sidebarCollapsed ? 'cl-messages-collapsed' : ''}`}>
-            <ChatMessenger />
-        </div>
-    ) : activeNav === 'Live Sessions' ? (
-        <LiveSessions role="client" />
     ) : activeNav === 'Training Videos' ? (
         <ClientTrainingVideos />
     ) : activeNav === 'Exercises' ? (
         <ExerciseLibrary />
-    ) : activeNav === 'Daily Check-in' || activeNav === 'Goals' ? (
-        <div className="cl-combined-health">
-            <DailyCheckin />
-            <ClientGoals />
-        </div>
+    ) : activeNav === 'Daily Check-in' ? (
+        <DailyCheckin />
     ) : activeNav === 'Meal Planner' ? (
         <MealPlanner />
     ) : activeNav === 'Progress Photos' ? (
         <ProgressPhotos />
     ) : activeNav === 'Settings' ? (
         <SettingsPanel />
-    ) : activeNav === 'Goals' ? (
-        <ClientGoals />
     ) : activeNav === 'Macro Calculator' ? (
         <TDEECalculator />
     ) : activeNav === 'Leaderboard' ? (
         <Leaderboard />
-    ) : activeNav === 'Achievements' ? (
-<Achievements onShare={true} />
     ) : activeNav === 'Social Feed' ? (
         <div className="cl-social-feed-view">
             <header className="cl-header">
@@ -753,8 +722,6 @@ export default function ClientDashboard() {
                 </div>
             </div>
         </div>
-    ) : activeNav === 'Challenges' ? (
-        <Challenges />
     ) : activeNav === 'Profile' ? (
         <div className="cl-profile-view">
             <header className="cl-header">
