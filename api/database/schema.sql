@@ -253,9 +253,9 @@ CREATE TABLE subscription_plans (
 ) ENGINE=InnoDB;
 
 INSERT INTO subscription_plans (name, description, price_monthly, price_yearly, popular) VALUES
-('Starter', 'Perfect to get started', 19.00, 13.00, 0),
-('Pro', 'Best for serious athletes', 39.00, 27.00, 1),
-('Elite', 'For the full experience', 69.00, 48.00, 0);
+('Starter', 'Perfect to get started with essential features.', 4.99, 47.99, 0),
+('Pro', 'Best for serious athletes who want real results.', 9.99, 95.99, 1),
+('Enterprise', 'For the full experience with everything included.', 14.99, 143.99, 0);
 
 -- ============================================================
 -- PLAN FEATURES
