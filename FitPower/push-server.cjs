@@ -1,3 +1,20 @@
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+
+// Load shared credentials from the API .env (dev layout: <repo>/FitPower + <repo>/api;
+// flattened layout: <root>/push-server.cjs + <root>/api).
+const dotenvCandidates = [
+  path.join(__dirname, '..', 'api', '.env'),
+  path.join(__dirname, 'api', '.env'),
+];
+for (const candidate of dotenvCandidates) {
+  if (fs.existsSync(candidate)) {
+    require('dotenv').config({ path: candidate });
+    break;
+  }
+}
+
 const express = require('express');
 const admin = require('firebase-admin');
 const mysql = require('mysql2/promise');
@@ -6,6 +23,24 @@ const app = express();
 app.use(express.json());
 
 const PORT = 5182;
+
+// Service-to-service authentication. Requests to /send-push and /send-push-multi
+// must carry a matching X-Internal-Secret header. Fail closed: without a
+// configured secret the push endpoints refuse to run.
+const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET || '';
+
+function requireInternalSecret(req, res, next) {
+  if (!INTERNAL_SECRET) {
+    return res.status(503).json({ error: 'INTERNAL_API_SECRET not configured' });
+  }
+  const provided = req.get('X-Internal-Secret') || '';
+  const expected = Buffer.from(INTERNAL_SECRET);
+  const received = Buffer.from(provided);
+  if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
 
 // Firebase Admin SDK - lazy init with env vars
 let firebaseInitialized = false;
@@ -42,7 +77,7 @@ async function getFcmToken(userId) {
 }
 
 // POST /send-push
-app.post('/send-push', async (req, res) => {
+app.post('/send-push', requireInternalSecret, async (req, res) => {
   const { userId, title, body, data } = req.body;
   if (!userId || !title) return res.status(400).json({ error: 'userId and title required' });
 
@@ -68,7 +103,7 @@ app.post('/send-push', async (req, res) => {
 });
 
 // POST /send-push-multi - broadcast to multiple users
-app.post('/send-push-multi', async (req, res) => {
+app.post('/send-push-multi', requireInternalSecret, async (req, res) => {
   const { userIds, title, body, data } = req.body;
   if (!userIds || !userIds.length) return res.status(400).json({ error: 'userIds required' });
 
@@ -97,7 +132,7 @@ app.post('/send-push-multi', async (req, res) => {
   res.json({ results });
 });
 
-// Health check
+// Health check (no sensitive data, left open for load-balancer probes)
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, '127.0.0.1', () => {

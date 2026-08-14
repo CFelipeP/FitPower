@@ -1,16 +1,11 @@
 import { WebSocketServer } from 'ws'
 import { createServer } from 'http'
+import { verifyToken } from './chat-auth.js'
 
 const PORT = 5180
 const API_BASE = process.env.API_BASE_URL || 'http://127.0.0.1:8088'
 
 const clients = new Map()
-
-function jwtSub(token) {
-    try {
-        return Number(JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString()).sub)
-    } catch { return null }
-}
 
 const server = createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -24,6 +19,13 @@ wss.on('connection', (ws, req) => {
     const token = params.get('token')
 
     if (token) {
+      // A token supplied at connection time must verify; otherwise the
+      // connection is refused (no unverified identity is ever trusted).
+      if (!verifyToken(token)) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Token inválido' }))
+        ws.close(4401, 'Token inválido')
+        return
+      }
       ws.authToken = token
     }
     ws.userId = null
@@ -49,6 +51,10 @@ wss.on('connection', (ws, req) => {
 async function handleMessage(ws, msg) {
     switch (msg.type) {
         case 'auth': {
+            if (!msg.token || !verifyToken(msg.token)) {
+                ws.send(JSON.stringify({ type: 'error', message: 'Token inválido' }))
+                return
+            }
             const res = await fetch(`${API_BASE}/api/auth/me`, {
                 headers: { Authorization: `Bearer ${msg.token}` },
             })
@@ -88,6 +94,10 @@ async function handleMessage(ws, msg) {
             const { conversationId, content, token } = msg
             if (!conversationId || !content || !token) break
 
+            // The sender identity in broadcasts must come from a verified
+            // token, never from an unverified payload decode.
+            const verified = verifyToken(token)
+
             const res = await fetch(`${API_BASE}/api/messages/${conversationId}`, {
                 method: 'POST',
                 headers: {
@@ -102,7 +112,7 @@ async function handleMessage(ws, msg) {
                 return
             }
 
-            const senderId = ws.userId || jwtSub(token)
+            const senderId = ws.userId || (verified ? Number(verified.sub) : null)
 
             const messageData = {
                 type: 'new_message',

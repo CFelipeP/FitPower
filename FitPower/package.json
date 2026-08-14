@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n API,VITE,CHAT,MEDIA,PUSH -c yellow,cyan,magenta,green,blue \"C:\\laragon\\bin\\php\\php-8.1.10-Win32-vs16-x64\\php.exe -S 127.0.0.1:8088 -t ../api ../api/index.php\" \"vite\" \"node chat-server.js\" \"node mediasoup-server.js\" \"node public/push-server.cjs\"",
+    "dev": "concurrently -n API,VITE,CHAT,MEDIA,PUSH -c yellow,cyan,magenta,green,blue \"C:\\laragon\\bin\\php\\php-8.1.10-Win32-vs16-x64\\php.exe -S 127.0.0.1:8088 -t ../api ../api/index.php\" \"vite\" \"node chat-server.js\" \"node mediasoup-server.js\" \"node push-server.cjs\"",
     "build": "vite build",
     "lint": "eslint .",
     "test": "vitest run",

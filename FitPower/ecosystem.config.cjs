@@ -55,7 +55,7 @@ module.exports = {
     // ---- Push Notification Server (optional - won't crash if Firebase missing) ----
     {
       name: 'fitpower-push',
-      script: 'public/push-server.cjs',
+      script: 'push-server.cjs',
       cwd: '/var/www/fitpower',
       autorestart: true,
       max_restarts: 5,
@@ -67,6 +67,7 @@ module.exports = {
         DB_USER: process.env.DB_USER || 'fitpower',
         DB_PASS: process.env.DB_PASS || '',
         DB_NAME: process.env.DB_NAME || 'fitpower',
+        INTERNAL_API_SECRET: process.env.INTERNAL_API_SECRET || '',
         FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID || '',
         FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL || '',
         FIREBASE_PRIVATE_KEY: process.env.FIREBASE_PRIVATE_KEY || '',

@@ -7,7 +7,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 export default defineConfig([
   globalIgnores(['dist']),
   {
-    files: ['**/*.{js,jsx}', '!chat-server.js', '!public/service-worker.js', '!ecosystem.config.cjs', '!public/push-server.js', '!public/firebase-messaging-sw.js'],
+    files: ['**/*.{js,jsx}', '!chat-server.js', '!chat-auth.js', '!push-server.cjs', '!public/service-worker.js', '!ecosystem.config.cjs', '!public/firebase-messaging-sw.js'],
     extends: [
       js.configs.recommended,
       reactHooks.configs.flat.recommended,
@@ -22,7 +22,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['ecosystem.config.cjs', 'chat-server.js', 'mediasoup-server.js', 'proxy-server.js', 'public/push-server.cjs', 'public/push-server.js', 'public/service-worker.js', 'public/firebase-messaging-sw.js'],
+    files: ['ecosystem.config.cjs', 'chat-server.js', 'chat-auth.js', 'push-server.cjs', 'mediasoup-server.js', 'proxy-server.js', 'public/service-worker.js', 'public/firebase-messaging-sw.js'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {

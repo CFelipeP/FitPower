@@ -6,10 +6,12 @@ After=network.target
 Type=simple
 User=fitpower
 WorkingDirectory=/home/fitpower/FitPower
-ExecStart=/usr/bin/node public/push-server.cjs
+ExecStart=/usr/bin/node push-server.cjs
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
+# INTERNAL_API_SECRET must match api/.env on the target host.
+EnvironmentFile=-/home/fitpower/FitPower/api/.env
 
 [Install]
 WantedBy=multi-user.target

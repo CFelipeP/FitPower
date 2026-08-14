@@ -189,20 +189,31 @@ function createTrainer(): void {
 
     $db = getDB();
 
-    $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+    // SECURITY: account takeover prevention. A public application must NEVER
+    // modify an existing account (password/role/status). If the email already
+    // belongs to a user, reject the application.
+    $stmt = $db->prepare("SELECT id, role FROM users WHERE email = ?");
     $stmt->execute([$input['email']]);
-    $existingUser = $stmt->fetch();
+    if ($stmt->fetch()) {
+        error('Ya existe una cuenta con este correo. Si ya tienes cuenta, inicia sesión para gestionar tu perfil.', 409);
+    }
+
+    // A trainer row with the same email and no linked user may exist from a
+    // legacy flow; link it instead of creating a duplicate (email is UNIQUE).
+    $trainerStmt = $db->prepare("SELECT id, user_id FROM trainers WHERE email = ?");
+    $trainerStmt->execute([$input['email']]);
+    $legacyTrainer = $trainerStmt->fetch();
 
     $hashedPassword = password_hash($input['password'], PASSWORD_BCRYPT);
 
-    if ($existingUser) {
-        $userId = (int)$existingUser['id'];
-        $db->prepare("UPDATE users SET password = ?, first_name = ?, last_name = ?, role = 'coach', status = 'active' WHERE id = ?")
-            ->execute([$hashedPassword, $input['firstName'], $input['lastName'], $userId]);
-    } else {
+    $db->beginTransaction();
+    try {
+        // New account is created as a regular pending user. The coach role is
+        // granted exclusively by adminApproveCoach after review (no escalation
+        // from a public request).
         $db->prepare("
             INSERT INTO users (first_name, last_name, email, role, password, status)
-            VALUES (?, ?, ?, 'coach', ?, 'active')
+            VALUES (?, ?, ?, 'client', ?, 'pending')
         ")->execute([
             $input['firstName'],
             $input['lastName'],
@@ -210,107 +221,103 @@ function createTrainer(): void {
             $hashedPassword,
         ]);
         $userId = (int)$db->lastInsertId();
-    }
 
-    $existingTrainer = $db->prepare("SELECT id, user_id FROM trainers WHERE user_id = ? OR email = ?");
-    $existingTrainer->execute([$userId, $input['email']]);
-    $existingTrainerRow = $existingTrainer->fetch();
-
-    if ($existingTrainerRow) {
-        $trainerId = (int)$existingTrainerRow['id'];
-        if (!$existingTrainerRow['user_id']) {
-            $db->prepare("UPDATE trainers SET user_id = ? WHERE id = ?")->execute([$userId, $trainerId]);
-        }
-        $db->prepare("
-            UPDATE trainers SET
-                first_name = ?, last_name = ?, email = ?, phone = ?, date_of_birth = ?, gender = ?,
-                experience = ?, bio = ?, philosophy = ?, instagram = ?, youtube = ?, website = ?,
-                country = ?, city = ?, timezone = ?, modality = ?,
-                emergency_name = ?, emergency_phone = ?, emergency_relation = ?,
-                terms_accepted = ?, privacy_accepted = ?, marketing_optin = ?,
-                status = 'approved'
-            WHERE id = ?
-        ")->execute([
-            $input['firstName'], $input['lastName'], $input['email'],
-            $input['phone'] ?? null, $input['dateOfBirth'] ?? null, $input['gender'] ?? null,
-            $input['experience'] ?? null, $input['bio'] ?? null, $input['philosophy'] ?? null,
-            $input['instagram'] ?? null, $input['youtube'] ?? null, $input['website'] ?? null,
-            $input['country'] ?? null, $input['city'] ?? null, $input['timezone'] ?? null,
-            $input['modality'] ?? null,
-            $input['emergName'] ?? null, $input['emergPhone'] ?? null, $input['emergRelation'] ?? null,
-            (int)($input['agreeTerms'] ?? false), (int)($input['agreePrivacy'] ?? false), (int)($input['agreeMarketing'] ?? false),
-            $trainerId,
-        ]);
-    } else {
-        $db->prepare("
-            INSERT INTO trainers (
-                first_name, last_name, email, phone, date_of_birth, gender,
-                experience, bio, philosophy, instagram, youtube, website,
-                country, city, timezone, modality, user_id,
-                emergency_name, emergency_phone, emergency_relation,
-                terms_accepted, privacy_accepted, marketing_optin,
-                status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ")->execute([
-            $input['firstName'], $input['lastName'], $input['email'],
-            $input['phone'] ?? null, $input['dateOfBirth'] ?? null, $input['gender'] ?? null,
-            $input['experience'] ?? null, $input['bio'] ?? null, $input['philosophy'] ?? null,
-            $input['instagram'] ?? null, $input['youtube'] ?? null, $input['website'] ?? null,
-            $input['country'] ?? null, $input['city'] ?? null, $input['timezone'] ?? null,
-            $input['modality'] ?? null, $userId,
-            $input['emergName'] ?? null, $input['emergPhone'] ?? null, $input['emergRelation'] ?? null,
-            (int)($input['agreeTerms'] ?? false), (int)($input['agreePrivacy'] ?? false), (int)($input['agreeMarketing'] ?? false),
-            'approved',
-        ]);
-        $trainerId = (int)$db->lastInsertId();
-    }
-
-    if (!empty($input['specializations'])) {
-        $specStmt = $db->prepare("INSERT IGNORE INTO trainer_specialization (trainer_id, specialization_id) VALUES (?, ?)");
-        foreach ($input['specializations'] as $specSlug) {
-            $s = $db->prepare("SELECT id FROM specializations WHERE slug = ?");
-            $s->execute([$specSlug]);
-            $specId = $s->fetchColumn();
-            if ($specId) {
-                $specStmt->execute([$trainerId, $specId]);
-            }
-        }
-    }
-
-    if (!empty($input['languages'])) {
-        $langStmt = $db->prepare("INSERT IGNORE INTO trainer_language (trainer_id, language_id) VALUES (?, ?)");
-        foreach ($input['languages'] as $langName) {
-            $l = $db->prepare("SELECT id FROM languages WHERE name = ?");
-            $l->execute([$langName]);
-            $langId = $l->fetchColumn();
-            if ($langId) {
-                $langStmt->execute([$trainerId, $langId]);
-            }
-        }
-    }
-
-    if (!empty($input['certType'])) {
-        $c = $db->prepare("SELECT id FROM certifications WHERE slug = ?");
-        $c->execute([$input['certType']]);
-        $certId = $c->fetchColumn();
-        if ($certId) {
+        if ($legacyTrainer) {
+            $trainerId = (int)$legacyTrainer['id'];
             $db->prepare("
-                INSERT INTO trainer_certification (trainer_id, certification_id, cert_id_number, cert_file)
-                VALUES (?, ?, ?, ?)
-            ")->execute([$trainerId, $certId, $input['certId'] ?? null, $input['certFile'] ?? null]);
+                UPDATE trainers SET
+                    user_id = ?, first_name = ?, last_name = ?, phone = ?, date_of_birth = ?, gender = ?,
+                    experience = ?, bio = ?, philosophy = ?, instagram = ?, youtube = ?, website = ?,
+                    country = ?, city = ?, timezone = ?, modality = ?,
+                    emergency_name = ?, emergency_phone = ?, emergency_relation = ?,
+                    terms_accepted = ?, privacy_accepted = ?, marketing_optin = ?,
+                    status = 'pending'
+                WHERE id = ?
+            ")->execute([
+                $userId, $input['firstName'], $input['lastName'],
+                $input['phone'] ?? null, $input['dateOfBirth'] ?? null, $input['gender'] ?? null,
+                $input['experience'] ?? null, $input['bio'] ?? null, $input['philosophy'] ?? null,
+                $input['instagram'] ?? null, $input['youtube'] ?? null, $input['website'] ?? null,
+                $input['country'] ?? null, $input['city'] ?? null, $input['timezone'] ?? null,
+                $input['modality'] ?? null,
+                $input['emergName'] ?? null, $input['emergPhone'] ?? null, $input['emergRelation'] ?? null,
+                (int)($input['agreeTerms'] ?? false), (int)($input['agreePrivacy'] ?? false), (int)($input['agreeMarketing'] ?? false),
+                $trainerId,
+            ]);
+        } else {
+            $db->prepare("
+                INSERT INTO trainers (
+                    first_name, last_name, email, phone, date_of_birth, gender,
+                    experience, bio, philosophy, instagram, youtube, website,
+                    country, city, timezone, modality, user_id,
+                    emergency_name, emergency_phone, emergency_relation,
+                    terms_accepted, privacy_accepted, marketing_optin,
+                    status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ")->execute([
+                $input['firstName'], $input['lastName'], $input['email'],
+                $input['phone'] ?? null, $input['dateOfBirth'] ?? null, $input['gender'] ?? null,
+                $input['experience'] ?? null, $input['bio'] ?? null, $input['philosophy'] ?? null,
+                $input['instagram'] ?? null, $input['youtube'] ?? null, $input['website'] ?? null,
+                $input['country'] ?? null, $input['city'] ?? null, $input['timezone'] ?? null,
+                $input['modality'] ?? null, $userId,
+                $input['emergName'] ?? null, $input['emergPhone'] ?? null, $input['emergRelation'] ?? null,
+                (int)($input['agreeTerms'] ?? false), (int)($input['agreePrivacy'] ?? false), (int)($input['agreeMarketing'] ?? false),
+                'pending',
+            ]);
+            $trainerId = (int)$db->lastInsertId();
         }
-    }
 
-    $token = generateJWT(['sub' => $userId, 'role' => 'coach']);
+        if (!empty($input['specializations'])) {
+            $specStmt = $db->prepare("INSERT IGNORE INTO trainer_specialization (trainer_id, specialization_id) VALUES (?, ?)");
+            foreach ($input['specializations'] as $specSlug) {
+                $s = $db->prepare("SELECT id FROM specializations WHERE slug = ?");
+                $s->execute([$specSlug]);
+                $specId = $s->fetchColumn();
+                if ($specId) {
+                    $specStmt->execute([$trainerId, $specId]);
+                }
+            }
+        }
+
+        if (!empty($input['languages'])) {
+            $langStmt = $db->prepare("INSERT IGNORE INTO trainer_language (trainer_id, language_id) VALUES (?, ?)");
+            foreach ($input['languages'] as $langName) {
+                $l = $db->prepare("SELECT id FROM languages WHERE name = ?");
+                $l->execute([$langName]);
+                $langId = $l->fetchColumn();
+                if ($langId) {
+                    $langStmt->execute([$trainerId, $langId]);
+                }
+            }
+        }
+
+        if (!empty($input['certType'])) {
+            $c = $db->prepare("SELECT id FROM certifications WHERE slug = ?");
+            $c->execute([$input['certType']]);
+            $certId = $c->fetchColumn();
+            if ($certId) {
+                $db->prepare("
+                    INSERT INTO trainer_certification (trainer_id, certification_id, cert_id_number, cert_file)
+                    VALUES (?, ?, ?, ?)
+                ")->execute([$trainerId, $certId, $input['certId'] ?? null, $input['certFile'] ?? null]);
+            }
+        }
+
+        $db->commit();
+    } catch (\Exception $e) {
+        $db->rollBack();
+        error('Error al crear entrenador: ' . $e->getMessage(), 500);
+    }
 
     success([
-        'token' => $token,
         'id' => $trainerId,
         'userName' => $input['firstName'] . ' ' . $input['lastName'],
         'firstName' => $input['firstName'],
         'lastName' => $input['lastName'],
         'email' => $input['email'],
-    ], 'Registro de entrenador exitoso', 201);
+        'status' => 'pending',
+    ], 'Solicitud de entrenador recibida. Tu perfil será revisado por un administrador.', 201);
 }
 
 function updateTrainer(string $id): void {

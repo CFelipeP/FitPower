@@ -506,7 +506,9 @@ function adminListCoaches(): void {
 
     $status = $_GET['status'] ?? '';
 
-    $where = "WHERE u.role = 'coach'";
+    // Include coach-role users AND pending coach applicants (users with a
+    // trainer profile who have not been approved yet).
+    $where = "WHERE (u.role = 'coach' OR t.user_id IS NOT NULL)";
     $params = [];
 
     if ($status) {
@@ -549,7 +551,8 @@ function adminApproveCoach(string $id): void {
     $input = getJsonInput();
     $db = getDB();
 
-    // Verify the target user exists and is a coach
+    // Verify the target user exists and is eligible to be a coach (a coach
+    // already, or a pending applicant with a trainer profile).
     $stmt = $db->prepare("SELECT id, role FROM users WHERE id = ?");
     $stmt->execute([$id]);
     $user = $stmt->fetch();
@@ -557,8 +560,16 @@ function adminApproveCoach(string $id): void {
     if (!$user) {
         error('Usuario no encontrado', 404);
     }
-    if ($user['role'] !== 'coach') {
-        error('El usuario no es un coach', 400);
+    if (!in_array($user['role'], ['coach', 'client'], true)) {
+        error('El usuario no puede ser aprobado como coach', 400);
+    }
+
+    $trainerStmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
+    $trainerStmt->execute([$id]);
+    $trainerId = $trainerStmt->fetchColumn();
+
+    if (!$trainerId) {
+        error('El usuario no tiene perfil de entrenador', 400);
     }
 
     // Validate using the validator for consistency
@@ -568,16 +579,12 @@ function adminApproveCoach(string $id): void {
         error('Estado inválido', 400, $errorsValidate);
     }
 
-    $stmt = $db->prepare("UPDATE trainers SET status = ? WHERE user_id = ?");
-    $stmt->execute([$status, $id]);
+    $db->prepare("UPDATE trainers SET status = ? WHERE user_id = ?")->execute([$status, $id]);
 
-    $stmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
-    $stmt->execute([$id]);
-    $trainerId = $stmt->fetchColumn();
-
-    if ($trainerId && $status === 'approved') {
-        $stmt = $db->prepare("UPDATE users SET status = 'active', email_verified_at = COALESCE(email_verified_at, NOW()) WHERE id = ?");
-        $stmt->execute([$id]);
+    if ($status === 'approved') {
+        // Role assignment happens ONLY here (admin approval), never from input.
+        $db->prepare("UPDATE users SET role = 'coach', status = 'active', email_verified_at = COALESCE(email_verified_at, NOW()) WHERE id = ?")
+            ->execute([$id]);
     }
 
     logAdminAction($auth['sub'], 'approve_coach', 'user', (int)$id, null);

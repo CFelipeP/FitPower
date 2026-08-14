@@ -75,13 +75,17 @@ function broadcastNotification(): void {
         $stmt->execute([$user['id'], $type, $input['title'], $input['body']]);
         $userIds[] = $user['id'];
     }
-    // Send push notifications via push-server
+    // Send push notifications via push-server (authenticated with the internal secret)
     try {
         $pushPayload = json_encode(['userIds' => $userIds, 'title' => $input['title'], 'body' => $input['body'], 'data' => ['type' => $type]]);
+        $headers = ['Content-Type: application/json'];
+        if (INTERNAL_API_SECRET !== '') {
+            $headers[] = 'X-Internal-Secret: ' . INTERNAL_API_SECRET;
+        }
         $ch = curl_init('http://127.0.0.1:5182/send-push-multi');
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $pushPayload);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 5);
         curl_exec($ch);

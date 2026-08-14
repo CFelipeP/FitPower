@@ -63,10 +63,15 @@ pm2 startup
 | 80 | Nginx (HTTP) | YES |
 | 5180 | Chat WebSocket | Internal (Nginx proxies) |
 | 5181 | Mediasoup Signal | Internal (Nginx proxies) |
-| 5182 | Push Server | Internal |
+| 5182 | Push Server (bind 127.0.0.1 only) | NO |
 | 8088 | PHP API | Internal (Nginx proxies) |
 | 3306 | MariaDB | NO |
 | 40000-49999 | RTP (Mediasoup) | External if video calls |
+
+> **Push Server auth**: `/send-push` and `/send-push-multi` require the
+> `X-Internal-Secret` header matching `INTERNAL_API_SECRET` (same value as
+> `api/.env`). The PHP API sends it automatically. The push server source runs
+> from outside the web root (`push-server.cjs`), never from `public/`.
 
 ## Video Calls (Mediasoup)
 
