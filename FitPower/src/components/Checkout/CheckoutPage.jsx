@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { Check, Crown, Loader2, ArrowLeft, Shield } from 'lucide-react'
+import { Check, Crown, Loader2, ArrowLeft, Shield, Lock } from 'lucide-react'
 import { apiFetch } from '../../lib/api'
-import WalletCheckout from '../Pricing/WalletCheckout'
 import './CheckoutPage.css'
 
 export default function CheckoutPage() {
@@ -12,6 +11,8 @@ export default function CheckoutPage() {
     const [plan, setPlan] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
+    const [processing, setProcessing] = useState(false)
+    const [payError, setPayError] = useState(null)
 
     useEffect(() => {
         if (!planId) {
@@ -37,6 +38,27 @@ export default function CheckoutPage() {
             ? plan.price?.yearly || plan.price_yearly
             : plan.price?.monthly || plan.price_monthly
         : null
+
+    const handlePayment = async () => {
+        if (!plan || processing) return
+        setProcessing(true)
+        setPayError(null)
+        try {
+            const res = await apiFetch('/stripe/create-checkout', {
+                method: 'POST',
+                body: JSON.stringify({ plan_id: plan.id, billing }),
+            })
+            if (res?.url) {
+                window.location.href = res.url
+                return
+            }
+            setPayError('Payment could not be initialized. Please try again.')
+        } catch {
+            setPayError('Payment could not be initialized. Please try again.')
+        } finally {
+            setProcessing(false)
+        }
+    }
 
     if (loading) {
         return (
@@ -97,7 +119,7 @@ export default function CheckoutPage() {
 
                     <div className="co-sidebar">
                         <div className="co-card co-payment-card">
-                            <h3 className="co-sidebar-title">Pay with Virtual Wallet</h3>
+                            <h3 className="co-sidebar-title">Secure payment</h3>
                             <div className="co-order-summary">
                                 <div className="co-order-row">
                                     <span>{plan.name} ({billing === 'yearly' ? 'Annual' : 'Monthly'})</span>
@@ -110,25 +132,20 @@ export default function CheckoutPage() {
                                 </div>
                             </div>
 
-                            <WalletCheckout
-                                amount={price}
-                                description={`${plan.name} - ${billing === 'yearly' ? 'Annual' : 'Monthly'}`}
-                                planId={plan.id}
-                                billing={billing}
-                                onSuccess={(res) => {
-                                    const params = new URLSearchParams({
-                                        plan_name: plan.name,
-                                        billing,
-                                        amount: price,
-                                        ...(res?.subscriptionId ? { subscription_id: res.subscriptionId } : {}),
-                                    })
-                                    window.location.href = `/payment/success?${params}`
-                                }}
-                            />
+                            <button
+                                className="co-btn co-btn-primary co-pay-btn"
+                                onClick={handlePayment}
+                                disabled={processing}
+                            >
+                                {processing ? <Loader2 size={16} className="spin" /> : <Lock size={16} />}
+                                {processing ? 'Redirecting to secure checkout…' : 'Continue to payment'}
+                            </button>
+
+                            {payError && <p className="co-pay-error">{payError}</p>}
 
                             <div className="co-secure">
                                 <Shield size={14} />
-                                <span>Secure payment</span>
+                                <span>Payments processed securely by Stripe</span>
                             </div>
                         </div>
                     </div>

@@ -157,7 +157,7 @@ function deleteExercise(string $id): void {
 }
 
 function seedExercises(): void {
-    $auth = requireAuth();
+    requireRole('admin');
     $db = getDB();
     $exercises = [
         ['Bench Press', 'Barbell bench press for chest', 'chest', 'pectorals', 'barbell', 'intermediate', 'Lie on bench, lower bar to chest, press up', 5.0],

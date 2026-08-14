@@ -53,7 +53,7 @@ foreach ($files as $file) {
                 $s = $db->query($_stmt);
                 $s->closeCursor();
             } catch (PDOException $e) {
-                if (str_contains($e->getMessage(), 'Duplicate column') || str_contains($e->getMessage(), 'already exists') || str_contains($e->getMessage(), 'Duplicate key name')) {
+                if (str_contains($e->getMessage(), 'Duplicate column') || str_contains($e->getMessage(), 'already exists') || str_contains($e->getMessage(), 'Duplicate key name') || str_contains($e->getMessage(), 'Duplicate foreign key')) {
                     continue;
                 }
                 throw $e;
@@ -65,7 +65,7 @@ foreach ($files as $file) {
         $migrationCount++;
         echo "OK\n";
     } catch (Exception $e) {
-        if (str_contains($e->getMessage(), 'Duplicate column') || str_contains($e->getMessage(), 'already exists') || str_contains($e->getMessage(), 'Duplicate key name')) {
+        if (str_contains($e->getMessage(), 'Duplicate column') || str_contains($e->getMessage(), 'already exists') || str_contains($e->getMessage(), 'Duplicate key name') || str_contains($e->getMessage(), 'Duplicate foreign key')) {
             try {
                 $db->prepare("INSERT INTO migrations (migration, batch) VALUES (?, ?)")
                     ->execute([$name, $newBatch]);

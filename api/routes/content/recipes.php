@@ -16,7 +16,7 @@ function listRecipes(): void {
         return [
             'id' => (int)$r['id'],
             'name' => $r['name'],
-            'description' => null,
+            'description' => $r['description'],
             'mealType' => $r['meal_type'],
             'calories' => (int)$r['calories'],
             'protein' => (float)$r['protein_g'],
@@ -33,7 +33,7 @@ function listRecipes(): void {
 }
 
 function createRecipe(): void {
-    $auth = requireAuth();
+    requireRole('admin');
     $input = getJsonInput();
     $rules = [
         'name' => 'required|string|min:1|max:255',
@@ -65,7 +65,7 @@ function createRecipe(): void {
 }
 
 function seedRecipes(): void {
-    $auth = requireAuth();
+    requireRole('admin');
     $db = getDB();
     $recipes = [
         ['Protein Oatmeal', 'Oatmeal with whey protein and berries', 'breakfast', 420, 35, 50, 10, '["1 cup oats","1 scoop whey protein","1/2 cup berries","1 tbsp honey"]', 'Cook oats, mix in protein, top with berries and honey', 10, 'easy'],
@@ -91,7 +91,7 @@ function seedRecipes(): void {
 }
 
 function updateRecipe(string $id): void {
-    $auth = requireAuth();
+    requireRole('admin');
     $input = getJsonInput();
     $db = getDB();
     $stmt = $db->prepare("SELECT id FROM recipes WHERE id = ?");
@@ -99,6 +99,7 @@ function updateRecipe(string $id): void {
     if (!$stmt->fetch()) error('Receta no encontrada', 404);
     $fieldMap = [
         'name' => 'name',
+        'description' => 'description',
         'mealType' => 'meal_type',
         'calories' => 'calories',
         'protein' => 'protein_g',
@@ -125,7 +126,7 @@ function updateRecipe(string $id): void {
 }
 
 function deleteRecipe(string $id): void {
-    $auth = requireAuth();
+    requireRole('admin');
     $db = getDB();
     $stmt = $db->prepare("SELECT id FROM recipes WHERE id = ?");
     $stmt->execute([(int)$id]);

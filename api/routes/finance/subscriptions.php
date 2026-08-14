@@ -277,11 +277,12 @@ function adminListPlans(): void {
             'name' => $p['name'],
             'description' => $p['description'],
             'popular' => (bool)$p['popular'],
+            'is_popular' => (bool)$p['popular'],
             'priceMonthly' => (float)$p['price_monthly'],
             'priceYearly' => (float)$p['price_yearly'],
             'status' => $p['status'],
             'features' => array_map(function($f) {
-                return ['text' => $f['text'], 'included' => (bool)$f['included']];
+                return $f['text'];
             }, $features),
         ];
     }, $plans);
@@ -289,9 +290,7 @@ function adminListPlans(): void {
     success($result);
 }
 
-function adminSavePlan(): void {
-    requireRole('admin');
-    $input = getJsonInput();
+function upsertPlan(array $input): array {
     $db = getDB();
 
     $rules = [
@@ -304,6 +303,8 @@ function adminSavePlan(): void {
     if (isset($input['status'])) $extraRules['status'] = 'in:active,inactive';
     if (isset($input['description'])) $extraRules['description'] = 'string|max:1000';
     if (isset($input['popular'])) $extraRules['popular'] = 'boolean';
+    if (isset($input['is_popular'])) $extraRules['is_popular'] = 'boolean';
+    if (isset($input['features'])) $extraRules['features'] = 'array';
 
     $allRules = array_merge($rules, $extraRules);
     $errors = validate($input, $allRules);
@@ -316,12 +317,15 @@ function adminSavePlan(): void {
         $status = 'active';
     }
 
+    $popular = isset($input['popular']) ? $input['popular'] : ($input['is_popular'] ?? false);
+
     if (!empty($input['id'])) {
         $stmt = $db->prepare("SELECT id FROM subscription_plans WHERE id = ?");
         $stmt->execute([$input['id']]);
         if (!$stmt->fetch()) {
             error('Plan no encontrado', 404);
         }
+        $planId = (int)$input['id'];
 
         $stmt = $db->prepare("UPDATE subscription_plans SET name = ?, description = ?, price_monthly = ?, price_yearly = ?, popular = ?, status = ? WHERE id = ?");
         $stmt->execute([
@@ -329,11 +333,10 @@ function adminSavePlan(): void {
             $input['description'] ?? null,
             $input['priceMonthly'],
             $input['priceYearly'],
-            !empty($input['popular']) ? 1 : 0,
+            !empty($popular) ? 1 : 0,
             $status,
-            $input['id'],
+            $planId,
         ]);
-        success(null, 'Plan actualizado');
     } else {
         $stmt = $db->prepare("INSERT INTO subscription_plans (name, description, price_monthly, price_yearly, popular, status) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([
@@ -341,11 +344,64 @@ function adminSavePlan(): void {
             $input['description'] ?? null,
             $input['priceMonthly'],
             $input['priceYearly'],
-            !empty($input['popular']) ? 1 : 0,
+            !empty($popular) ? 1 : 0,
             $status,
         ]);
-        success(['id' => (int)$db->lastInsertId()], 'Plan creado', 201);
+        $planId = (int)$db->lastInsertId();
     }
+
+    if (array_key_exists('features', $input) && is_array($input['features'])) {
+        $db->prepare("DELETE FROM plan_features WHERE plan_id = ?")->execute([$planId]);
+        $featStmt = $db->prepare("INSERT INTO plan_features (plan_id, text, included, sort_order) VALUES (?, ?, ?, ?)");
+        $sort = 1;
+        foreach ($input['features'] as $f) {
+            $text = is_array($f) ? trim($f['text'] ?? $f['name'] ?? '') : trim((string)$f);
+            if ($text === '') continue;
+            $included = is_array($f) ? ((($f['included'] ?? $f['inc'] ?? true)) ? 1 : 0) : 1;
+            $featStmt->execute([$planId, $text, $included, $sort]);
+            $sort++;
+        }
+    }
+
+    return ['id' => $planId];
+}
+
+function adminSavePlan(): void {
+    requireRole('admin');
+    $input = getJsonInput();
+    $plan = upsertPlan($input);
+    $isUpdate = !empty($input['id']);
+    if ($isUpdate) {
+        success($plan, 'Plan actualizado');
+    } else {
+        success($plan, 'Plan creado', 201);
+    }
+}
+
+function adminUpdatePlan(string $id): void {
+    requireRole('admin');
+    $input = getJsonInput();
+    $input['id'] = (int)$id;
+    $plan = upsertPlan($input);
+    success($plan, 'Plan actualizado');
+}
+
+function getSubscriptionInvoice(string $id): void {
+    $auth = requireAuth();
+    $subscriptionId = (int)$id;
+    $db = getDB();
+    $stmt = $db->prepare("SELECT user_id FROM user_subscriptions WHERE id = ?");
+    $stmt->execute([$subscriptionId]);
+    $sub = $stmt->fetch();
+    if (!$sub) error('Suscripción no encontrada', 404);
+    if ((int)$sub['user_id'] !== $auth['sub'] && $auth['role'] !== 'admin') {
+        error('No tienes permisos para ver esta factura', 403);
+    }
+    require_once __DIR__ . '/../../helpers/invoice.php';
+    $file = generateInvoicePdf($subscriptionId);
+    header('Content-Type: text/html');
+    readfile($file);
+    unlink($file);
 }
 
 function createSubscription(): void {

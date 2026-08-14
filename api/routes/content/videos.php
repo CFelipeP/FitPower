@@ -335,3 +335,58 @@ function getFeedback(string $clientId): void {
 
     success($feedback);
 }
+
+function sendVideoFeedback(): void {
+    $auth = requireAuth();
+    if (!in_array($auth['role'] ?? '', ['admin', 'coach'], true)) {
+        error('Solo entrenadores pueden enviar feedback', 403);
+    }
+
+    $input = getJsonInput();
+
+    $rules = [
+        'clientId' => 'required|numeric',
+        'videoId' => 'required|numeric',
+        'message' => 'required|string|min:1|max:2000',
+    ];
+    $errors = validate($input, $rules);
+    if ($errors) {
+        error('Error de validación', 422, $errors);
+    }
+
+    $db = getDB();
+
+    $clientStmt = $db->prepare("SELECT id FROM users WHERE id = ? AND role = 'client'");
+    $clientStmt->execute([(int)$input['clientId']]);
+    if (!$clientStmt->fetch()) {
+        error('Cliente no encontrado', 404);
+    }
+
+    $videoStmt = $db->prepare("SELECT file_path FROM video_library WHERE id = ?");
+    $videoStmt->execute([(int)$input['videoId']]);
+    $video = $videoStmt->fetch();
+    if (!$video) {
+        error('Video no encontrado', 404);
+    }
+
+    $stmt = $db->prepare(
+        "INSERT INTO video_feedback (coach_id, client_id, workout_log_id, video_url, notes)
+         VALUES (?, ?, NULL, ?, ?)"
+    );
+    $stmt->execute([
+        (int)$auth['sub'],
+        (int)$input['clientId'],
+        $video['file_path'],
+        $input['message'],
+    ]);
+
+    $feedbackId = (int)$db->lastInsertId();
+
+    require_once __DIR__ . '/../../helpers/activity.php';
+    logActivity((int)$auth['sub'], 'feedback', 'Feedback de video enviado', 'Video', '#10b981', 'Sent', 'bg-success');
+
+    success([
+        'id' => $feedbackId,
+        'videoUrl' => $video['file_path'],
+    ], 'Feedback enviado exitosamente', 201);
+}

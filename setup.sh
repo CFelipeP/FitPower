@@ -19,12 +19,16 @@ echo "[1/8] Instalando coturn..."
 sudo apt update
 sudo apt install -y coturn jq
 
+# TURN secret must be provided via env (never hardcoded). Generates one if absent.
+TURN_SECRET="${TURN_SECRET:-$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p)}"
+export TURN_SECRET
+
 sudo tee /etc/turnserver.conf > /dev/null <<TURNEOF
 listening-port=3478
 fingerprint
 lt-cred-mech
 use-auth-secret
-static-auth-secret=TURN_SECRET_REDACTED
+static-auth-secret=${TURN_SECRET}
 realm=fitpower
 total-quota=100
 bps-capacity=0
@@ -62,15 +66,19 @@ fi
 
 # ---------- 4. BASE DE DATOS ----------
 echo "[5/8] Configurando base de datos..."
+DB_USER="${DB_USER:-root}"
+DB_PASS="${DB_PASS:-}"
 if command -v mysql &> /dev/null; then
     echo "  Creando base de datos fitpower (si no existe)..."
-    mysql -u root -pDB_PASS_REDACTED -e "CREATE DATABASE IF NOT EXISTS fitpower CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null || \
-    mysql -u root -pDB_PASS_REDACTED -h localhost -e "CREATE DATABASE IF NOT EXISTS fitpower CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null || \
-    echo "  [AVISO] No pude conectar a MySQL. Crea la DB manualmente: 'CREATE DATABASE fitpower;'"
-
-    echo "  Ejecutando schema.sql..."
-    mysql -u root -pDB_PASS_REDACTED fitpower < database/schema.sql 2>/dev/null || echo "  [AVISO] schema.sql ya aplicado o error menor"
-
+    if [ -n "$DB_PASS" ]; then
+        mysql -u "$DB_USER" -p"$DB_PASS" -e "CREATE DATABASE IF NOT EXISTS fitpower CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null || \
+        mysql -u "$DB_USER" -p"$DB_PASS" -h localhost -e "CREATE DATABASE IF NOT EXISTS fitpower CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null || \
+        echo "  [AVISO] No pude conectar a MySQL. Crea la DB manualmente: 'CREATE DATABASE fitpower;'"
+        echo "  Ejecutando schema.sql..."
+        mysql -u "$DB_USER" -p"$DB_PASS" fitpower < database/schema.sql 2>/dev/null || echo "  [AVISO] schema.sql ya aplicado o error menor"
+    else
+        echo "  [AVISO] DB_PASS vacío. Crea la DB manualmente y exporta DB_PASS."
+    fi
     echo "  Ejecutando migraciones..."
     php migrate.php 2>/dev/null || echo "  [AVISO] Migraciones ya aplicadas"
 else
@@ -93,7 +101,7 @@ cd "\$PROJECT_DIR"
 echo "[FitPower] Iniciando servicios..."
 
 export TURN_USERNAME="fitpower"
-export TURN_CREDENTIAL="TURN_SECRET_REDACTED"
+export TURN_CREDENTIAL="$TURN_SECRET"
 
 # 1. PHP API
 pm2 start "php -S 0.0.0.0:8088 -t api api/index.php" --name fitpower-api 2>/dev/null || pm2 restart fitpower-api

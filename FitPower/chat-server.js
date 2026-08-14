@@ -58,6 +58,7 @@ async function handleMessage(ws, msg) {
                 return
             }
             ws.userId = data.data.id
+            ws.authToken = msg.token
             if (!clients.has(ws.userId)) clients.set(ws.userId, new Set())
             clients.get(ws.userId).add(ws)
             ws.send(JSON.stringify({ type: 'auth_ok', userId: ws.userId }))
@@ -67,6 +68,17 @@ async function handleMessage(ws, msg) {
         case 'subscribe': {
             const convId = msg.conversationId
             if (!convId) break
+            if (!ws.userId || !ws.authToken) {
+                ws.send(JSON.stringify({ type: 'error', message: 'Debes autenticarte' }))
+                break
+            }
+            const res = await fetch(`${API_BASE}/api/messages/${convId}`, {
+                headers: { Authorization: `Bearer ${ws.authToken}` },
+            })
+            if (!res.ok) {
+                ws.send(JSON.stringify({ type: 'error', message: 'No puedes suscribirte a esta conversación' }))
+                break
+            }
             ws.conversations.add(convId)
             ws.send(JSON.stringify({ type: 'subscribed', conversationId: convId }))
             break

@@ -8,6 +8,8 @@ set -e
 PI_IP="192.168.0.222"
 PI_USER="sotomayorpi"
 NGROK_TOKEN=""  # Déjalo vacío, lo pones después
+TURN_SECRET="${TURN_SECRET:-$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p)}"
+export TURN_SECRET
 
 echo "========================================"
 echo "  FitPower + TURN Server + ngrok"
@@ -26,7 +28,7 @@ tls-listening-port=5349
 fingerprint
 lt-cred-mech
 use-auth-secret
-static-auth-secret=TURN_SECRET_REDACTED
+static-auth-secret=${TURN_SECRET}
 realm=localhost
 total-quota=100
 bps-capacity=0

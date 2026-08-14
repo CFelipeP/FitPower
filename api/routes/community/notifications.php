@@ -39,7 +39,7 @@ function markAllRead(): void {
 }
 
 function createNotification(): void {
-    $auth = requireAuth();
+    requireRole('admin');
     $input = getJsonInput();
     $userId = (int)($input['userId'] ?? 0);
     if (!$userId) error('userId requerido', 422);

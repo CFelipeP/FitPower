@@ -319,8 +319,19 @@ function updateTrainer(string $id): void {
 
     $stmt = $db->prepare("SELECT id FROM trainers WHERE id = ?");
     $stmt->execute([$id]);
-    if (!$stmt->fetch()) {
+    $trainer = $stmt->fetch();
+    if (!$trainer) {
         error('Entrenador no encontrado', 404);
+    }
+
+    $isAdmin = $auth['role'] === 'admin';
+    if (!$isAdmin) {
+        $ownerStmt = $db->prepare("SELECT user_id FROM trainers WHERE id = ?");
+        $ownerStmt->execute([$id]);
+        $ownerId = (int)$ownerStmt->fetchColumn();
+        if ($ownerId !== $auth['sub']) {
+            error('No tienes permisos para modificar este entrenador', 403);
+        }
     }
 
     $input = getJsonInput();
@@ -339,8 +350,11 @@ function updateTrainer(string $id): void {
         'instagram' => 'instagram',
         'youtube' => 'youtube',
         'website' => 'website',
-        'status' => 'status',
     ];
+
+    if ($isAdmin) {
+        $fieldMap['status'] = 'status';
+    }
 
     $updates = [];
     $params = [];
@@ -384,7 +398,7 @@ function updateTrainer(string $id): void {
 }
 
 function deleteTrainer(string $id): void {
-    $auth = requireAuth();
+    requireRole('admin');
     $db = getDB();
 
     $stmt = $db->prepare("SELECT id FROM trainers WHERE id = ?");

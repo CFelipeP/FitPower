@@ -42,6 +42,7 @@ sudo composer install --no-dev --optimize-autoloader
 # 7. Setup DB
 sudo mysql -u root < api/database/schema.sql
 mysql -u fitpower -p fitpower < api/database/seed_programs.sql
+php api/migrate.php   # run migrations (idempotent)
 
 # 8. Install Node deps
 cd /var/www/fitpower

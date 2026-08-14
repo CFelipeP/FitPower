@@ -143,30 +143,21 @@ function connectStripe(): void {
 function getPayouts(): void {
     $auth = requireRole('coach');
     $db = getDB();
-    $stmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
+    $stmt = $db->prepare("SELECT id, amount, currency, stripe_transfer_id, status, description, paid_at, created_at FROM coach_payouts WHERE coach_id = ? ORDER BY created_at DESC LIMIT 50");
     $stmt->execute([$auth['sub']]);
-    $trainer = $stmt->fetch();
-    if (!$trainer) error('Perfil de entrenador no encontrado', 404);
-    $trainerId = (int)$trainer['id'];
-    $stmt = $db->prepare("SELECT * FROM coach_payouts WHERE trainer_id = ? ORDER BY created_at DESC LIMIT 50");
-    $stmt->execute([$trainerId]);
     success($stmt->fetchAll());
 }
 
 function getEarnings(): void {
     $auth = requireRole('coach');
     $db = getDB();
-    $stmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
-    $stmt->execute([$auth['sub']]);
-    $trainer = $stmt->fetch();
-    if (!$trainer) error('Perfil de entrenador no encontrado', 404);
-    $trainerId = (int)$trainer['id'];
-    $total = $db->prepare("SELECT COALESCE(SUM(amount), 0) FROM coach_earnings WHERE trainer_id = ?");
-    $total->execute([$trainerId]);
-    $monthStmt = $db->prepare("SELECT COALESCE(SUM(amount), 0) FROM coach_earnings WHERE trainer_id = ? AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW())");
-    $monthStmt->execute([$trainerId]);
-    $byMonth = $db->prepare("SELECT DATE_FORMAT(created_at, '%Y-%m') as month, SUM(amount) as total FROM coach_earnings WHERE trainer_id = ? GROUP BY month ORDER BY month DESC LIMIT 12");
-    $byMonth->execute([$trainerId]);
+    $userId = (int)$auth['sub'];
+    $total = $db->prepare("SELECT COALESCE(SUM(amount), 0) FROM coach_earnings WHERE coach_id = ?");
+    $total->execute([$userId]);
+    $monthStmt = $db->prepare("SELECT COALESCE(SUM(amount), 0) FROM coach_earnings WHERE coach_id = ? AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW())");
+    $monthStmt->execute([$userId]);
+    $byMonth = $db->prepare("SELECT DATE_FORMAT(created_at, '%Y-%m') as month, SUM(amount) as total FROM coach_earnings WHERE coach_id = ? GROUP BY month ORDER BY month DESC LIMIT 12");
+    $byMonth->execute([$userId]);
     success([
         'totalEarnings' => (float)$total->fetchColumn(),
         'thisMonth' => (float)$monthStmt->fetchColumn(),
@@ -204,7 +195,7 @@ function getClientDailySummary(string $id): void {
 
     // Goals with progress
     try {
-        $goalStmt = $db->prepare("SELECT * FROM goals WHERE user_id = ? ORDER BY created_at DESC LIMIT 10");
+        $goalStmt = $db->prepare("SELECT * FROM client_goals WHERE user_id = ? ORDER BY created_at DESC LIMIT 10");
         $goalStmt->execute([$userId]);
         $goals = array_map(function($g) {
             return [
@@ -217,7 +208,7 @@ function getClientDailySummary(string $id): void {
                 'progress' => $g['target_value'] ? min(100, round(($g['current_value'] ?? 0) / $g['target_value'] * 100)) : 0,
                 'startDate' => $g['start_date'],
                 'targetDate' => $g['target_date'],
-                'completed' => (bool)$g['completed'],
+                'completed' => $g['status'] === 'completed',
             ];
         }, $goalStmt->fetchAll());
     } catch (\Exception $e) { $goals = []; }

@@ -78,6 +78,9 @@ function listUsers(): void {
 
 function getUser(string $id): void {
     $auth = requireAuth();
+    if ((int)$id !== $auth['sub'] && $auth['role'] !== 'admin') {
+        error('No tienes permisos para ver este perfil', 403);
+    }
     $db = getDB();
 
     $stmt = $db->prepare("SELECT id, first_name, last_name, email, fitness_level, primary_goal, training_days, photo, status, created_at, updated_at FROM users WHERE id = ?");
@@ -199,10 +202,43 @@ function updateUser(string $id): void {
 function listContacts(): void {
     $auth = requireAuth();
     $userId = $auth['sub'];
+    $role = $auth['role'];
     $db = getDB();
 
-    $stmt = $db->prepare("SELECT id, first_name, last_name, email FROM users WHERE id != ? ORDER BY first_name");
-    $stmt->execute([$userId]);
+    $stmt = $db->prepare("
+        SELECT DISTINCT u.id, u.first_name, u.last_name, u.email
+        FROM users u
+        WHERE u.id != ? AND u.status = 'active'
+          AND (
+            u.id IN (
+                SELECT participant_one FROM conversations WHERE participant_two = ?
+                UNION
+                SELECT participant_two FROM conversations WHERE participant_one = ?
+            )
+            OR u.role = 'admin'
+            OR ? = 'admin'
+            OR u.id IN (
+                SELECT sp.user_id FROM session_participants sp
+                JOIN sessions s ON s.id = sp.session_id
+                JOIN trainers t ON t.id = s.trainer_id
+                WHERE t.user_id = ?
+            )
+            OR u.id IN (
+                SELECT t.user_id FROM trainers t
+                WHERE t.id IN (
+                    SELECT s.trainer_id FROM sessions s
+                    JOIN session_participants sp ON sp.session_id = s.id
+                    WHERE sp.user_id = ?
+                    UNION
+                    SELECT p.trainer_id FROM programs p
+                    JOIN user_programs up ON up.program_id = p.id
+                    WHERE up.user_id = ? AND p.trainer_id IS NOT NULL
+                )
+            )
+          )
+        ORDER BY u.first_name
+    ");
+    $stmt->execute([$userId, $userId, $userId, $role, $userId, $userId, $userId]);
     $users = $stmt->fetchAll();
 
     $result = array_map(function($u) {

@@ -31,7 +31,7 @@ function listTickets(): void {
     $whereClause = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
     $stmt = $db->prepare("
-        SELECT st.*, CONCAT(u.first_name, ' ', u.last_name) as user_name,
+        SELECT st.*, CONCAT(u.first_name, ' ', u.last_name) as user_name, u.email as user_email,
                CONCAT(a.first_name, ' ', a.last_name) as assigned_name
         FROM support_tickets st
         LEFT JOIN users u ON u.id = st.user_id
@@ -42,16 +42,49 @@ function listTickets(): void {
     $stmt->execute($params);
     $tickets = $stmt->fetchAll();
 
-    $result = array_map(function($t) {
+    $repliesByTicket = [];
+    if ($isAdmin && !empty($tickets)) {
+        $ticketIds = array_map('intval', array_column($tickets, 'id'));
+        $placeholders = implode(',', array_fill(0, count($ticketIds), '?'));
+        $replyStmt = $db->prepare("
+            SELECT tr.*, CONCAT(u.first_name, ' ', u.last_name) as admin_name
+            FROM ticket_replies tr
+            LEFT JOIN users u ON u.id = tr.user_id
+            WHERE tr.ticket_id IN ($placeholders)
+            ORDER BY tr.created_at ASC
+        ");
+        $replyStmt->execute($ticketIds);
+        foreach ($replyStmt->fetchAll() as $rep) {
+            $repliesByTicket[(int)$rep['ticket_id']][] = [
+                'id' => (int)$rep['id'],
+                'userId' => (int)$rep['user_id'],
+                'userName' => $rep['admin_name'],
+                'adminName' => $rep['admin_name'],
+                'message' => $rep['message'],
+                'text' => $rep['message'],
+                'createdAt' => $rep['created_at'],
+            ];
+        }
+    }
+
+    $result = array_map(function($t) use ($isAdmin, $repliesByTicket) {
+        $ticketId = (int)$t['id'];
         return [
-            'id' => '#' . $t['id'],
+            'id' => $ticketId,
             'subject' => $t['subject'],
+            'title' => $t['subject'],
             'message' => $t['message'],
+            'description' => $t['message'],
+            'desc' => $t['message'],
             'severity' => $t['severity'],
+            'status' => $t['severity'],
             'userName' => $t['user_name'],
+            'user' => $t['user_name'],
+            'email' => $t['user_email'] ?? '',
             'assignedTo' => $t['assigned_name'],
             'createdAt' => $t['created_at'],
             'updatedAt' => $t['updated_at'],
+            'replies' => $isAdmin ? ($repliesByTicket[$ticketId] ?? []) : [],
         ];
     }, $tickets);
 
@@ -148,6 +181,65 @@ function updateTicket(string $id): void {
 function adminListTickets(): void {
     requireRole('admin');
     listTickets();
+}
+
+function adminUpdateTicket(string $id): void {
+    $auth = requireRole('admin');
+    $input = getJsonInput();
+    $db = getDB();
+
+    $stmt = $db->prepare("SELECT * FROM support_tickets WHERE id = ?");
+    $stmt->execute([$id]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        error('Ticket no encontrado', 404);
+    }
+
+    $updates = [];
+    $params = [];
+
+    $statusValue = $input['status'] ?? $input['severity'] ?? null;
+    if ($statusValue !== null) {
+        $errors = validate(['status' => $statusValue], ['status' => 'in:open,in_progress,critical,resolved,closed']);
+        if ($errors) {
+            error('Error de validación', 422, $errors);
+        }
+        $updates[] = "severity = ?";
+        $params[] = $statusValue;
+    }
+
+    if (isset($input['assignedTo']) || isset($input['assigned_to'])) {
+        $assignedTo = $input['assignedTo'] ?? $input['assigned_to'];
+        $stmt = $db->prepare("SELECT id FROM users WHERE id = ?");
+        $stmt->execute([$assignedTo]);
+        if (!$stmt->fetch()) {
+            error('Usuario asignado no encontrado', 404);
+        }
+        $updates[] = "assigned_to = ?";
+        $params[] = $assignedTo;
+    }
+
+    if (isset($input['adminNote']) || isset($input['admin_note'])) {
+        $adminNote = $input['adminNote'] ?? $input['admin_note'];
+        $errors = validate(['admin_note' => $adminNote], ['admin_note' => 'string|max:1000']);
+        if ($errors) {
+            error('Error de validación', 422, $errors);
+        }
+        $updates[] = "admin_note = ?";
+        $params[] = $adminNote;
+    }
+
+    if (empty($updates)) {
+        error('No hay campos para actualizar', 400);
+    }
+
+    $params[] = $id;
+    $db->prepare("UPDATE support_tickets SET " . implode(', ', $updates) . " WHERE id = ?")
+        ->execute($params);
+
+    logAdminAction($auth['sub'], 'update_ticket', 'ticket', (int)$id, ['status' => $statusValue ?? null]);
+
+    success(null, 'Ticket actualizado');
 }
 
 function adminReplyTicket(string $id): void {

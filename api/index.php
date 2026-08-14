@@ -146,6 +146,11 @@ route('/auth/verify-email', ['method' => 'POST', 'handler' => function() {
     verifyEmail();
 }]);
 
+route('/auth/verify', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/auth/verify.php';
+    verifyEmail();
+}]);
+
 route('/auth/resend-verification', ['method' => 'POST', 'handler' => function() {
     require __DIR__ . '/routes/auth/verify.php';
     resendVerification();
@@ -331,7 +336,7 @@ route('/coach/availability', ['method' => 'PUT', 'handler' => function() {
 
 route('/coaches/{id}/availability', ['method' => 'GET', 'handler' => function($p) {
     require __DIR__ . '/routes/support/coach_availability.php';
-    getCoachAvailability();
+    getCoachAvailability($p['id']);
 }]);
 
 // --- Session Routes ---
@@ -353,6 +358,16 @@ route('/sessions/{id}', ['method' => 'PUT', 'handler' => function($p) {
 route('/sessions/{id}', ['method' => 'DELETE', 'handler' => function($p) {
     require __DIR__ . '/routes/support/sessions.php';
     deleteSession($p['id']);
+}]);
+
+route('/sessions/{id}/exercises', ['method' => 'POST', 'handler' => function($p) {
+    require __DIR__ . '/routes/support/sessions.php';
+    addSessionExercise($p['id']);
+}]);
+
+route('/sessions/{id}/exercises/{exerciseId}', ['method' => 'DELETE', 'handler' => function($p) {
+    require __DIR__ . '/routes/support/sessions.php';
+    deleteSessionExercise($p['id'], $p['exerciseId']);
 }]);
 
 // --- Nutrition Routes ---
@@ -436,11 +451,8 @@ route('/subscriptions/cancel', ['method' => 'POST', 'handler' => function() {
 }]);
 
 route('/subscriptions/{id}/invoice', ['method' => 'GET', 'handler' => function($p) {
-    require __DIR__ . '/helpers/invoice.php';
-    $file = generateInvoicePdf((int)$p['id']);
-    header('Content-Type: text/html');
-    readfile($file);
-    unlink($file);
+    require __DIR__ . '/routes/finance/subscriptions.php';
+    getSubscriptionInvoice($p['id']);
 }]);
 
 // --- Stripe Routes ---
@@ -488,17 +500,6 @@ route('/paypal/capture-order', ['method' => 'POST', 'handler' => function() {
 route('/paypal/webhook', ['method' => 'POST', 'handler' => function() {
     require __DIR__ . '/routes/finance/paypal.php';
     handlePayPalWebhook();
-}]);
-
-// --- Virtual Wallet Routes ---
-route('/wallet/create-subscription', ['method' => 'POST', 'handler' => function() {
-    require __DIR__ . '/routes/finance/wallet.php';
-    createWalletSubscription();
-}]);
-
-route('/wallet/webhook', ['method' => 'POST', 'handler' => function() {
-    require __DIR__ . '/routes/finance/wallet.php';
-    handleWalletWebhook();
 }]);
 
 // --- Chat Routes ---
@@ -740,6 +741,11 @@ route('/admin/plans', ['method' => 'POST', 'handler' => function() {
     adminSavePlan();
 }]);
 
+route('/admin/plans/{id}', ['method' => 'PUT', 'handler' => function($p) {
+    require __DIR__ . '/routes/finance/subscriptions.php';
+    adminUpdatePlan($p['id']);
+}]);
+
 // --- Coupon Routes ---
 route('/admin/coupons', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/finance/coupons.php';
@@ -760,6 +766,11 @@ route('/admin/coupons/{id}', ['method' => 'DELETE', 'handler' => function($p) {
 route('/admin/tickets', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/support/tickets.php';
     adminListTickets();
+}]);
+
+route('/admin/tickets/{id}', ['method' => 'PUT', 'handler' => function($p) {
+    require __DIR__ . '/routes/support/tickets.php';
+    adminUpdateTicket($p['id']);
 }]);
 
 route('/admin/tickets/{id}/reply', ['method' => 'POST', 'handler' => function($p) {
@@ -1159,7 +1170,7 @@ route('/admin/messages/{id}/reply', ['method' => 'POST', 'handler' => function($
 // --- Admin Challenge Management Routes ---
 route('/admin/challenges', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/community/challenges.php';
-    listChallenges();
+    adminListChallenges();
 }]);
 
 route('/admin/challenges', ['method' => 'POST', 'handler' => function() {
@@ -1441,6 +1452,11 @@ route('/videos/upload', ['method' => 'POST', 'handler' => function() {
 route('/videos/feedback', ['method' => 'POST', 'handler' => function() {
     require __DIR__ . '/routes/content/videos.php';
     createFeedback();
+}]);
+
+route('/coach/video-feedback', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/content/videos.php';
+    sendVideoFeedback();
 }]);
 
 route('/videos/feedback/{client_id}', ['method' => 'GET', 'handler' => function($p) {

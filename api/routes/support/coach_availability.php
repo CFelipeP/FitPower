@@ -51,11 +51,10 @@ function updateMyAvailability(): void {
     success(null, 'Disponibilidad actualizada');
 }
 
-function getCoachAvailability(): void {
-    $id = func_get_arg(0)['id'] ?? 0;
+function getCoachAvailability(string $id): void {
     $db = getDB();
 
-    $stmt = $db->prepare("SELECT ca.*, t.first_name, t.last_name FROM coach_availability ca JOIN trainers t ON t.id = ca.trainer_id WHERE t.user_id = ? AND ca.is_available = 1 ORDER BY ca.day_of_week, ca.start_time");
+    $stmt = $db->prepare("SELECT ca.*, t.first_name, t.last_name FROM coach_availability ca JOIN trainers t ON t.id = ca.trainer_id WHERE t.id = ? AND ca.is_available = 1 ORDER BY ca.day_of_week, ca.start_time");
     $stmt->execute([(int)$id]);
     $slots = array_map(function($s) {
         return [

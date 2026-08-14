@@ -202,7 +202,7 @@ CREATE TABLE sessions (
     date DATE NULL,
     start_time TIME NULL,
     end_time TIME NULL,
-    type ENUM('group','1on1','video') NOT NULL DEFAULT 'group',
+    type ENUM('group','1on1','video','strength','hypertrophy','cardio','hiit','flexibility') NOT NULL DEFAULT 'group',
     max_participants INT UNSIGNED NULL DEFAULT 10,
     status ENUM('scheduled','completed','cancelled') NOT NULL DEFAULT 'scheduled',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -693,6 +693,7 @@ CREATE TABLE progress_photos (
 CREATE TABLE recipes (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    description TEXT NULL,
     meal_type VARCHAR(100) NULL,
     calories INT UNSIGNED NULL,
     protein_g DECIMAL(6,1) NULL,
@@ -740,3 +741,26 @@ CREATE TABLE IF NOT EXISTS challenge_participants (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE KEY unique_participant (challenge_id, user_id)
 ) ENGINE=InnoDB;
+
+-- ============================================================
+-- MIGRATION 044: login_sessions, stripe accounts, session owner
+-- ============================================================
+CREATE TABLE IF NOT EXISTS login_sessions (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    device_type VARCHAR(20) NOT NULL DEFAULT 'desktop',
+    device_name VARCHAR(255) DEFAULT NULL,
+    ip_address VARCHAR(45) DEFAULT NULL,
+    user_agent VARCHAR(500) DEFAULT NULL,
+    last_active DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    KEY idx_login_sessions_user (user_id),
+    KEY idx_login_sessions_last_active (last_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE users ADD COLUMN stripe_account_id VARCHAR(255) DEFAULT NULL;
+ALTER TABLE trainers ADD COLUMN stripe_account_id VARCHAR(255) DEFAULT NULL;
+ALTER TABLE sessions ADD COLUMN user_id INT UNSIGNED NULL AFTER id;
+ALTER TABLE sessions ADD KEY idx_sessions_user (user_id);
+ALTER TABLE sessions ADD CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;

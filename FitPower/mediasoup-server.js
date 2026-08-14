@@ -26,9 +26,16 @@ function getLocalIp() {
 const ANNOUNCED_IP = getLocalIp()
 console.log(`[Mediasoup] announced IP: ${ANNOUNCED_IP}`)
 const TURN_URL = process.env.TURN_URL
-const TURN_USERNAME = process.env.TURN_USERNAME || 'fitpower'
-const TURN_CREDENTIAL = process.env.TURN_CREDENTIAL || 'TURN_SECRET_REDACTED'
-const ICE_SERVERS = TURN_URL ? [{ urls: TURN_URL, username: TURN_USERNAME, credential: TURN_CREDENTIAL }] : []
+const TURN_USERNAME = process.env.TURN_USERNAME
+const TURN_CREDENTIAL = process.env.TURN_CREDENTIAL
+let ICE_SERVERS = []
+if (TURN_URL) {
+    if (TURN_USERNAME && TURN_CREDENTIAL) {
+        ICE_SERVERS = [{ urls: TURN_URL, username: TURN_USERNAME, credential: TURN_CREDENTIAL }]
+    } else {
+        console.warn('[Mediasoup] TURN_URL set but TURN_USERNAME/TURN_CREDENTIAL missing — TURN disabled')
+    }
+}
 
 const rooms = new Map()
 let worker
@@ -56,9 +63,15 @@ async function verifyToken(token) {
             headers: { Authorization: `Bearer ${token}` },
         })
         const data = await res.json()
-        if (!data.success) return null
+        if (!data.success) {
+            console.error('[Mediasoup] verifyToken rejected:', res.status, JSON.stringify(data).slice(0, 200), '| token prefix:', String(token).slice(0, 24), 'len', String(token).length)
+            return null
+        }
         return data.data
-    } catch { return null }
+    } catch (e) {
+        console.error('[Mediasoup] verifyToken fetch failed:', e.message)
+        return null
+    }
 }
 
 const server = createServer((req, res) => {
@@ -77,6 +90,10 @@ wss.on('connection', (ws) => {
     ws.on('message', async (raw) => {
         try {
             const msg = JSON.parse(raw)
+            if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string') {
+                ws.send(JSON.stringify({ type: 'error', message: 'Invalid message' }))
+                return
+            }
             await handleSignaling(ws, msg)
         } catch (e) {
             console.error('[Mediasoup] handler error:', e)
@@ -88,12 +105,12 @@ wss.on('connection', (ws) => {
         if (ws.roomId && ws.user) {
             const room = rooms.get(ws.roomId)
             if (room) {
-                room.removePeer(ws.user.id)
+                const removed = room.removePeer(ws.user.id, ws)
                 if (room.peerCount === 0) {
                     room.close()
                     rooms.delete(ws.roomId)
                     console.log(`[Mediasoup] room ${ws.roomId} closed`)
-                } else {
+                } else if (removed) {
                     room.notifyPeers('peer_left', { peerId: ws.user.id })
                 }
             }
@@ -119,8 +136,8 @@ async function handleSignaling(ws, msg) {
                 ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }))
                 return
             }
-            const { roomId } = msg
-            if (!roomId) {
+            const roomId = typeof msg.roomId === 'string' ? msg.roomId.trim() : ''
+            if (!roomId || roomId.length > 100) {
                 ws.send(JSON.stringify({ type: 'error', message: 'roomId required' }))
                 return
             }
@@ -164,11 +181,25 @@ async function handleSignaling(ws, msg) {
                 console.log(`[Mediasoup] room ${roomId} created`)
             }
 
+            // Register the peer in the room (this was missing — caused "Peer not found")
+            const existing = room.getPeer(ws.user.id)
+            if (existing) {
+                if (existing.ws !== ws) {
+                    // Reconnection: tear down the previous socket's media before reusing the peer
+                    existing.reset()
+                    existing.ws = ws
+                    console.log(`[Mediasoup] peer ${ws.user.id} reconnected in room ${roomId}`)
+                }
+            } else {
+                room.addPeer(ws.user.id, ws)
+                console.log(`[Mediasoup] peer ${ws.user.id} joined room ${roomId}`)
+            }
+
             ws.send(JSON.stringify({
                 type: 'room_joined',
                 peerId: ws.user.id,
                 roomId,
-                peers: room.getPeerList(),
+                peers: room.getPeerList().filter(id => id !== ws.user.id),
                 producers: room.getAllProducers(),
                 rtpCapabilities: room.router.rtpCapabilities,
             }))
@@ -196,7 +227,10 @@ async function handleSignaling(ws, msg) {
             }
 
             const transport = await room.router.createWebRtcTransport({
-                listenIps: [{ ip: ANNOUNCED_IP, announcedIp: ANNOUNCED_IP }],
+                listenIps: [{
+                    ip: '0.0.0.0',
+                    announcedIp: ANNOUNCED_IP && ANNOUNCED_IP !== '127.0.0.1' ? ANNOUNCED_IP : undefined,
+                }],
                 enableUdp: true,
                 enableTcp: true,
                 preferUdp: true,
@@ -404,9 +438,12 @@ class Room {
         return this.peers.get(userId)
     }
 
-    removePeer(userId) {
+    removePeer(userId, ws) {
         const peer = this.peers.get(userId)
         if (peer) {
+            if (ws && peer.ws !== ws) {
+                return false
+            }
             for (const producer of peer.producers.values()) {
                 producer.close()
             }
@@ -416,7 +453,9 @@ class Room {
             if (peer.sendTransport) peer.sendTransport.close()
             if (peer.recvTransport) peer.recvTransport.close()
             this.peers.delete(userId)
+            return true
         }
+        return false
     }
 
     getPeerList() {
@@ -457,5 +496,20 @@ class Peer {
         this.recvTransport = null
         this.producers = new Map()
         this.consumers = new Map()
+    }
+
+    reset() {
+        for (const producer of this.producers.values()) producer.close()
+        for (const consumer of this.consumers.values()) consumer.close()
+        this.producers.clear()
+        this.consumers.clear()
+        if (this.sendTransport) {
+            this.sendTransport.close()
+            this.sendTransport = null
+        }
+        if (this.recvTransport) {
+            this.recvTransport.close()
+            this.recvTransport = null
+        }
     }
 }

@@ -4,7 +4,8 @@
 
 $PI_USER = "sotomayorpi"
 $PI_HOST = "192.168.0.14"
-$PI_PASS = "PI_PASS_REDACTED"
+# Never hardcode credentials. Prompt at runtime instead.
+$PI_PASS = $env:PI_PASS
 $DEPLOY_DIR = "/home/$PI_USER/fitpower-deploy"
 
 $ROOT = Split-Path -Parent $PSScriptRoot

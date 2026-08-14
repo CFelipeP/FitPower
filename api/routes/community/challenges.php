@@ -34,6 +34,25 @@ function listChallenges(): void {
     success($challenges);
 }
 
+function adminListChallenges(): void {
+    requireRole('admin');
+    $db = getDB();
+    $stmt = $db->query("
+        SELECT c.*,
+               CONCAT(u.first_name, ' ', u.last_name) as created_by_name,
+               (SELECT COUNT(*) FROM challenge_participants WHERE challenge_id = c.id) as participant_count
+        FROM challenges c
+        LEFT JOIN users u ON u.id = c.created_by
+        ORDER BY c.is_featured DESC, c.created_at DESC
+    ");
+    $challenges = $stmt->fetchAll();
+    foreach ($challenges as &$ch) {
+        $ch['participant_count'] = (int)$ch['participant_count'];
+    }
+    unset($ch);
+    success($challenges);
+}
+
 function joinChallenge(int $challengeId): void {
     $auth = requireAuth();
     $db = getDB();

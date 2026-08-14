@@ -54,13 +54,13 @@ function getArticle(string $slug): void {
 }
 
 function createArticle(): void {
-    $auth = requireAuth();
+    $auth = requireRole('admin');
     $input = getJsonInput();
     $rules = ['title' => 'required|string|min:1|max:255', 'content' => 'required|string|min:1'];
     $errors = validate($input, $rules);
     if ($errors) error('Error de validación', 422, $errors);
 
-    $slug = $input['slug'] ?? strtolower(trim(preg_replace('/[^a-z0-9]+/', '-', $input['title']), '-'));
+    $slug = $input['slug'] ?? strtolower(trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($input['title'])), '-'));
     $db = getDB();
     $stmt = $db->prepare("
         INSERT INTO articles (author_id, title, slug, excerpt, content, cover_image, category, tags, status, published_at)

@@ -50,11 +50,12 @@ export default function AdminTickets() {
                         <input className="ad-content-search" style={{ paddingLeft: 36 }} placeholder="Search tickets..." value={search} onChange={e => setSearch(e.target.value)} />
                     </div>
                     <select className="ad-content-search" style={{ minWidth: 120 }} value={severityFilter} onChange={e => setSeverityFilter(e.target.value)}>
-                        <option value="">All Severity</option>
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
+                        <option value="">All Status</option>
+                        <option value="open">Open</option>
+                        <option value="in_progress">In Progress</option>
                         <option value="critical">Critical</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
                     </select>
                 </div>
             </div>

@@ -36,13 +36,33 @@ function requestPayout(): void {
     $bal->execute([$auth['sub']]);
     $available = (float)$bal->fetch()['total'];
     if ($amount > $available) error('Saldo insuficiente. Disponible: ' . $available, 400);
-    // Create payout
-    $db->prepare("INSERT INTO coach_payouts (coach_id, amount, status) VALUES (?, ?, 'pending')")
-        ->execute([$auth['sub'], $amount]);
-    // Mark earnings as paid
-    $db->prepare("UPDATE coach_earnings SET status = 'paid' WHERE coach_id = ? AND status = 'available' LIMIT ?")
-        ->execute([$auth['sub'], $amount]);
-    success(['id' => (int)$db->lastInsertId()], 'Payout solicitado', 201);
+    // Select earnings to mark as paid (oldest first), capping at requested amount
+    $rows = $db->prepare("SELECT id, amount FROM coach_earnings WHERE coach_id = ? AND status = 'available' ORDER BY created_at ASC, id ASC");
+    $rows->execute([$auth['sub']]);
+    $remaining = $amount;
+    $earningIds = [];
+    foreach ($rows->fetchAll() as $r) {
+        if ($remaining <= 0) break;
+        $earningIds[] = (int)$r['id'];
+        $remaining -= (float)$r['amount'];
+    }
+    if (empty($earningIds)) {
+        error('Sin ganancias disponibles', 400);
+    }
+    $db->beginTransaction();
+    try {
+        $db->prepare("INSERT INTO coach_payouts (coach_id, amount, status) VALUES (?, ?, 'pending')")
+            ->execute([$auth['sub'], $amount]);
+        $payoutId = (int)$db->lastInsertId();
+        $placeholders = implode(',', array_fill(0, count($earningIds), '?'));
+        $db->prepare("UPDATE coach_earnings SET status = 'paid' WHERE id IN ($placeholders)")
+            ->execute($earningIds);
+        $db->commit();
+    } catch (Throwable $e) {
+        $db->rollBack();
+        error('No se pudo procesar el payout', 500);
+    }
+    success(['id' => $payoutId], 'Payout solicitado', 201);
 }
 
 function adminListPayouts(): void {
@@ -63,7 +83,7 @@ function adminListPayouts(): void {
 }
 
 function adminApprovePayout(string $id): void {
-    requireRole('admin');
+    $auth = requireRole('admin');
     $input = getJsonInput();
     $db = getDB();
     $stmt = $db->prepare("SELECT * FROM coach_payouts WHERE id = ? AND status = 'pending'");
@@ -72,6 +92,6 @@ function adminApprovePayout(string $id): void {
     if (!$payout) error('Payout no encontrado o ya procesado', 404);
     $db->prepare("UPDATE coach_payouts SET status = 'paid', paid_at = NOW(), stripe_transfer_id = ? WHERE id = ?")
         ->execute([$input['stripeTransferId'] ?? 'manual_' . bin2hex(random_bytes(8)), (int)$id]);
-    logAdminAction($auth['sub'] ?? 0, 'approve_payout', "Payout \${$payout['amount']} aprobado para coach {$payout['coach_id']}");
+    logAdminAction((int)$auth['sub'], 'approve_payout', 'payout', (int)$id, ['amount' => (float)$payout['amount'], 'coach_id' => (int)$payout['coach_id']]);
     success(null, 'Payout aprobado');
 }

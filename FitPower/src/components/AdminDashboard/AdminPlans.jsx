@@ -3,7 +3,7 @@ import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
 import { Plus, X, Edit2, Star } from 'lucide-react'
 
-const emptyForm = { name: '', price: '', interval: 'monthly', features: '', is_popular: false }
+const emptyForm = { name: '', priceMonthly: '', priceYearly: '', features: '', is_popular: false }
 
 export default function AdminPlans() {
     const { showToast } = useToast()
@@ -13,25 +13,37 @@ export default function AdminPlans() {
     const [form, setForm] = useState({ ...emptyForm })
 
     useEffect(() => {
-        apiFetch('/admin/plans').then(d => setPlans(d.plans || d.data || [])).catch(() => {})
+        apiFetch('/admin/plans').then(d => setPlans(d.data || d.plans || [])).catch(() => {})
     }, [])
 
     const openCreate = () => { setEditId(null); setForm({ ...emptyForm }); setModalOpen(true) }
 
     const openEdit = (plan) => {
         setEditId(plan.id)
-        setForm({ name: plan.name, price: String(plan.price), interval: plan.interval || 'monthly', features: Array.isArray(plan.features) ? plan.features.join('\n') : plan.features || '', is_popular: plan.is_popular || false })
+        setForm({
+            name: plan.name || '',
+            priceMonthly: String(plan.priceMonthly ?? ''),
+            priceYearly: String(plan.priceYearly ?? ''),
+            features: Array.isArray(plan.features) ? plan.features.join('\n') : plan.features || '',
+            is_popular: !!plan.is_popular || !!plan.popular,
+        })
         setModalOpen(true)
     }
 
     const handleSave = async () => {
-        if (!form.name || !form.price) { showToast('Name and price required'); return }
-        const body = { ...form, price: parseFloat(form.price), features: form.features.split('\n').filter(Boolean) }
+        if (!form.name || form.priceMonthly === '' || form.priceYearly === '') { showToast('Name and prices required'); return }
+        const body = {
+            name: form.name,
+            priceMonthly: parseFloat(form.priceMonthly),
+            priceYearly: parseFloat(form.priceYearly),
+            popular: form.is_popular,
+            features: form.features.split('\n').filter(Boolean),
+        }
         try {
             if (editId) { await apiFetch(`/admin/plans/${editId}`, { method: 'PUT', body: JSON.stringify(body) }); showToast('Plan updated') }
             else { await apiFetch('/admin/plans', { method: 'POST', body: JSON.stringify(body) }); showToast('Plan created') }
             setModalOpen(false)
-            apiFetch('/admin/plans').then(d => setPlans(d.plans || d.data || [])).catch(() => {})
+            apiFetch('/admin/plans').then(d => setPlans(d.data || d.plans || [])).catch(() => {})
         } catch (e) { showToast(e.message || 'Error saving plan') }
     }
 
@@ -47,7 +59,10 @@ export default function AdminPlans() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                             <div>
                                 <div style={{ fontSize: 18, fontWeight: 700 }}>{plan.name}</div>
-                                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--power-500)', marginTop: 8 }}>${plan.price}<span style={{ fontSize: 14, color: '#737373', fontWeight: 400 }}>/{plan.interval}</span></div>
+                                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--power-500)', marginTop: 8 }}>
+                                    ${plan.priceMonthly}<span style={{ fontSize: 14, color: '#737373', fontWeight: 400 }}>/month</span>
+                                </div>
+                                <div style={{ fontSize: 13, color: '#a3a3a3' }}>${plan.priceYearly}/year</div>
                             </div>
                             {plan.is_popular && <span className="ad-status-badge ad-status-active">Popular</span>}
                         </div>
@@ -69,12 +84,8 @@ export default function AdminPlans() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                         <input className="ad-content-search" style={{ width: '100%', minWidth: 'unset' }} placeholder="Plan name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
                         <div style={{ display: 'flex', gap: 12 }}>
-                            <input className="ad-content-search" style={{ flex: 1, minWidth: 'unset' }} type="number" placeholder="Price" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
-                            <select className="ad-content-search" style={{ flex: 1, minWidth: 'unset' }} value={form.interval} onChange={e => setForm({ ...form, interval: e.target.value })}>
-                                <option value="monthly">Monthly</option>
-                                <option value="yearly">Yearly</option>
-                                <option value="weekly">Weekly</option>
-                            </select>
+                            <input className="ad-content-search" style={{ flex: 1, minWidth: 'unset' }} type="number" placeholder="Monthly price ($)" value={form.priceMonthly} onChange={e => setForm({ ...form, priceMonthly: e.target.value })} />
+                            <input className="ad-content-search" style={{ flex: 1, minWidth: 'unset' }} type="number" placeholder="Yearly price ($)" value={form.priceYearly} onChange={e => setForm({ ...form, priceYearly: e.target.value })} />
                         </div>
                         <textarea className="ad-content-search" style={{ width: '100%', minWidth: 'unset', minHeight: 100, resize: 'vertical' }} placeholder="Features (one per line)" value={form.features} onChange={e => setForm({ ...form, features: e.target.value })} />
                         <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#a3a3a3', cursor: 'pointer' }}>

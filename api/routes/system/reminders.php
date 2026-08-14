@@ -1,6 +1,15 @@
 <?php
 
 function processReminders() {
+    $secret = INTERNAL_API_SECRET;
+    if ($secret === '') {
+        error('Cron no configurado: define INTERNAL_API_SECRET', 503);
+    }
+    $provided = $_SERVER['HTTP_X_INTERNAL_SECRET'] ?? '';
+    if (!hash_equals($secret, $provided)) {
+        error('Acceso denegado', 403);
+    }
+
     $db = getDB();
     $notified = [];
 
@@ -11,16 +20,17 @@ function processReminders() {
 
     // 1. Check-in reminders (users who haven't checked in today)
     $today = date('Y-m-d');
-    $stmt = $db->query("
+    $stmt = $db->prepare("
         SELECT u.id, u.email, u.first_name, u.settings 
         FROM users u 
         WHERE u.role = 'client' 
         AND u.id NOT IN (
-            SELECT user_id FROM daily_checkins WHERE DATE(created_at) = '$today'
+            SELECT user_id FROM daily_checkins WHERE DATE(created_at) = ?
         )
         AND u.status = 'active'
         LIMIT 50
     ");
+    $stmt->execute([$today]);
     while ($user = $stmt->fetch()) {
         $settings = json_decode($user['settings'] ?? '{}', true);
         $emailNotifs = $settings['emailNotifications'] ?? true;
@@ -45,15 +55,16 @@ function processReminders() {
     // 2. Upcoming session reminders (1 hour before)
     $inOneHour = date('Y-m-d H:i:s', strtotime('+1 hour'));
     $now = date('Y-m-d H:i:s');
-    $stmt = $db->query("
+    $stmt = $db->prepare("
         SELECT s.id as session_id, s.title, s.date, u.id as user_id, u.email, u.first_name, u.settings
         FROM sessions s
         JOIN session_participants sp ON s.id = sp.session_id
         JOIN users u ON sp.user_id = u.id
-        WHERE s.date BETWEEN '$now' AND '$inOneHour'
+        WHERE s.date BETWEEN ? AND ?
         AND sp.reminded = 0
         LIMIT 50
     ");
+    $stmt->execute([$now, $inOneHour]);
     while ($row = $stmt->fetch()) {
         $settings = json_decode($row['settings'] ?? '{}', true);
         $emailNotifs = $settings['emailNotifications'] ?? true;

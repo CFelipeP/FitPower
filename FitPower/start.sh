@@ -46,8 +46,8 @@ echo ""
 
 # 5. Iniciar mediasoup + chat con TURN
 export TURN_URL="$TURN_URL"
-export TURN_USERNAME="fitpower"
-export TURN_CREDENTIAL="TURN_SECRET_REDACTED"
+export TURN_USERNAME="${TURN_USERNAME:-fitpower}"
+export TURN_CREDENTIAL="${TURN_CREDENTIAL:-}"
 
 pm2 start mediasoup-server.js --name fitpower-mediasoup 2>/dev/null || \
   pm2 restart fitpower-mediasoup --update-env

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
@@ -59,6 +59,28 @@ export default function Login() {
         }
     }, [searchParams, showToast])
 
+    // Handle reset_token / verify_token links from emails
+    useEffect(() => {
+        const resetToken = searchParams.get('reset_token')
+        if (resetToken) {
+            setResetToken(resetToken)
+            showView(VIEWS.NEW_PASS)
+            return
+        }
+        const verifyToken = searchParams.get('verify_token')
+        if (verifyToken) {
+            fetch('/api/auth/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: verifyToken }),
+            })
+                .then(r => r.json())
+                .then(d => showToast(d.message || 'Email verification result'))
+                .catch(() => showToast('Server connection error'))
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams])
+
     // Redirect to dashboard if already authenticated (e.g., after Google OAuth reload)
     useEffect(() => {
         if (initialized && isAuthenticated && currentView !== VIEWS.SETUP_PASS) {
@@ -90,12 +112,10 @@ export default function Login() {
     const [forgotLoading, setForgotLoading] = useState(false)
 
     // Code verification
-    const [codeDigits, setCodeDigits] = useState(['', '', '', '', '', ''])
+    const [resetCode, setResetCode] = useState('')
     const [codeError, setCodeError] = useState(false)
     const [resendTimer, setResendTimer] = useState(0)
     const [verifying, setVerifying] = useState(false)
-    const codeInputsRef = useRef([])
-    const verifyTimeoutRef = useRef(null)
 
     // New password
     const [newPassword, setNewPassword] = useState('')
@@ -141,12 +161,6 @@ export default function Login() {
         return () => clearInterval(id)
     }, [resendTimer])
 
-    useEffect(() => {
-        return () => {
-            if (verifyTimeoutRef.current) clearTimeout(verifyTimeoutRef.current)
-        }
-    }, [])
-
     const showView = (view) => {
         setCurrentView(view)
         setLoginError(false)
@@ -184,65 +198,28 @@ export default function Login() {
                 body: JSON.stringify({ email: forgotEmail }),
             })
             const data = await res.json()
-            if (data.success && data.data?.resetToken) {
-                setResetToken(data.data.resetToken)
-                setForgotLoading(false)
-                showView(VIEWS.NEW_PASS)
-            } else {
-                showToast(data.message || 'Error sending reset code')
-                setForgotLoading(false)
-            }
+            setForgotLoading(false)
+            showToast(data.message || 'Check your email for the reset code')
+            setResetCode('')
+            setResendTimer(60)
+            showView(VIEWS.CODE)
         } catch {
             showToast('Server connection error')
             setForgotLoading(false)
         }
     }
 
-    // Code handlers
-    const handleCodeChange = (index, value) => {
-        const digit = value.replace(/\D/g, '').slice(0, 1)
-        const newDigits = [...codeDigits]
-        newDigits[index] = digit
-        setCodeDigits(newDigits)
-        setCodeError(false)
-
-        if (digit && index < 5) {
-            const next = codeInputsRef.current[index + 1]
-            if (next) next.focus()
-        }
-    }
-
-    const handleCodeKeyDown = (index, e) => {
-        if (e.key === 'Backspace' && !codeDigits[index] && index > 0) {
-            const newDigits = [...codeDigits]
-            newDigits[index - 1] = ''
-            setCodeDigits(newDigits)
-            const prev = codeInputsRef.current[index - 1]
-            if (prev) prev.focus()
-        }
-    }
-
-    const handleCodePaste = (e) => {
-        e.preventDefault()
-        const pasted = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6)
-        const newDigits = [...codeDigits]
-        pasted.split('').forEach((ch, i) => { newDigits[i] = ch })
-        setCodeDigits(newDigits)
-        const lastIdx = Math.min(pasted.length - 1, 5)
-        const target = codeInputsRef.current[lastIdx]
-        if (target) target.focus()
-    }
-
     const handleVerifyCode = () => {
+        const code = resetCode.trim()
+        if (!code) {
+            setCodeError(true)
+            return
+        }
         setVerifying(true)
-        if (verifyTimeoutRef.current) clearTimeout(verifyTimeoutRef.current)
-        verifyTimeoutRef.current = setTimeout(() => {
-            setVerifying(false)
-            showView(VIEWS.NEW_PASS)
-        }, 800)
+        setResetToken(code)
+        setCodeError(false)
+        showView(VIEWS.NEW_PASS)
     }
-
-    const codeComplete = codeDigits.every((d) => d)
 
     // New password handler
     const handleSavePassword = async () => {
@@ -301,7 +278,7 @@ export default function Login() {
         setForgotEmail('')
         setNewPassword('')
         setConfirmPassword('')
-        setCodeDigits(['', '', '', '', '', ''])
+        setResetCode('')
         setLoginTouched({ email: false, password: false })
         setForgotTouched(false)
         setNewPassTouched(false)
@@ -690,29 +667,25 @@ export default function Login() {
                                     </div>
 
                                     <h1 className="login-title">Enter code</h1>
-                                    <p className="login-subtitle" style={{ marginBottom: 8 }}>We sent a 6-digit code to</p>
+                                    <p className="login-subtitle" style={{ marginBottom: 8 }}>We sent a reset code to</p>
                                     <p className="login-code-email">{forgotEmail || 'your@email.com'}</p>
 
-                                    <div className="login-code-inputs">
-                                        {codeDigits.map((digit, i) => (
-                                            <input
-                                                key={i}
-                                                ref={(el) => (codeInputsRef.current[i] = el)}
-                                                type="text"
-                                                maxLength={1}
-                                                className={`login-code-input ${digit ? 'filled' : ''}`}
-                                                inputMode="numeric"
-                                                value={digit}
-                                                onChange={(e) => handleCodeChange(i, e.target.value)}
-                                                onKeyDown={(e) => handleCodeKeyDown(i, e)}
-                                                onPaste={i === 0 ? handleCodePaste : undefined}
-                                                autoFocus={i === 0}
-                                            />
-                                        ))}
+                                    <div className="login-field" style={{ marginTop: 12 }}>
+                                        <input
+                                            type="text"
+                                            className={`login-input ${codeError ? 'error' : ''}`}
+                                            placeholder="Paste the code from the email"
+                                            value={resetCode}
+                                            onChange={(e) => { setResetCode(e.target.value); setCodeError(false) }}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' && resetCode.trim()) handleVerifyCode() }}
+                                            autoComplete="one-time-code"
+                                            autoFocus
+                                        />
+                                        <KeyRound size={18} className="login-input-icon" />
                                     </div>
 
                                     {codeError && (
-                                        <p className="login-code-error">Invalid code. Please try again or request a new one.</p>
+                                        <p className="login-code-error">Please enter the code from the email.</p>
                                     )}
 
                                     <div className="login-resend">
@@ -720,10 +693,8 @@ export default function Login() {
                                         <button
                                             type="button"
                                             className="login-resend-btn"
-                                            disabled={resendTimer > 0}
-                                            onClick={() => {
-                                                setResendTimer(60)
-                                            }}
+                                            disabled={resendTimer > 0 || forgotLoading}
+                                            onClick={handleSendCode}
                                         >
                                             {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend code'}
                                         </button>
@@ -733,12 +704,12 @@ export default function Login() {
                                         type="button"
                                         className="login-btn-primary btn-shine"
                                         onClick={handleVerifyCode}
-                                        disabled={!codeComplete || verifying}
+                                        disabled={!resetCode.trim() || verifying}
                                     >
                                         {verifying ? (
                                             <><span className="login-spinner"></span> Verifying...</>
                                         ) : (
-                                            'Verify Code'
+                                            'Continue'
                                         )}
                                     </button>
                                 </div>

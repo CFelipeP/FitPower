@@ -132,6 +132,12 @@ function loginUser(): void {
         error('Cuenta suspendida', 403);
     }
 
+    // Enforce email verification only when SMTP is actually configured,
+    // otherwise users could never receive the verification email and would be locked out.
+    if (REQUIRE_EMAIL_VERIFICATION && emailsConfigured() && empty($user['email_verified_at'])) {
+        error('Debes verificar tu email antes de iniciar sesión', 403, ['code' => 'email_not_verified', 'email' => $user['email']]);
+    }
+
     recordLoginAttempt($identifier, $ip, true);
 
     $role = $user['role'] ?? 'client';
@@ -214,6 +220,7 @@ function forgotPassword(): void {
     $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
     $stmt->execute([$input['email']]);
     if (!$stmt->fetch()) {
+        // Generic response to avoid user enumeration
         success(null, 'Si el email existe, recibirás un código de recuperación');
         return;
     }
@@ -221,17 +228,26 @@ function forgotPassword(): void {
     $token = bin2hex(random_bytes(32));
     $expires = date('Y-m-d H:i:s', time() + 3600);
 
+    // Store only a hash of the token so a DB leak cannot be used to reset passwords.
     $stmt = $db->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)");
-    $stmt->execute([$input['email'], $token, $expires]);
+    $stmt->execute([$input['email'], hash('sha256', $token), $expires]);
 
+    $sent = false;
     try {
         if (file_exists(__DIR__ . '/../../helpers/mailer.php')) {
             require_once __DIR__ . '/../../helpers/mailer.php';
-            sendPasswordResetEmail($input['email'], $token);
+            $sent = sendPasswordResetEmail($input['email'], $token);
         }
-    } catch (\Throwable $e) {}
+    } catch (\Throwable $e) {
+        error_log('Password reset email failed: ' . $e->getMessage());
+    }
 
-    success(['resetToken' => $token], 'Check your email for the reset link');
+    if (!$sent) {
+        error_log('Password reset email could not be sent for: ' . $input['email']);
+    }
+
+    // Generic response; never return the token in the API response.
+    success(null, 'Si el email existe, recibirás un código de recuperación');
 }
 
 function resetPassword(): void {
@@ -249,8 +265,15 @@ function resetPassword(): void {
 
     $db = getDB();
 
-    $stmt = $db->prepare("SELECT * FROM password_resets WHERE token = ? AND used = 0 AND expires_at > NOW()");
-    $stmt->execute([$input['token']]);
+    $token = trim($input['token']);
+    if (strlen($token) > 200) {
+        error('Token inválido o expirado', 400);
+    }
+    $tokenHash = hash('sha256', $token);
+
+    // Accept hashed tokens (new) and legacy plaintext tokens stored by older versions.
+    $stmt = $db->prepare("SELECT * FROM password_resets WHERE (token = ? OR token = ?) AND used = 0 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1");
+    $stmt->execute([$tokenHash, $token]);
     $reset = $stmt->fetch();
 
     if (!$reset) {
@@ -259,11 +282,22 @@ function resetPassword(): void {
 
     $hashedPassword = password_hash($input['password'], PASSWORD_BCRYPT);
 
-    $db->prepare("UPDATE users SET password = ? WHERE email = ?")
+    $db->prepare("UPDATE users SET password = ?, token_version = token_version + 1 WHERE email = ?")
         ->execute([$hashedPassword, $reset['email']]);
 
     $db->prepare("UPDATE password_resets SET used = 1 WHERE id = ?")
         ->execute([$reset['id']]);
+
+    // Invalidate refresh tokens and sessions for this account.
+    $userStmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+    $userStmt->execute([$reset['email']]);
+    $user = $userStmt->fetch();
+    if ($user) {
+        $db->prepare("UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND revoked = 0")->execute([$user['id']]);
+        try {
+            $db->prepare("DELETE FROM login_sessions WHERE user_id = ?")->execute([$user['id']]);
+        } catch (\PDOException $e) {}
+    }
 
     success(null, 'Contraseña actualizada exitosamente');
 }

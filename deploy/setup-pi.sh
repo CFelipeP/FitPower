@@ -85,6 +85,13 @@ fi
 echo ""
 echo "[4/7] Setting up database..."
 
+# DB app password must come from env (never hardcoded). Fails closed without it.
+DB_APP_PASS="${DB_APP_PASS:-}"
+if [ -z "$DB_APP_PASS" ]; then
+    echo "  [ERROR] DB_APP_PASS no está definido. Exporta DB_APP_PASS antes de ejecutar este script."
+    exit 1
+fi
+
 # Check if DB already exists
 DB_EXISTS=$(sudo mysql -u root -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='fitpower'" 2>/dev/null)
 
@@ -93,35 +100,38 @@ if [ -z "$DB_EXISTS" ]; then
         echo "  Importing database dump..."
         sudo mysql -u root <<SQL
 CREATE DATABASE IF NOT EXISTS fitpower CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS 'fitpower'@'localhost' IDENTIFIED BY 'DB_APP_PASS_REDACTED';
+CREATE USER IF NOT EXISTS 'fitpower'@'localhost' IDENTIFIED BY '${DB_APP_PASS}';
 GRANT ALL PRIVILEGES ON fitpower.* TO 'fitpower'@'localhost';
 FLUSH PRIVILEGES;
 SQL
-        sudo mysql -u fitpower -pDB_APP_PASS_REDACTED fitpower < "$DEPLOY_DIR/fitpower_dump.sql"
+        sudo mysql -u fitpower -p"$DB_APP_PASS" fitpower < "$DEPLOY_DIR/fitpower_dump.sql"
         echo "  Database imported."
     else
         echo "  No database dump found. Creating empty database from schema..."
         sudo mysql -u root <<SQL
 CREATE DATABASE IF NOT EXISTS fitpower CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS 'fitpower'@'localhost' IDENTIFIED BY 'DB_APP_PASS_REDACTED';
+CREATE USER IF NOT EXISTS 'fitpower'@'localhost' IDENTIFIED BY '${DB_APP_PASS}';
 GRANT ALL PRIVILEGES ON fitpower.* TO 'fitpower'@'localhost';
 FLUSH PRIVILEGES;
 SQL
         # Run schema
         if [ -f "$DEPLOY_DIR/schema.sql" ]; then
-            sudo mysql -u fitpower -pDB_APP_PASS_REDACTED fitpower < "$DEPLOY_DIR/schema.sql"
-        fi
-        # Run migrations
-        if [ -d "$DEPLOY_DIR/migrations" ]; then
-            for f in $(ls "$DEPLOY_DIR/migrations/"*.sql 2>/dev/null | sort); do
-                echo "  Running migration: $(basename $f)"
-                sudo mysql -u fitpower -pDB_APP_PASS_REDACTED fitpower < "$f"
-            done
+            sudo mysql -u fitpower -p"$DB_APP_PASS" fitpower < "$DEPLOY_DIR/schema.sql"
         fi
         echo "  Database created."
     fi
 else
-    echo "  Database 'fitpower' already exists, skipping."
+    echo "  Database 'fitpower' already exists, skipping import."
+fi
+
+# --- Step 4b: Run migrations (idempotent) ---
+echo ""
+echo "[4b/7] Running database migrations..."
+if [ -d "/var/www/fitpower/api/database/migrations" ]; then
+    cd /var/www/fitpower/api
+    sudo -u www-data $PHP migrate.php || $PHP migrate.php
+else
+    echo "  No migrations directory found, skipping."
 fi
 
 # --- Step 5: Configure Apache ---
@@ -187,7 +197,7 @@ echo ""
 echo "  Open http://192.168.0.14 in your browser"
 echo ""
 echo "If you need to modify the DB:"
-echo "  mysql -u fitpower -pDB_APP_PASS_REDACTED fitpower"
+echo "  mysql -u fitpower -p\$DB_APP_PASS fitpower"
 echo ""
 echo "Logs:"
 echo "  sudo tail -f /var/log/apache2/fitpower-error.log"

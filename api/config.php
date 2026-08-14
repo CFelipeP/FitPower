@@ -15,8 +15,16 @@ define('DB_NAME', getenv('DB_NAME') ?: 'fitpower');
 define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASS', getenv('DB_PASS') ?: '');
 
-// IMPORTANT: Change JWT_SECRET to a random 32+ char string in production via .env
-define('JWT_SECRET', getenv('JWT_SECRET') ?: 'JWT_SECRET_REDACTED');
+// JWT_SECRET must be set via .env / environment. A known fallback value is a
+// critical security risk (token forgery), so the API fails closed without it.
+$_jwtSecret = getenv('JWT_SECRET') ?: '';
+if ($_jwtSecret === '' || $_jwtSecret === 'JWT_SECRET_REDACTED') {
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'message' => 'JWT_SECRET no configurado']);
+    exit;
+}
+define('JWT_SECRET', $_jwtSecret);
 define('JWT_EXPIRY', (int)(getenv('JWT_EXPIRY') ?: 86400 * 7));
 define('REFRESH_TOKEN_EXPIRY', (int)(getenv('REFRESH_TOKEN_EXPIRY') ?: 86400 * 30));
 
@@ -42,6 +50,16 @@ define('API_BASE', '/api');
 
 define('GOOGLE_CLIENT_ID', getenv('GOOGLE_CLIENT_ID') ?: '');
 define('GOOGLE_CLIENT_SECRET', getenv('GOOGLE_CLIENT_SECRET') ?: '');
+
+define('REQUIRE_EMAIL_VERIFICATION', filter_var(getenv('REQUIRE_EMAIL_VERIFICATION') ?: 'true', FILTER_VALIDATE_BOOLEAN));
+define('INTERNAL_API_SECRET', getenv('INTERNAL_API_SECRET') ?: '');
+
+function emailsConfigured(): bool {
+    $pass = getenv('SMTP_PASS') ?: SMTP_PASS;
+    if (SMTP_HOST === '' || SMTP_USER === '' || $pass === '') return false;
+    if (str_contains($pass, 'placeholder') || str_contains($pass, 'CHANGE_ME') || str_contains($pass, 'replace_in_production')) return false;
+    return true;
+}
 
 define('RATE_LIMIT_MAX', 60);
 define('RATE_LIMIT_WINDOW', 60);
@@ -114,6 +132,10 @@ function requireCsrf(): void {
     }
     // Webhooks come from external payment providers without CSRF tokens
     if (preg_match('#/webhook#', $uri)) {
+        return;
+    }
+    // Internal cron/system endpoints are protected by INTERNAL_API_SECRET
+    if (preg_match('#/system/#', $uri)) {
         return;
     }
     // Skip CSRF when a valid JWT is present — the bearer token can't be forged
