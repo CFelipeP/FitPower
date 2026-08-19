@@ -26,27 +26,36 @@ function listProgramReviews(string $programId): void {
 function createProgramReview(): void {
     $auth = requireAuth();
     $input = getJsonInput();
-    $rules = ['programId' => 'required', 'rating' => 'required|numeric|min:1|max:5'];
+    $rules = [
+        'programId' => 'required|numeric|min_value:1',
+        'rating' => 'required|numeric|min_value:1|max_value:5',
+        'comment' => 'string|max:5000',
+    ];
     $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
+    if ($errors) error('Validation error', 422, $errors);
+    $programId = (int)$input['programId'];
 
     $db = getDB();
+    $progCheck = $db->prepare("SELECT id FROM programs WHERE id = ?");
+    $progCheck->execute([$programId]);
+    if (!$progCheck->fetch()) error('Program not found', 404);
+
     $stmt = $db->prepare("SELECT id FROM program_reviews WHERE user_id = ? AND program_id = ?");
-    $stmt->execute([$auth['sub'], $input['programId']]);
+    $stmt->execute([$auth['sub'], $programId]);
     if ($stmt->fetch()) {
         $db->prepare("UPDATE program_reviews SET rating = ?, comment = ? WHERE user_id = ? AND program_id = ?")
-            ->execute([$input['rating'], $input['comment'] ?? null, $auth['sub'], $input['programId']]);
-        success(null, 'Review actualizada');
+            ->execute([$input['rating'], $input['comment'] ?? null, $auth['sub'], $programId]);
+        success(null, 'Review updated');
     } else {
         $db->prepare("INSERT INTO program_reviews (user_id, program_id, rating, comment) VALUES (?, ?, ?, ?)")
-            ->execute([$auth['sub'], $input['programId'], $input['rating'], $input['comment'] ?? null]);
+            ->execute([$auth['sub'], $programId, $input['rating'], $input['comment'] ?? null]);
 
         $pStmt = $db->prepare("SELECT AVG(rating) FROM program_reviews WHERE program_id = ?");
-        $pStmt->execute([$input['programId']]);
+        $pStmt->execute([$programId]);
         $avg = $pStmt->fetchColumn();
 
-        $db->prepare("UPDATE programs SET avg_rating = ? WHERE id = ?")->execute([round((float)$avg, 1), $input['programId']]);
+        $db->prepare("UPDATE programs SET avg_rating = ? WHERE id = ?")->execute([round((float)$avg, 1), $programId]);
 
-        success(null, 'Review creada', 201);
+        success(null, 'Review created', 201);
     }
 }

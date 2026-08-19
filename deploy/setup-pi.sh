@@ -30,6 +30,16 @@ else
     PHP=php8.1
 fi
 
+# Tune PHP for FitPower (uploads up to 50 MB: videos, progress photos, certs)
+PHP_INI=$(find /etc/php -name php.ini -path '*apache2*' 2>/dev/null | head -1)
+if [ -n "$PHP_INI" ]; then
+    sudo sed -i 's/^upload_max_filesize = .*/upload_max_filesize = 50M/' "$PHP_INI"
+    sudo sed -i 's/^post_max_size = .*/post_max_size = 55M/' "$PHP_INI"
+    sudo sed -i 's/^max_execution_time = .*/max_execution_time = 300/' "$PHP_INI"
+    sudo sed -i 's/^memory_limit = .*/memory_limit = 256M/' "$PHP_INI"
+    echo "  PHP upload limits tuned."
+fi
+
 # Check Apache
 if systemctl is-active --quiet apache2 2>/dev/null; then
     echo "  Apache: OK"
@@ -51,7 +61,7 @@ else
 fi
 
 # Enable required Apache modules
-sudo a2enmod rewrite headers alias
+sudo a2enmod rewrite headers alias proxy proxy_http proxy_wstunnel
 
 # --- Step 2: Create directories ---
 echo ""
@@ -79,6 +89,26 @@ sudo cp -r "$DEPLOY_DIR/api/"* /var/www/fitpower/api/
 # Copy .env
 if [ -f "$DEPLOY_DIR/.env" ]; then
     sudo cp "$DEPLOY_DIR/.env" /var/www/fitpower/api/.env
+    # Replace placeholder secrets with real random values on first deploy so
+    # the API does not fail closed or run with a forgeable JWT secret.
+    ENV_FILE=/var/www/fitpower/api/.env
+    if grep -q "JWT_SECRET=change_me" "$ENV_FILE" 2>/dev/null; then
+        NEW_SECRET=$(openssl rand -hex 32)
+        sudo sed -i "s|^JWT_SECRET=.*|JWT_SECRET=${NEW_SECRET}|" "$ENV_FILE"
+        echo "  Generated new JWT_SECRET for the API."
+    fi
+    if grep -q "DB_PASS=change_me" "$ENV_FILE" 2>/dev/null && [ -n "$DB_APP_PASS" ]; then
+        sudo sed -i "s|^DB_PASS=.*|DB_PASS=${DB_APP_PASS}|" "$ENV_FILE"
+        echo "  Set DB_PASS from DB_APP_PASS."
+    fi
+fi
+
+# Copy Node service files (chat, mediasoup, push, PM2 ecosystem)
+if [ -d "$DEPLOY_DIR/node" ]; then
+    echo ""
+    echo "[3b/7] Copying Node service files..."
+    sudo cp "$DEPLOY_DIR/node/"* /var/www/fitpower/ 2>/dev/null || true
+    echo "  Node service files copied."
 fi
 
 # --- Step 4: Set up Database ---
@@ -88,7 +118,7 @@ echo "[4/7] Setting up database..."
 # DB app password must come from env (never hardcoded). Fails closed without it.
 DB_APP_PASS="${DB_APP_PASS:-}"
 if [ -z "$DB_APP_PASS" ]; then
-    echo "  [ERROR] DB_APP_PASS no está definido. Exporta DB_APP_PASS antes de ejecutar este script."
+    echo "  [ERROR] DB_APP_PASS is not set. Export DB_APP_PASS before running this script."
     exit 1
 fi
 
@@ -134,6 +164,20 @@ else
     echo "  No migrations directory found, skipping."
 fi
 
+# --- Step 4c: Composer dependencies ---
+echo ""
+echo "[4c/7] Installing API dependencies (composer)..."
+if command -v composer &>/dev/null; then
+    cd /var/www/fitpower/api
+    if [ -f composer.json ]; then
+        sudo composer install --no-dev --optimize-autoloader 2>/dev/null || composer install --no-dev --optimize-autoloader
+        echo "  Composer dependencies installed."
+    fi
+else
+    echo "  Composer not found. Install with: curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer"
+    echo "  Then run: cd /var/www/fitpower/api && composer install --no-dev"
+fi
+
 # --- Step 5: Configure Apache ---
 echo ""
 echo "[5/7] Configuring Apache..."
@@ -166,6 +210,15 @@ sudo bash -c "cat > /etc/apache2/sites-available/fitpower.conf" <<'VHOST'
         Require all granted
     </Directory>
 
+    # WebSocket: chat + mediasoup signaling (frontend uses /ws/...)
+    ProxyPass /ws/chat ws://127.0.0.1:5180
+    ProxyPassReverse /ws/chat ws://127.0.0.1:5180
+    ProxyPass /ws/mediasoup ws://127.0.0.1:5181
+    ProxyPassReverse /ws/mediasoup ws://127.0.0.1:5181
+
+    # The PHP API is served directly by Apache; the Node services call the
+    # internal API through the PM2-managed PHP built-in server on 8088.
+
     ErrorLog ${APACHE_LOG_DIR}/fitpower-error.log
     CustomLog ${APACHE_LOG_DIR}/fitpower-access.log combined
 </VirtualHost>
@@ -174,6 +227,39 @@ VHOST
 sudo a2dissite 000-default 2>/dev/null || true
 sudo a2ensite fitpower
 sudo systemctl reload apache2
+
+# --- Step 5b: Node deps + PM2 services ---
+echo ""
+echo "[5b/7] Installing Node dependencies and starting services..."
+if [ -f /var/www/fitpower/package.json ]; then
+    cd /var/www/fitpower
+    sudo npm install --omit=dev --no-audit --no-fund 2>/dev/null || npm install --omit=dev --no-audit --no-fund
+    if command -v pm2 &>/dev/null; then
+        if [ -f /var/www/fitpower/ecosystem.config.cjs ]; then
+            pm2 start /var/www/fitpower/ecosystem.config.cjs 2>/dev/null || pm2 restart all
+            pm2 save
+            sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u "$PI_USER" --hp "/home/$PI_USER" 2>/dev/null || true
+            echo "  PM2 services started."
+        fi
+    else
+        echo "  PM2 not installed. Install with: sudo npm install -g pm2"
+    fi
+else
+    echo "  No package.json at /var/www/fitpower — Node services (chat/video) skipped."
+fi
+
+# --- Step 5c: Reminders cron ---
+echo ""
+echo "[5c/7] Installing reminders cron..."
+if [ -n "${INTERNAL_API_SECRET:-}" ]; then
+    sudo bash -c "cat > /etc/cron.d/fitpower-reminders" <<CRON
+# FitPower check-in & session reminders (every 30 minutes)
+*/30 * * * * root curl -s -m 30 -X POST http://127.0.0.1/api/system/reminders -H 'X-Internal-Secret: ${INTERNAL_API_SECRET}' -H 'Content-Type: application/json' >/dev/null 2>&1
+CRON
+    echo "  Reminders cron installed (every 30 min)."
+else
+    echo "  INTERNAL_API_SECRET not set — reminders cron skipped."
+fi
 
 # --- Step 6: Set permissions ---
 echo ""

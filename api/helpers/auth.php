@@ -42,12 +42,12 @@ function getUserById(int $id): ?array {
 function requireAuth(): array {
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
     if (!preg_match('/^Bearer\s+(.+)$/i', $authHeader, $matches)) {
-        error('Token de autenticación requerido', 401);
+        error('Authentication token required', 401);
     }
 
     $payload = verifyJWT($matches[1]);
     if (!$payload) {
-        error('Token inválido o expirado', 401);
+        error('Invalid or expired token', 401);
     }
 
     if (isset($payload['tv'])) {
@@ -56,7 +56,7 @@ function requireAuth(): array {
         $stmt->execute([$payload['sub']]);
         $user = $stmt->fetch();
         if (!$user || (int)$user['token_version'] !== (int)$payload['tv']) {
-            error('Sesión revocada. Inicia sesión de nuevo.', 401);
+            error('Session revoked. Please sign in again.', 401);
         }
     }
 
@@ -66,7 +66,7 @@ function requireAuth(): array {
 function requireRole(string ...$roles): array {
     $auth = requireAuth();
     if (!in_array($auth['role'] ?? '', $roles)) {
-        error('No tienes permisos para acceder a este recurso', 403);
+        error('You do not have permission to access this resource', 403);
     }
     return $auth;
 }

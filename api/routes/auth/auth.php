@@ -12,7 +12,7 @@ function registerUser(): void {
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
@@ -20,7 +20,7 @@ function registerUser(): void {
     $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
     $stmt->execute([$input['email']]);
     if ($stmt->fetch()) {
-        error('El email ya está registrado', 409);
+        error('Email already registered', 409);
     }
 
     $hashedPassword = password_hash($input['password'], PASSWORD_BCRYPT);
@@ -84,7 +84,7 @@ function registerUser(): void {
     }
 
     require_once __DIR__ . '/../../helpers/activity.php';
-    logActivity($userId, 'signup', 'Bienvenido a FitPower', 'UserPlus', '#10b981', 'New', 'bg-success');
+    logActivity($userId, 'signup', 'Welcome to FitPower', 'UserPlus', '#10b981', 'New', 'bg-success');
 
     success([
         'token' => $token,
@@ -97,7 +97,7 @@ function registerUser(): void {
             'email' => $input['email'],
             'role' => 'client',
         ],
-    ], 'Registro exitoso', 201);
+    ], 'Registration successful', 201);
 }
 
 function loginUser(): void {
@@ -110,7 +110,7 @@ function loginUser(): void {
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
@@ -123,19 +123,24 @@ function loginUser(): void {
     $stmt->execute([$input['email']]);
     $user = $stmt->fetch();
 
-    if (!$user || !password_verify($input['password'], $user['password'])) {
+    // Timing-safe rejection: suspended accounts must not reveal that the
+    // supplied password was correct. Verify against a dummy hash and return
+    // the same generic error as invalid credentials.
+    if (!$user || $user['status'] === 'suspended') {
+        password_verify($input['password'], '$2y$10$4FrJfiv9g9MkEFLjKr2Ryub6iQ05bT/DMxo/bfMKVmXhJt7l5aJ2.');
         recordLoginAttempt($identifier, $ip, false);
-        error('Credenciales inválidas', 401);
+        error('Invalid credentials', 401);
     }
 
-    if ($user['status'] === 'suspended') {
-        error('Cuenta suspendida', 403);
+    if (!password_verify($input['password'], $user['password'])) {
+        recordLoginAttempt($identifier, $ip, false);
+        error('Invalid credentials', 401);
     }
 
     // Enforce email verification only when SMTP is actually configured,
     // otherwise users could never receive the verification email and would be locked out.
     if (REQUIRE_EMAIL_VERIFICATION && emailsConfigured() && empty($user['email_verified_at'])) {
-        error('Debes verificar tu email antes de iniciar sesión', 403, ['code' => 'email_not_verified', 'email' => $user['email']]);
+        error('You must verify your email before logging in', 403, ['code' => 'email_not_verified', 'email' => $user['email']]);
     }
 
     recordLoginAttempt($identifier, $ip, true);
@@ -175,7 +180,7 @@ function loginUser(): void {
             'primaryGoal' => $user['primary_goal'],
             'photo' => $user['photo'],
         ],
-    ], 'Inicio de sesión exitoso');
+    ], 'Login successful');
 }
 
 function getCurrentUser(): void {
@@ -187,7 +192,7 @@ function getCurrentUser(): void {
     $user = $stmt->fetch();
 
     if (!$user) {
-        error('Usuario no encontrado', 404);
+        error('User not found', 404);
     }
 
     $userData = [
@@ -212,7 +217,7 @@ function forgotPassword(): void {
 
     $errors = validate($input, ['email' => 'required|email']);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
@@ -221,7 +226,7 @@ function forgotPassword(): void {
     $stmt->execute([$input['email']]);
     if (!$stmt->fetch()) {
         // Generic response to avoid user enumeration
-        success(null, 'Si el email existe, recibirás un código de recuperación');
+        success(null, 'If the email exists, you will receive a recovery code');
         return;
     }
 
@@ -247,7 +252,7 @@ function forgotPassword(): void {
     }
 
     // Generic response; never return the token in the API response.
-    success(null, 'Si el email existe, recibirás un código de recuperación');
+    success(null, 'If the email exists, you will receive a recovery code');
 }
 
 function resetPassword(): void {
@@ -260,14 +265,14 @@ function resetPassword(): void {
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
 
     $token = trim($input['token']);
     if (strlen($token) > 200) {
-        error('Token inválido o expirado', 400);
+        error('Invalid or expired token', 400);
     }
     $tokenHash = hash('sha256', $token);
 
@@ -277,7 +282,7 @@ function resetPassword(): void {
     $reset = $stmt->fetch();
 
     if (!$reset) {
-        error('Token inválido o expirado', 400);
+        error('Invalid or expired token', 400);
     }
 
     $hashedPassword = password_hash($input['password'], PASSWORD_BCRYPT);
@@ -299,14 +304,14 @@ function resetPassword(): void {
         } catch (\PDOException $e) {}
     }
 
-    success(null, 'Contraseña actualizada exitosamente');
+    success(null, 'Password updated successfully');
 }
 
 function googleLogin(): void {
     $input = getJsonInput();
     $rules = ['credential' => 'required|string'];
     $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
+    if ($errors) error('Validation error', 422, $errors);
 
     $ch = curl_init('https://oauth2.googleapis.com/tokeninfo?id_token=' . urlencode($input['credential']));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -315,13 +320,13 @@ function googleLogin(): void {
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if ($httpCode !== 200 || !$response) error('Token de Google inválido', 401);
+    if ($httpCode !== 200 || !$response) error('Invalid Google token', 401);
 
     $google = json_decode($response, true);
-    if (!$google || !isset($google['email'])) error('No se pudo verificar el token', 401);
+    if (!$google || !isset($google['email'])) error('Could not verify the token', 401);
 
     $clientId = GOOGLE_CLIENT_ID;
-    if ($clientId && ($google['aud'] ?? '') !== $clientId) error('Token no emitido para esta aplicación', 401);
+    if ($clientId && ($google['aud'] ?? '') !== $clientId) error('Token not issued for this application', 401);
 
     $email = $google['email'];
     $firstName = $google['given_name'] ?? explode('@', $email)[0];
@@ -334,7 +339,7 @@ function googleLogin(): void {
     $user = $stmt->fetch();
 
     if ($user) {
-        if ($user['status'] === 'suspended') error('Cuenta suspendida', 403);
+        if ($user['status'] === 'suspended') error('Account suspended', 403);
         $role = $user['role'] ?? 'client';
         $token = generateJWT(['sub' => (int)$user['id'], 'role' => $role, 'tv' => (int)($user['token_version'] ?? 0)]);
         $refreshToken = generateRefreshToken((int)$user['id']);
@@ -342,7 +347,7 @@ function googleLogin(): void {
             'token' => $token, 'refresh_token' => $refreshToken, 'csrf_token' => generateCsrfToken(),
             'needsPasswordSetup' => empty($user['password']),
             'user' => ['id' => (int)$user['id'], 'firstName' => $user['first_name'], 'lastName' => $user['last_name'], 'email' => $user['email'], 'role' => $role, 'photo' => $google['picture'] ?? $user['photo']],
-        ], 'Inicio de sesión exitoso');
+        ], 'Login successful');
         return;
     }
 
@@ -354,13 +359,13 @@ function googleLogin(): void {
     $refreshToken = generateRefreshToken($userId);
 
     require_once __DIR__ . '/../../helpers/activity.php';
-    logActivity($userId, 'signup', 'Bienvenido a FitPower (Google)', 'UserPlus', '#10b981', 'New', 'bg-success');
+    logActivity($userId, 'signup', 'Welcome to FitPower (Google)', 'UserPlus', '#10b981', 'New', 'bg-success');
 
     success([
         'token' => $token, 'refresh_token' => $refreshToken, 'csrf_token' => generateCsrfToken(),
         'needsPasswordSetup' => true,
         'user' => ['id' => $userId, 'firstName' => $firstName, 'lastName' => $lastName, 'email' => $email, 'role' => 'client', 'photo' => $google['picture'] ?? null],
-    ], 'Registro exitoso', 201);
+    ], 'Registration successful', 201);
 }
 
 function setPassword(): void {
@@ -368,17 +373,20 @@ function setPassword(): void {
     $input = getJsonInput();
     $rules = ['password' => 'required|string|min:8|max:255'];
     $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
+    if ($errors) error('Validation error', 422, $errors);
     $db = getDB();
     $hashed = password_hash($input['password'], PASSWORD_BCRYPT);
     $db->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$hashed, $auth['sub']]);
-    success(null, 'Contraseña establecida exitosamente');
+    success(null, 'Password set successfully');
 }
 
 function googleRedirect(): void {
-    if (session_status() === PHP_SESSION_NONE) session_start();
+    if (session_status() === PHP_SESSION_NONE) {
+        ensureSessionHardened();
+        session_start();
+    }
     $clientId = GOOGLE_CLIENT_ID;
-    if (!$clientId) error('Google Client ID no configurado', 500);
+    if (!$clientId) error('Google Client ID not configured', 500);
 
     $state = bin2hex(random_bytes(16));
     $_SESSION['google_oauth_state'] = $state;
@@ -396,18 +404,21 @@ function googleRedirect(): void {
 }
 
 function googleCallback(): void {
-    if (session_status() === PHP_SESSION_NONE) session_start();
+    if (session_status() === PHP_SESSION_NONE) {
+        ensureSessionHardened();
+        session_start();
+    }
     $input = getJsonInput();
     $code = $input['code'] ?? '';
     $state = $input['state'] ?? '';
 
-    if (!$code) error('Código de autorización requerido', 400);
-    if (!$state || $state !== ($_SESSION['google_oauth_state'] ?? '')) error('Estado inválido', 400);
+    if (!$code) error('Authorization code required', 400);
+    if (!$state || $state !== ($_SESSION['google_oauth_state'] ?? '')) error('Invalid state', 400);
     unset($_SESSION['google_oauth_state']);
 
     $clientId = GOOGLE_CLIENT_ID;
     $clientSecret = GOOGLE_CLIENT_SECRET;
-    if (!$clientId) error('Google Client ID no configurado', 500);
+    if (!$clientId) error('Google Client ID not configured', 500);
 
     $ch = curl_init('https://oauth2.googleapis.com/token');
     curl_setopt($ch, CURLOPT_POST, 1);
@@ -421,10 +432,10 @@ function googleCallback(): void {
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if ($httpCode !== 200) error('Error al intercambiar código con Google', 401);
+    if ($httpCode !== 200) error('Error exchanging code with Google', 401);
     $tokenData = json_decode($tokenResponse, true);
     $accessToken = $tokenData['access_token'] ?? '';
-    if (!$accessToken) error('No se pudo obtener token de acceso', 401);
+    if (!$accessToken) error('Could not get access token', 401);
 
     $ch = curl_init('https://www.googleapis.com/oauth2/v3/userinfo');
     curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $accessToken]);
@@ -434,9 +445,9 @@ function googleCallback(): void {
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if ($httpCode !== 200) error('No se pudo obtener información del usuario', 401);
+    if ($httpCode !== 200) error('Could not get user information', 401);
     $googleUser = json_decode($userResponse, true);
-    if (!$googleUser || !isset($googleUser['email'])) error('No se pudo obtener email del usuario', 401);
+    if (!$googleUser || !isset($googleUser['email'])) error('Could not get user email', 401);
 
     $email = $googleUser['email'];
     $firstName = $googleUser['given_name'] ?? explode('@', $email)[0];
@@ -449,7 +460,7 @@ function googleCallback(): void {
     $user = $stmt->fetch();
 
     if ($user) {
-        if ($user['status'] === 'suspended') error('Cuenta suspendida', 403);
+        if ($user['status'] === 'suspended') error('Account suspended', 403);
         $userId = (int)$user['id'];
         $role = $user['role'] ?? 'client';
         $firstName = $user['first_name'];
@@ -475,7 +486,10 @@ function googleCallback(): void {
 }
 
 function googleCallbackGet(): void {
-    if (session_status() === PHP_SESSION_NONE) session_start();
+    if (session_status() === PHP_SESSION_NONE) {
+        ensureSessionHardened();
+        session_start();
+    }
     $code = $_GET['code'] ?? '';
     $state = $_GET['state'] ?? '';
     $error = $_GET['error'] ?? '';
@@ -545,7 +559,10 @@ function googleCallbackGet(): void {
         $needsPassword = true;
     }
 
-    $frontendUrl = $loginUrl . '?token=' . urlencode($jwt) . '&refresh_token=' . urlencode($refreshToken);
+    // Tokens go in the URL fragment so they never hit server logs, browser
+    // history entries or Referer headers. The SPA reads them via
+    // window.location.hash and immediately navigates to a clean URL.
+    $frontendUrl = $loginUrl . '#token=' . urlencode($jwt) . '&refresh_token=' . urlencode($refreshToken);
     if ($needsPassword) {
         $frontendUrl .= '&setup_password=1';
     }
@@ -559,11 +576,11 @@ function saveFcmToken(): void {
     $input = getJsonInput();
     $rules = ['fcm_token' => 'required|string|min:10'];
     $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
+    if ($errors) error('Validation error', 422, $errors);
     $db = getDB();
     $db->prepare("UPDATE users SET fcm_token = ? WHERE id = ?")
         ->execute([$input['fcm_token'], $auth['sub']]);
-    success(null, 'FCM token guardado');
+    success(null, 'FCM token saved');
 }
 
 function revokeAllSessions(): void {
@@ -580,12 +597,25 @@ function getSessionsByEmail(): void {
     $errors = validate($input, ['email' => 'required|email']);
     if ($errors) error('Validation error', 422, $errors);
 
+    // Strict per-endpoint rate limit: this endpoint is a user-enumeration
+    // vector, so unauthenticated probing is throttled hard.
+    rateLimit(5);
+
+    // Enumeration protection: only reveal sessions to the authenticated
+    // owner of the email. Unauthenticated or foreign callers always get the
+    // same generic (empty) response.
+    $auth = tryAuth();
+    if (!$auth) {
+        success(['sessions' => [], 'role' => null]);
+        return;
+    }
+
     $db = getDB();
-    $stmt = $db->prepare("SELECT id, role FROM users WHERE email = ?");
+    $stmt = $db->prepare("SELECT id, role, email FROM users WHERE email = ?");
     $stmt->execute([$input['email']]);
     $user = $stmt->fetch();
 
-    if (!$user) {
+    if (!$user || (int)$user['id'] !== (int)$auth['sub']) {
         success(['sessions' => [], 'role' => null]);
         return;
     }

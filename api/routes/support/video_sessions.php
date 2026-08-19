@@ -42,17 +42,19 @@ function createVideoSession(): void {
     }
     $input = getJsonInput();
 
-    if (empty($input['calleeId'])) {
-        error('calleeId is required', 422);
-    }
+    $errors = validate($input, [
+        'calleeId' => 'required|numeric|min_value:1',
+        'title' => 'string|min:1|max:255',
+    ]);
+    if ($errors) error('Validation error', 422, $errors);
+
+    $calleeId = (int)$input['calleeId'];
+    if ($calleeId === (int)$auth['sub']) error('You cannot start a session with yourself', 422);
 
     $db = getDB();
-
     $userStmt = $db->prepare("SELECT id FROM users WHERE id = ?");
-    $userStmt->execute([$input['calleeId']]);
-    if (!$userStmt->fetch()) {
-        error('User not found', 404);
-    }
+    $userStmt->execute([$calleeId]);
+    if (!$userStmt->fetch()) error('User not found', 404);
 
     $stmt = $db->prepare("
         INSERT INTO video_sessions (caller_id, callee_id, title, status)
@@ -60,8 +62,8 @@ function createVideoSession(): void {
     ");
     $stmt->execute([
         $auth['sub'],
-        $input['calleeId'],
-        $input['title'] ?? 'Video Session',
+        $calleeId,
+        isset($input['title']) ? trim($input['title']) : 'Video Session',
     ]);
 
     $sessionId = (int)$db->lastInsertId();

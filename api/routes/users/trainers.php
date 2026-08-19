@@ -86,7 +86,7 @@ function getTrainer(string $id): void {
     $trainer = $stmt->fetch();
 
     if (!$trainer) {
-        error('Entrenador no encontrado', 404);
+        error('Trainer not found', 404);
     }
 
     $specStmt = $db->prepare("
@@ -178,13 +178,25 @@ function createTrainer(): void {
         'firstName' => 'required|string|min:1|max:100',
         'lastName' => 'required|string|min:1|max:100',
         'email' => 'required|email',
-        'phone' => 'required|string|min:6',
+        'phone' => 'required|string|min:6|max:50',
         'password' => 'required|string|min:8|max:255',
+        'photo' => 'string|max:500',
+        'certFile' => 'string|max:500',
     ];
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
+    }
+
+    // Uploaded file paths must point into the app's own upload directories.
+    foreach (['photo', 'certFile'] as $uploadField) {
+        if (!empty($input[$uploadField])) {
+            $path = (string)$input[$uploadField];
+            if (!str_starts_with($path, 'uploads/') || str_contains($path, '..')) {
+                error('Invalid file path', 422);
+            }
+        }
     }
 
     $db = getDB();
@@ -195,7 +207,7 @@ function createTrainer(): void {
     $stmt = $db->prepare("SELECT id, role FROM users WHERE email = ?");
     $stmt->execute([$input['email']]);
     if ($stmt->fetch()) {
-        error('Ya existe una cuenta con este correo. Si ya tienes cuenta, inicia sesión para gestionar tu perfil.', 409);
+        error('An account with this email already exists. If you already have an account, log in to manage your profile.', 409);
     }
 
     // A trainer row with the same email and no linked user may exist from a
@@ -231,7 +243,7 @@ function createTrainer(): void {
                     country = ?, city = ?, timezone = ?, modality = ?,
                     emergency_name = ?, emergency_phone = ?, emergency_relation = ?,
                     terms_accepted = ?, privacy_accepted = ?, marketing_optin = ?,
-                    status = 'pending'
+                    photo = ?, status = 'pending'
                 WHERE id = ?
             ")->execute([
                 $userId, $input['firstName'], $input['lastName'],
@@ -242,6 +254,7 @@ function createTrainer(): void {
                 $input['modality'] ?? null,
                 $input['emergName'] ?? null, $input['emergPhone'] ?? null, $input['emergRelation'] ?? null,
                 (int)($input['agreeTerms'] ?? false), (int)($input['agreePrivacy'] ?? false), (int)($input['agreeMarketing'] ?? false),
+                $input['photo'] ?? null,
                 $trainerId,
             ]);
         } else {
@@ -252,8 +265,8 @@ function createTrainer(): void {
                     country, city, timezone, modality, user_id,
                     emergency_name, emergency_phone, emergency_relation,
                     terms_accepted, privacy_accepted, marketing_optin,
-                    status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    photo, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ")->execute([
                 $input['firstName'], $input['lastName'], $input['email'],
                 $input['phone'] ?? null, $input['dateOfBirth'] ?? null, $input['gender'] ?? null,
@@ -263,6 +276,7 @@ function createTrainer(): void {
                 $input['modality'] ?? null, $userId,
                 $input['emergName'] ?? null, $input['emergPhone'] ?? null, $input['emergRelation'] ?? null,
                 (int)($input['agreeTerms'] ?? false), (int)($input['agreePrivacy'] ?? false), (int)($input['agreeMarketing'] ?? false),
+                $input['photo'] ?? null,
                 'pending',
             ]);
             $trainerId = (int)$db->lastInsertId();
@@ -307,7 +321,7 @@ function createTrainer(): void {
         $db->commit();
     } catch (\Exception $e) {
         $db->rollBack();
-        error('Error al crear entrenador: ' . $e->getMessage(), 500);
+        error('Error creating trainer: ' . $e->getMessage(), 500);
     }
 
     success([
@@ -317,7 +331,7 @@ function createTrainer(): void {
         'lastName' => $input['lastName'],
         'email' => $input['email'],
         'status' => 'pending',
-    ], 'Solicitud de entrenador recibida. Tu perfil será revisado por un administrador.', 201);
+    ], 'Trainer application received. Your profile will be reviewed by an administrator.', 201);
 }
 
 function updateTrainer(string $id): void {
@@ -328,7 +342,7 @@ function updateTrainer(string $id): void {
     $stmt->execute([$id]);
     $trainer = $stmt->fetch();
     if (!$trainer) {
-        error('Entrenador no encontrado', 404);
+        error('Trainer not found', 404);
     }
 
     $isAdmin = $auth['role'] === 'admin';
@@ -337,7 +351,7 @@ function updateTrainer(string $id): void {
         $ownerStmt->execute([$id]);
         $ownerId = (int)$ownerStmt->fetchColumn();
         if ($ownerId !== $auth['sub']) {
-            error('No tienes permisos para modificar este entrenador', 403);
+            error('You do not have permission to modify this trainer', 403);
         }
     }
 
@@ -401,7 +415,7 @@ function updateTrainer(string $id): void {
         }
     }
 
-    success(null, 'Entrenador actualizado');
+    success(null, 'Trainer updated');
 }
 
 function deleteTrainer(string $id): void {
@@ -411,9 +425,9 @@ function deleteTrainer(string $id): void {
     $stmt = $db->prepare("SELECT id FROM trainers WHERE id = ?");
     $stmt->execute([$id]);
     if (!$stmt->fetch()) {
-        error('Entrenador no encontrado', 404);
+        error('Trainer not found', 404);
     }
 
     $db->prepare("DELETE FROM trainers WHERE id = ?")->execute([$id]);
-    success(null, 'Entrenador eliminado');
+    success(null, 'Trainer deleted');
 }

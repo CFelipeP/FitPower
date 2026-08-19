@@ -1,8 +1,8 @@
 #!/bin/bash
 # ============================================
-# FITPOWER - SETUP COMPLETO
+# FITPOWER - FULL SETUP
 # coturn + ngrok + mediasoup + chat + PHP + DB
-# SIN COSTO, SIN INSTALAR NADA EL USUARIO
+# FREE, NO USER INSTALLS REQUIRED
 # ============================================
 set -e
 
@@ -10,12 +10,12 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_DIR"
 
 echo "========================================"
-echo "  FITPOWER DEPLOY - Setup Completo"
+echo "  FITPOWER DEPLOY - Full Setup"
 echo "========================================"
 echo ""
 
 # ---------- 1. COTURN ----------
-echo "[1/8] Instalando coturn..."
+echo "[1/8] Installing coturn..."
 sudo apt update
 sudo apt install -y coturn jq
 
@@ -42,22 +42,22 @@ TURNEOF
 sudo sed -i 's/#TURNSERVER_ENABLED=1/TURNSERVER_ENABLED=1/' /etc/default/coturn
 sudo systemctl restart coturn
 sudo systemctl enable coturn
-echo "  coturn listo (puerto 3478 TCP)"
+echo "  coturn ready (TCP port 3478)"
 
 # ---------- 2. DEPENDENCIAS ----------
-echo "[2/8] Verificando Node.js..."
+echo "[2/8] Checking Node.js..."
 if ! command -v node &> /dev/null; then
     curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
     sudo apt install -y nodejs
 fi
 
-echo "[3/8] Verificando PHP..."
+echo "[3/8] Checking PHP..."
 if ! command -v php &> /dev/null; then
     sudo apt install -y php php-mysql php-curl php-mbstring php-xml
 fi
 
 # ---------- 3. NGROK ----------
-echo "[4/8] Instalando ngrok..."
+echo "[4/8] Installing ngrok..."
 if ! command -v ngrok &> /dev/null; then
     curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc > /dev/null
     echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list > /dev/null
@@ -65,40 +65,40 @@ if ! command -v ngrok &> /dev/null; then
 fi
 
 # ---------- 4. BASE DE DATOS ----------
-echo "[5/8] Configurando base de datos..."
+echo "[5/8] Setting up database..."
 DB_USER="${DB_USER:-root}"
 DB_PASS="${DB_PASS:-}"
 if command -v mysql &> /dev/null; then
-    echo "  Creando base de datos fitpower (si no existe)..."
+    echo "  Creating fitpower database (if not exists)..."
     if [ -n "$DB_PASS" ]; then
         mysql -u "$DB_USER" -p"$DB_PASS" -e "CREATE DATABASE IF NOT EXISTS fitpower CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null || \
         mysql -u "$DB_USER" -p"$DB_PASS" -h localhost -e "CREATE DATABASE IF NOT EXISTS fitpower CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null || \
-        echo "  [AVISO] No pude conectar a MySQL. Crea la DB manualmente: 'CREATE DATABASE fitpower;'"
-        echo "  Ejecutando schema.sql..."
-        mysql -u "$DB_USER" -p"$DB_PASS" fitpower < database/schema.sql 2>/dev/null || echo "  [AVISO] schema.sql ya aplicado o error menor"
+        echo "  [WARNING] Could not connect to MySQL. Create the DB manually: 'CREATE DATABASE fitpower;'"
+        echo "  Running schema.sql..."
+        mysql -u "$DB_USER" -p"$DB_PASS" fitpower < database/schema.sql 2>/dev/null || echo "  [WARNING] schema.sql already applied or minor error"
     else
-        echo "  [AVISO] DB_PASS vacío. Crea la DB manualmente y exporta DB_PASS."
+        echo "  [WARNING] DB_PASS is empty. Create the DB manually and export DB_PASS."
     fi
-    echo "  Ejecutando migraciones..."
-    php migrate.php 2>/dev/null || echo "  [AVISO] Migraciones ya aplicadas"
+    echo "  Running migrations..."
+    php migrate.php 2>/dev/null || echo "  [WARNING] Migrations already applied"
 else
-    echo "  [AVISO] MySQL no instalado. Instálalo: sudo apt install mysql-server"
+    echo "  [WARNING] MySQL not installed. Install it: sudo apt install mysql-server"
 fi
 
 # ---------- 5. PROYECTO ----------
-echo "[6/8] Instalando dependencias del proyecto..."
+echo "[6/8] Installing project dependencies..."
 npm install
 sudo npm install -g pm2
 
-# ---------- 6. CONFIGURAR PM2 ----------
-echo "[7/8] Configurando servicios..."
+# ---------- 6. CONFIGURE PM2 ----------
+echo "[7/8] Configuring services..."
 
 cat > start.sh <<STARTEOF
 #!/bin/bash
 PROJECT_DIR="\$(cd "\$(dirname "\$0")" && pwd)"
 cd "\$PROJECT_DIR"
 
-echo "[FitPower] Iniciando servicios..."
+echo "[FitPower] Starting services..."
 
 export TURN_USERNAME="fitpower"
 export TURN_CREDENTIAL="$TURN_SECRET"
@@ -113,7 +113,7 @@ pm2 start proxy-server.js --name fitpower-proxy 2>/dev/null || pm2 restart fitpo
 pm2 start "ngrok start --all --config ngrok.yml" --name fitpower-ngrok 2>/dev/null || pm2 restart fitpower-ngrok
 
 # 4. Esperar ngrok
-echo "[FitPower] Esperando ngrok..."
+echo "[FitPower] Waiting for ngrok..."
 sleep 5
 for i in \$(seq 1 30); do
   if curl -s http://127.0.0.1:4040/api/tunnels > /dev/null 2>&1; then break; fi
@@ -133,36 +133,36 @@ pm2 save
 
 echo ""
 echo "========================================"
-echo "  FITPOWER LISTO!"
+echo "  FITPOWER READY!"
 echo "  Web: \$WEB_URL"
 echo "  TURN: \$TURN_URL"
 echo "========================================"
 echo ""
-echo "  Los usuarios abren: \$WEB_URL"
-echo "  No necesitan instalar nada."
+echo "  Users open: \$WEB_URL"
+echo "  They do not need to install anything."
 echo ""
 STARTEOF
 
 chmod +x start.sh
 
 # ---------- 7. RESUMEN ----------
-echo "[8/8] Setup completado."
+echo "[8/8] Setup complete."
 echo ""
 echo "========================================"
-echo "  PASOS FINALES"
+echo "  FINAL STEPS"
 echo "========================================"
 echo ""
-echo "  1. Edita ngrok.yml con tu authtoken:"
+echo "  1. Edit ngrok.yml with your authtoken:"
 echo "     nano ngrok.yml"
-echo "     (Sácalo gratis en https://dashboard.ngrok.com)"
+echo "     (Get it free at https://dashboard.ngrok.com)"
 echo ""
-echo "  2. Ejecuta:"
+echo "  2. Run:"
 echo "     bash start.sh"
 echo ""
-echo "  3. Comparte la URL Web que aparece"
-echo "     Los usuarios solo abren ese link"
+echo "  3. Share the Web URL that appears"
+echo "     Users only need to open that link"
 echo ""
-echo "  4. Para que arranque solo al reiniciar:"
+echo "  4. To start automatically on reboot:"
 echo "     pm2 startup"
 echo "     pm2 save"
 echo ""

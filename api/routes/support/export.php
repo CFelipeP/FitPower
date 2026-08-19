@@ -10,7 +10,7 @@ function exportProgram(string $id): void {
     ");
     $stmt->execute([$id]);
     $program = $stmt->fetch();
-    if (!$program) error('Programa no encontrado', 404);
+    if (!$program) error('Program not found', 404);
 
     $sessionStmt = $db->prepare("SELECT * FROM sessions WHERE program_id = ? ORDER BY date, start_time");
     $sessionStmt->execute([$id]);

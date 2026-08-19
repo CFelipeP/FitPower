@@ -33,7 +33,7 @@ set_exception_handler(function (Throwable $e) {
     header('Content-Type: application/json');
     echo json_encode([
         'success' => false,
-        'message' => 'Error interno del servidor',
+        'message' => 'Internal server error',
     ]);
     exit;
 });
@@ -95,7 +95,7 @@ function route(string $path, array $handlers): void {
         if ($handler) {
             $handler($params);
         } else {
-            error('Handler no definido', 500);
+            error('Handler not defined', 500);
         }
         exit;
     }
@@ -122,11 +122,11 @@ route('/auth/refresh', ['method' => 'POST', 'handler' => function() {
     $input = getJsonInput();
     $refreshToken = $input['refresh_token'] ?? '';
     if (!$refreshToken) {
-        error('Refresh token requerido', 400);
+        error('Refresh token required', 400);
     }
     $result = refreshAccessToken($refreshToken);
     if (!$result) {
-        error('Refresh token inválido o expirado', 401);
+        error('Invalid or expired refresh token', 401);
     }
     success($result);
 }]);
@@ -168,6 +168,25 @@ route('/auth/account', ['method' => 'DELETE', 'handler' => function() {
 
 route('/csrf-token', ['method' => 'GET', 'handler' => function() {
     success(['csrf_token' => generateCsrfToken()]);
+}]);
+
+// --- Health check (used by deploy/release/health scripts) ---
+route('/health', ['method' => 'GET', 'handler' => function() {
+    header('Cache-Control: no-store');
+    $dbOk = false;
+    try {
+        $db = getDB();
+        $db->query('SELECT 1');
+        $dbOk = true;
+    } catch (\Throwable $e) {
+        $dbOk = false;
+    }
+    success([
+        'status' => $dbOk ? 'ok' : 'degraded',
+        'database' => $dbOk ? 'ok' : 'error',
+        'php' => PHP_VERSION,
+        'time' => date('c'),
+    ]);
 }]);
 
 // --- User Routes ---
@@ -302,6 +321,11 @@ route('/enrollments', ['method' => 'POST', 'handler' => function() {
     enrollUser();
 }]);
 
+route('/enrollments', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/content/programs.php';
+    listUserEnrollments();
+}]);
+
 route('/enrollments/{id}', ['method' => 'DELETE', 'handler' => function($p) {
     require __DIR__ . '/routes/content/programs.php';
     unenrollUser($p['id']);
@@ -370,6 +394,11 @@ route('/sessions/{id}/exercises/{exerciseId}', ['method' => 'DELETE', 'handler' 
     deleteSessionExercise($p['id'], $p['exerciseId']);
 }]);
 
+route('/sessions/{id}/progress', ['method' => 'PUT', 'handler' => function($p) {
+    require __DIR__ . '/routes/support/sessions.php';
+    saveSessionProgress($p['id']);
+}]);
+
 // --- Nutrition Routes ---
 route('/nutrition', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/health/nutrition.php';
@@ -429,6 +458,11 @@ route('/tickets/{id}', ['method' => 'PUT', 'handler' => function($p) {
     updateTicket($p['id']);
 }]);
 
+route('/tickets/{id}/reply', ['method' => 'POST', 'handler' => function($p) {
+    require __DIR__ . '/routes/support/tickets.php';
+    replyToTicket($p['id']);
+}]);
+
 // --- Subscription Routes ---
 route('/plans', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/finance/subscriptions.php';
@@ -450,6 +484,26 @@ route('/subscriptions/cancel', ['method' => 'POST', 'handler' => function() {
     cancelUserSubscription();
 }]);
 
+route('/subscriptions/reactivate', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/finance/subscriptions.php';
+    reactivateUserSubscription();
+}]);
+
+route('/subscriptions/invoices', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/finance/subscriptions.php';
+    listUserInvoices();
+}]);
+
+route('/admin/payments', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/finance/payments.php';
+    adminListPayments();
+}]);
+
+route('/admin/payments/{id}/refund', ['method' => 'POST', 'handler' => function($p) {
+    require __DIR__ . '/routes/finance/paypal.php';
+    adminRefundPayment($p['id']);
+}]);
+
 route('/subscriptions/{id}/invoice', ['method' => 'GET', 'handler' => function($p) {
     require __DIR__ . '/routes/finance/subscriptions.php';
     getSubscriptionInvoice($p['id']);
@@ -469,6 +523,16 @@ route('/stripe/webhook', ['method' => 'POST', 'handler' => function() {
 route('/stripe/config', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/finance/stripe.php';
     getStripePublishableKey();
+}]);
+
+route('/stripe/portal', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/finance/stripe.php';
+    createBillingPortal();
+}]);
+
+route('/entitlements', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/helpers/entitlements.php';
+    getEntitlementsEndpoint();
 }]);
 
 route('/stripe/cancel-subscription', ['method' => 'POST', 'handler' => function() {
@@ -513,6 +577,11 @@ route('/conversations', ['method' => 'POST', 'handler' => function() {
     startConversation();
 }]);
 
+route('/conversations/{id}/read', ['method' => 'PUT', 'handler' => function($p) {
+    require __DIR__ . '/routes/chat/chat.php';
+    markConversationRead($p['id']);
+}]);
+
 route('/messages/{id}', ['method' => 'GET', 'handler' => function($p) {
     require __DIR__ . '/routes/chat/chat.php';
     getMessages($p);
@@ -543,6 +612,11 @@ route('/video-sessions/{id}', ['method' => 'PUT', 'handler' => function($p) {
 route('/exercises', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/content/exercises.php';
     listExercises();
+}]);
+
+route('/exercises/{id}', ['method' => 'GET', 'handler' => function($p) {
+    require __DIR__ . '/routes/content/exercises.php';
+    getExercise($p['id']);
 }]);
 
 route('/exercises', ['method' => 'POST', 'handler' => function() {
@@ -619,18 +693,18 @@ route('/upload/profile-photo', ['method' => 'POST', 'handler' => function() {
     $userId = $auth['sub'];
 
     if (empty($_FILES['photo'])) {
-        error('No se envió ninguna imagen', 422);
+        error('No image was provided', 422);
     }
 
     $file = $_FILES['photo'];
     if ($file['error'] !== UPLOAD_ERR_OK) {
-        error('Error al subir la imagen', 500);
+        error('Error uploading the image', 500);
     }
 
     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     $allowed = ['jpg', 'jpeg', 'png'];
     if (!in_array($ext, $allowed, true)) {
-        error('Formato no permitido. Use jpg, jpeg o png', 422);
+        error('Format not allowed. Use jpg, jpeg or png', 422);
     }
 
     $dir = UPLOAD_DIR . '/profiles';
@@ -642,7 +716,7 @@ route('/upload/profile-photo', ['method' => 'POST', 'handler' => function() {
     $dest = $dir . '/' . $filename;
 
     if (!move_uploaded_file($file['tmp_name'], $dest)) {
-        error('Error al guardar la imagen', 500);
+        error('Error saving the image', 500);
     }
 
     $photoUrl = 'uploads/profiles/' . $filename;
@@ -655,7 +729,84 @@ route('/upload/profile-photo', ['method' => 'POST', 'handler' => function() {
     success([
         'photo' => $photoUrl,
         'photoUrl' => $baseUrl . '/' . $photoUrl,
-    ], 'Foto actualizada');
+    ], 'Photo updated');
+}]);
+
+// --- Trainer application photo upload (public, pre-account creation) ---
+route('/upload/application-photo', ['method' => 'POST', 'handler' => function() {
+    rateLimit(10);
+    if (empty($_FILES['photo'])) {
+        error('No image was provided', 422);
+    }
+    $file = $_FILES['photo'];
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        error('Error uploading the image', 500);
+    }
+    if ($file['size'] > 5 * 1024 * 1024) {
+        error('The image must not exceed 5 MB', 422);
+    }
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    $allowed = ['jpg', 'jpeg', 'png'];
+    if (!in_array($ext, $allowed, true)) {
+        error('Format not allowed. Use jpg, jpeg or png', 422);
+    }
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = $finfo->file($file['tmp_name']);
+    if (!in_array($mime, ['image/jpeg', 'image/png'], true)) {
+        error('The file is not a valid image', 422);
+    }
+    $dir = UPLOAD_DIR . '/trainer_photos';
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+    $filename = 'app_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+    if (!move_uploaded_file($file['tmp_name'], $dir . '/' . $filename)) {
+        error('Error saving the image', 500);
+    }
+    $baseUrl = rtrim(APP_URL, '/');
+    success([
+        'photo' => 'uploads/trainer_photos/' . $filename,
+        'photoUrl' => $baseUrl . '/api/uploads/trainer_photos/' . $filename,
+    ], 'Photo uploaded');
+}]);
+
+// --- Trainer application certification upload (public, pre-account creation) ---
+route('/upload/application-cert', ['method' => 'POST', 'handler' => function() {
+    rateLimit(10);
+    if (empty($_FILES['cert'])) {
+        error('No file was provided', 422);
+    }
+    $file = $_FILES['cert'];
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        error('Error uploading the file', 500);
+    }
+    if ($file['size'] > 10 * 1024 * 1024) {
+        error('The file must not exceed 10 MB', 422);
+    }
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    $allowed = ['pdf', 'jpg', 'jpeg', 'png'];
+    if (!in_array($ext, $allowed, true)) {
+        error('Format not allowed. Use pdf, jpg, jpeg or png', 422);
+    }
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = $finfo->file($file['tmp_name']);
+    $allowedMime = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (!in_array($mime, $allowedMime, true)) {
+        error('The file is not a valid PDF or image', 422);
+    }
+    $dir = UPLOAD_DIR . '/certifications';
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+    $filename = 'cert_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+    if (!move_uploaded_file($file['tmp_name'], $dir . '/' . $filename)) {
+        error('Error saving the file', 500);
+    }
+    $baseUrl = rtrim(APP_URL, '/');
+    success([
+        'file' => 'uploads/certifications/' . $filename,
+        'fileUrl' => $baseUrl . '/api/uploads/certifications/' . $filename,
+    ], 'File uploaded');
 }]);
 
 // --- Admin User Management Routes ---
@@ -747,6 +898,11 @@ route('/admin/plans/{id}', ['method' => 'PUT', 'handler' => function($p) {
 }]);
 
 // --- Coupon Routes ---
+route('/coupons/validate', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/finance/coupons.php';
+    validateCoupon();
+}]);
+
 route('/admin/coupons', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/finance/coupons.php';
     listCoupons();
@@ -819,6 +975,16 @@ route('/notifications/read-all', ['method' => 'POST', 'handler' => function() {
 route('/notifications/{id}/read', ['method' => 'POST', 'handler' => function($p) {
     require __DIR__ . '/routes/community/notifications.php';
     markRead($p);
+}]);
+
+route('/notifications/{id}', ['method' => 'DELETE', 'handler' => function($p) {
+    require __DIR__ . '/routes/community/notifications.php';
+    deleteNotification($p);
+}]);
+
+route('/notifications', ['method' => 'DELETE', 'handler' => function() {
+    require __DIR__ . '/routes/community/notifications.php';
+    deleteAllNotifications();
 }]);
 
 route('/notifications', ['method' => 'POST', 'handler' => function() {
@@ -954,6 +1120,12 @@ route('/routines/complete', ['method' => 'POST', 'handler' => function() {
 route('/water', ['method' => 'POST', 'handler' => function() {
     require __DIR__ . '/routes/health/water.php';
     updateWater();
+}]);
+
+// --- Streak Routes ---
+route('/streak/freeze', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/health/streak.php';
+    freezeMyStreak();
 }]);
 
 // --- Body Measurements Routes ---
@@ -1311,6 +1483,11 @@ route('/coach/connect-stripe', ['method' => 'POST', 'handler' => function() {
     connectStripe();
 }]);
 
+route('/coach/connect-status', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/users/coach.php';
+    getConnectStatus();
+}]);
+
 route('/coach/payouts', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/users/coach.php';
     getPayouts();
@@ -1404,6 +1581,12 @@ route('/admin/forum/topics/{id}', ['method' => 'DELETE', 'handler' => function($
 route('/programs/{id}/enroll', ['method' => 'POST', 'handler' => function($p) {
     require __DIR__ . '/routes/content/programs.php';
     selfEnroll($p['id']);
+}]);
+
+// --- Coach/Admin bulk assignment Route ---
+route('/programs/{id}/bulk-enroll', ['method' => 'POST', 'handler' => function($p) {
+    require __DIR__ . '/routes/content/programs.php';
+    bulkEnrollProgram($p['id']);
 }]);
 
 // --- Goal Milestone Routes ---
@@ -1523,7 +1706,7 @@ route('/uploads/{path:*}', ['method' => 'GET', 'handler' => function($p) {
     $uploadDirReal = realpath(UPLOAD_DIR);
 
     if (!$file || !str_starts_with($file, $uploadDirReal) || !is_file($file)) {
-        error('Archivo no encontrado', 404);
+        error('File not found', 404);
     }
 
     $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
@@ -1548,4 +1731,4 @@ route('/uploads/{path:*}', ['method' => 'GET', 'handler' => function($p) {
 }]);
 
 // --- 404 ---
-error('Ruta no encontrada: ' . $method . ' ' . $uri, 404);
+error('Route not found: ' . $method . ' ' . $uri, 404);

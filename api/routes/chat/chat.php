@@ -1,5 +1,5 @@
 <?php
-//prueba
+//test
 function listConversations(): void {
     $auth = requireAuth();
     $userId = $auth['sub'];
@@ -39,7 +39,7 @@ function getMessages(array $params): void {
     $db = getDB();
     $stmt = $db->prepare("SELECT id FROM conversations WHERE id = ? AND (participant_one = ? OR participant_two = ?)");
     $stmt->execute([$convId, $userId, $userId]);
-    if (!$stmt->fetch()) error('Conversación no encontrada', 404);
+    if (!$stmt->fetch()) error('Conversation not found', 404);
     $msgStmt = $db->prepare("SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC");
     $msgStmt->execute([$convId]);
     $msgs = array_map(function($m) {
@@ -58,17 +58,20 @@ function sendMessage(array $params): void {
     $userId = $auth['sub'];
     $convId = (int)$params['id'];
     $input = getJsonInput();
+
+    $errors = validate($input, ['content' => 'required|string|max:5000']);
+    if ($errors) error('Validation error', 422, $errors);
+
     $db = getDB();
     $stmt = $db->prepare("SELECT id FROM conversations WHERE id = ? AND (participant_one = ? OR participant_two = ?)");
     $stmt->execute([$convId, $userId, $userId]);
-    if (!$stmt->fetch()) error('Conversación no encontrada', 404);
-    $content = $input['content'] ?? '';
-    if (!$content) error('Mensaje vacío', 422);
+    if (!$stmt->fetch()) error('Conversation not found', 404);
+    $content = trim($input['content']);
     $db->prepare("INSERT INTO messages (conversation_id, sender_id, content) VALUES (?, ?, ?)")
         ->execute([$convId, $userId, $content]);
     $db->prepare("UPDATE conversations SET last_message = ?, last_message_at = NOW() WHERE id = ?")
         ->execute([$content, $convId]);
-    success(['id' => (int)$db->lastInsertId()], 'Mensaje enviado', 201);
+    success(['id' => (int)$db->lastInsertId()], 'Message sent', 201);
 }
 
 function startConversation(): void {
@@ -76,8 +79,12 @@ function startConversation(): void {
     $userId = $auth['sub'];
     $input = getJsonInput();
     $otherId = (int)($input['userId'] ?? 0);
-    if (!$otherId || $otherId === $userId) error('Usuario inválido', 422);
+    if (!$otherId || $otherId === $userId) error('Invalid user', 422);
     $db = getDB();
+    // The target user must exist (otherwise the FK insert would 500).
+    $userStmt = $db->prepare("SELECT id FROM users WHERE id = ? AND status != 'suspended'");
+    $userStmt->execute([$otherId]);
+    if (!$userStmt->fetch()) error('Invalid user', 422);
     $stmt = $db->prepare("
         SELECT id FROM conversations 
         WHERE (participant_one = ? AND participant_two = ?) OR (participant_one = ? AND participant_two = ?)
@@ -102,7 +109,7 @@ function startConversation(): void {
     ");
     $convStmt->execute([$convId]);
     $c = $convStmt->fetch();
-    if (!$c) error('Error al obtener conversación', 500);
+    if (!$c) error('Error getting conversation', 500);
     $otherName = $c['participant_one'] == $userId ? $c['p2_name'] : $c['p1_name'];
     $otherPhoto = $c['participant_one'] == $userId ? $c['p2_photo'] : $c['p1_photo'];
     success([
@@ -112,5 +119,25 @@ function startConversation(): void {
         'otherUserPhoto' => $otherPhoto,
         'lastMessage' => $c['last_message'],
         'lastMessageAt' => $c['last_message_at'],
-    ], $existing ? 'Conversación existente' : 'Conversación creada', $existing ? 200 : 201);
+    ], $existing ? 'Existing conversation' : 'Conversation created', $existing ? 200 : 201);
+}
+
+/**
+ * Marks a conversation as read for the current user (QA-audit fix:
+ * the frontend ChatMessenger called PUT /conversations/{id}/read which
+ * did not exist).
+ */
+function markConversationRead(string $id): void {
+    $auth = requireAuth();
+    $db = getDB();
+    $stmt = $db->prepare("SELECT id FROM conversations WHERE id = ? AND (participant_one = ? OR participant_two = ?)");
+    $stmt->execute([(int)$id, $auth['sub'], $auth['sub']]);
+    if (!$stmt->fetch()) {
+        error('Conversation not found', 404);
+    }
+    $db->prepare("INSERT INTO conversation_reads (conversation_id, user_id, last_read_at)
+        VALUES (?, ?, NOW())
+        ON DUPLICATE KEY UPDATE last_read_at = NOW()")
+        ->execute([(int)$id, $auth['sub']]);
+    success(null, 'Conversation marked as read');
 }

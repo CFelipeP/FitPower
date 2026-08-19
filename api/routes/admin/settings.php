@@ -20,7 +20,7 @@ function adminUpdateSettings(): void {
     $input = getJsonInput();
 
     if (empty($input) || !is_array($input)) {
-        error('No hay datos para actualizar', 400);
+        error('No data to update', 400);
     }
 
     $db = getDB();
@@ -34,5 +34,5 @@ function adminUpdateSettings(): void {
         }
     }
 
-    success(['updated' => $updated], 'Configuración actualizada');
+    success(['updated' => $updated], 'Settings updated');
 }

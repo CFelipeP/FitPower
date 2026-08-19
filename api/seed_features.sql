@@ -18,7 +18,7 @@ INSERT IGNORE INTO exercise_library (name, description, category, muscle_group, 
 ('Running','Cardio running','cardio','full body','none','beginner','Run at steady or interval pace'),
 ('Jump Rope','Jump rope cardio','cardio','full body','jump rope','beginner','Jump rope at moderate pace');
 
-INSERT IGNORE INTO recipes (name, description, meal_type, calories, protein, carbs, fat, ingredients, instructions, prep_time, difficulty) VALUES
+INSERT IGNORE INTO recipes (name, description, meal_type, calories, protein_g, carbs_g, fat_g, ingredients, instructions, prep_time_minutes, difficulty) VALUES
 ('Protein Oatmeal','Oatmeal with whey protein and berries','breakfast',420,35,50,10,'["1 cup oats","1 scoop whey","1/2 cup berries","1 tbsp honey"]','Cook oats, mix protein, top with berries',10,'easy'),
 ('Chicken Salad','Grilled chicken breast with mixed greens','lunch',480,45,15,22,'["200g chicken","2 cups greens","1/2 avocado","1 tbsp olive oil"]','Grill chicken, slice, toss with greens',15,'easy'),
 ('Salmon with Quinoa','Grilled salmon with quinoa and vegetables','dinner',520,40,45,18,'["150g salmon","1 cup quinoa","1 cup broccoli","lemon juice"]','Cook quinoa, grill salmon, steam broccoli',25,'medium'),

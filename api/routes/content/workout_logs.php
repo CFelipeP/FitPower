@@ -5,27 +5,44 @@ function logWorkout(): void {
     $input = getJsonInput();
     $db = getDB();
 
+    $errors = validate($input, [
+        'sessionId' => 'numeric|min_value:1',
+        'exercises' => 'array',
+        'duration' => 'numeric|min_value:0|max_value:1440',
+        'calories' => 'numeric|min_value:0|max_value:99999',
+    ]);
+    if ($errors) error('Validation error', 422, $errors);
+
     $sessionId = isset($input['sessionId']) ? (int)$input['sessionId'] : null;
     $exercises = $input['exercises'] ?? [];
 
-    if (empty($exercises)) {
-        error('Debe incluir al menos un ejercicio', 422);
+    if (!is_array($exercises) || empty($exercises)) {
+        error('You must include at least one exercise', 422);
+    }
+    if (count($exercises) > 100) {
+        error('Maximum 100 exercises per log entry', 422);
     }
 
-    $stmt = $db->prepare("INSERT INTO workout_logs (user_id, session_id, exercise_id, sets_completed, reps_completed, weight_used, notes, calories_burned) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt = $db->prepare("INSERT INTO workout_logs (user_id, session_id, exercise_id, sets_completed, reps_completed, weight_used, notes, calories_burned, total_volume) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $ids = [];
     $totalCaloriesBurned = 0;
 
     foreach ($exercises as $ex) {
-        $exerciseId = isset($ex['exerciseId']) ? (int)$ex['exerciseId'] : null;
-        $sets = (int)($ex['sets'] ?? 0);
-        $reps = $ex['reps'] ?? null;
-        $weight = $ex['weight'] ?? null;
-        $notes = $ex['notes'] ?? null;
+        if (!is_array($ex)) continue;
+        $exerciseId = isset($ex['exerciseId']) && is_numeric($ex['exerciseId']) ? (int)$ex['exerciseId'] : null;
+        $sets = isset($ex['sets']) && is_numeric($ex['sets']) ? min(255, max(0, (int)$ex['sets'])) : 0;
+        $reps = isset($ex['reps']) && $ex['reps'] !== '' && $ex['reps'] !== null ? mb_substr((string)$ex['reps'], 0, 100) : null;
+        $weight = isset($ex['weight']) && $ex['weight'] !== '' && $ex['weight'] !== null ? mb_substr((string)$ex['weight'], 0, 50) : null;
+        $notes = isset($ex['notes']) && $ex['notes'] !== '' && $ex['notes'] !== null ? mb_substr((string)$ex['notes'], 0, 1000) : null;
+        // Volume = sets × weight (only when the weight is numeric).
+        $totalVolume = null;
+        if (is_numeric($weight)) {
+            $totalVolume = round($sets * (float)$weight, 2);
+        }
 
         $caloriesPerSet = null;
-        if (isset($ex['caloriesBurned'])) {
-            $caloriesPerSet = (int)$ex['caloriesBurned'];
+        if (isset($ex['caloriesBurned']) && is_numeric($ex['caloriesBurned'])) {
+            $caloriesPerSet = min(99999, max(0, (int)$ex['caloriesBurned']));
         } elseif ($exerciseId) {
             $calStmt = $db->prepare("SELECT calories_burned FROM exercise_library WHERE id = ?");
             $calStmt->execute([$exerciseId]);
@@ -35,7 +52,7 @@ function logWorkout(): void {
             }
         }
 
-        $stmt->execute([$auth['sub'], $sessionId, $exerciseId, $sets, $reps, $weight, $notes, $caloriesPerSet]);
+        $stmt->execute([$auth['sub'], $sessionId, $exerciseId, $sets, $reps, $weight, $notes, $caloriesPerSet, $totalVolume]);
         $ids[] = (int)$db->lastInsertId();
         if ($caloriesPerSet !== null) {
             $totalCaloriesBurned += $caloriesPerSet;
@@ -55,7 +72,7 @@ function logWorkout(): void {
         checkAndUnlockAchievements();
     }
 
-    success(['ids' => $ids, 'caloriesBurned' => $totalCaloriesBurned], 'Workout registrado', 201);
+    success(['ids' => $ids, 'caloriesBurned' => $totalCaloriesBurned], 'Workout logged', 201);
 }
 
 function listWorkoutLogs(): void {

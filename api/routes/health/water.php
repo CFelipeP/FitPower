@@ -4,7 +4,7 @@ function updateWater(): void {
     $auth = requireAuth();
     $input = getJsonInput();
     $glasses = (int)($input['glasses'] ?? 0);
-    if ($glasses < 0 || $glasses > 20) error('Valor inválido', 400);
+    if ($glasses < 0 || $glasses > 20) error('Invalid value', 400);
 
     $db = getDB();
     $stmt = $db->prepare("SELECT id, water_glasses FROM nutrition_logs WHERE user_id = ? AND log_date = CURDATE()");
@@ -18,5 +18,5 @@ function updateWater(): void {
             ->execute([$auth['sub'], $glasses]);
     }
 
-    success(['glasses' => $glasses], 'Agua actualizada');
+    success(['glasses' => $glasses], 'Water updated');
 }

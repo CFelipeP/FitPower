@@ -70,11 +70,12 @@ function saveNutrition(): void {
         'fatCurrent' => 'numeric|min_value:0|max_value:9999',
         'fatTarget' => 'numeric|min_value:0|max_value:9999',
         'waterGlasses' => 'numeric|min_value:0|max_value:99',
+        'date' => 'date',
     ];
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
@@ -128,7 +129,7 @@ function saveNutrition(): void {
             ->execute($params);
     }
 
-    success(null, 'Nutrición guardada');
+    success(null, 'Nutrition saved');
 }
 
 function getMetrics(): void {
@@ -231,14 +232,22 @@ function saveMetrics(): void {
         'bodyFat' => 'numeric|min_value:1|max_value:70',
         'muscle' => 'numeric|min_value:10|max_value:300',
         'bmi' => 'numeric|min_value:10|max_value:60',
+        'date' => 'date',
     ];
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
+    // Basic progress (weight) is available on every plan; body composition
+    // fields (body fat / muscle / BMI) require the Enterprise feature.
+    if (isset($input['bodyFat']) || isset($input['muscle']) || isset($input['bmi'])) {
+        require_once __DIR__ . '/../../helpers/features.php';
+        requireFeature($db, (int)$auth['sub'], 'body_composition');
+    }
+
     $date = parseDate($input['date'] ?? date('Y-m-d'));
 
     $db->prepare("
@@ -255,5 +264,5 @@ function saveMetrics(): void {
         $input['bmi'] ?? null,
     ]);
 
-    success(null, 'Métricas guardadas');
+    success(null, 'Metrics saved');
 }

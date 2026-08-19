@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
@@ -53,18 +53,23 @@ function getUserSubscription(): void {
     $auth = requireAuth();
     $db = getDB();
 
+    // One-time PayPal plans have no auto-renewal: expire overdue rows lazily
+    // so the user always sees their real plan state.
+    require_once __DIR__ . '/paypal.php';
+    expireOverdueSubscriptions($db, (int)$auth['sub']);
+
     $stmt = $db->prepare("
         SELECT us.*, sp.name as plan_name, sp.price_monthly, sp.price_yearly
         FROM user_subscriptions us
         JOIN subscription_plans sp ON sp.id = us.plan_id
-        WHERE us.user_id = ? AND us.status = 'active'
-        ORDER BY us.starts_at DESC LIMIT 1
+        WHERE us.user_id = ?
+        ORDER BY us.starts_at DESC, us.id DESC LIMIT 1
     ");
     $stmt->execute([$auth['sub']]);
     $sub = $stmt->fetch();
 
     if (!$sub) {
-        success(null, 'Sin suscripción activa');
+        success(null, 'No active subscription');
         return;
     }
 
@@ -77,23 +82,132 @@ function getUserSubscription(): void {
         'status' => $sub['status'],
         'startedAt' => $sub['starts_at'],
         'endsAt' => $sub['ends_at'],
+        'cancelledAt' => $sub['cancelled_at'] ?? null,
+        'cancellationReason' => $sub['cancellation_reason'] ?? null,
     ]);
 }
 
 function cancelUserSubscription(): void {
     $auth = requireAuth();
+    $input = getJsonInput();
     $db = getDB();
 
-    $stmt = $db->prepare("SELECT * FROM user_subscriptions WHERE user_id = ? AND status = 'active' ORDER BY starts_at DESC LIMIT 1");
+    $reason = trim((string)($input['reason'] ?? '')) ?: null;
+    if ($reason !== null && mb_strlen($reason) > 255) {
+        error('Validation error', 422, ['reason' => 'reason is too long']);
+    }
+
+    $stmt = $db->prepare("SELECT * FROM user_subscriptions WHERE user_id = ? AND status IN ('active', 'pending_cancel', 'payment_failed', 'suspended') ORDER BY starts_at DESC LIMIT 1");
     $stmt->execute([$auth['sub']]);
     $subscription = $stmt->fetch();
 
     if (!$subscription) error('No active subscription found');
 
-    $db->prepare("UPDATE user_subscriptions SET status = 'cancelled', cancelled_at = NOW() WHERE id = ?")
-        ->execute([$subscription['id']]);
+    // Cancel at the end of the period on the provider so the user keeps
+    // access until the paid period ends and can reactivate anytime.
+    if (!empty($subscription['stripe_subscription_id']) && defined('STRIPE_SECRET_KEY') && STRIPE_SECRET_KEY && !str_contains(STRIPE_SECRET_KEY, 'placeholder')) {
+        require_once __DIR__ . '/stripe.php';
+        \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
+        try {
+            $stripeSub = \Stripe\Subscription::retrieve($subscription['stripe_subscription_id']);
+            if ($stripeSub->status !== 'canceled') {
+                \Stripe\Subscription::update($subscription['stripe_subscription_id'], [
+                    'cancel_at_period_end' => true,
+                ]);
+            }
+            $db->prepare("UPDATE user_subscriptions SET status = 'pending_cancel', cancellation_reason = ? WHERE id = ?")
+                ->execute([$reason, $subscription['id']]);
+            success([
+                'status' => 'pending_cancel',
+                'endsAt' => $subscription['ends_at'],
+                'message' => 'Your access continues until the end of the current billing period.',
+            ]);
+            return;
+        } catch (\Exception $e) {
+            error('Could not cancel the subscription. Please try again or contact support.', 502);
+        }
+    }
 
-    success(null, 'Subscription cancelled');
+    // No Stripe-backed subscription (PayPal one-time or legacy): keep access
+    // until the paid period ends, then flip to cancelled.
+    $endsAt = $subscription['ends_at'];
+    if ($endsAt && strtotime($endsAt) > time()) {
+        $db->prepare("UPDATE user_subscriptions SET status = 'pending_cancel', cancellation_reason = ? WHERE id = ?")
+            ->execute([$reason, $subscription['id']]);
+        success([
+            'status' => 'pending_cancel',
+            'endsAt' => $endsAt,
+            'message' => 'Your access continues until the end of the current billing period.',
+        ]);
+        return;
+    }
+
+    $db->prepare("UPDATE user_subscriptions SET status = 'cancelled', cancelled_at = NOW(), cancellation_reason = ? WHERE id = ?")
+        ->execute([$reason, $subscription['id']]);
+
+    success(['status' => 'cancelled', 'message' => 'Subscription cancelled. Your data is preserved if you want to come back.']);
+}
+
+function reactivateUserSubscription(): void {
+    $auth = requireAuth();
+    $db = getDB();
+
+    $stmt = $db->prepare("SELECT * FROM user_subscriptions WHERE user_id = ? ORDER BY starts_at DESC LIMIT 1");
+    $stmt->execute([$auth['sub']]);
+    $subscription = $stmt->fetch();
+    if (!$subscription) error('No subscription found');
+
+    if ($subscription['status'] === 'cancelled' || $subscription['status'] === 'expired') {
+        error('Your previous plan has ended. Start a new subscription â€” your history and progress are preserved.', 409);
+    }
+
+    if ($subscription['status'] === 'pending_cancel') {
+        if (!empty($subscription['stripe_subscription_id']) && defined('STRIPE_SECRET_KEY') && STRIPE_SECRET_KEY && !str_contains(STRIPE_SECRET_KEY, 'placeholder')) {
+            require_once __DIR__ . '/stripe.php';
+            \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
+            try {
+                \Stripe\Subscription::update($subscription['stripe_subscription_id'], [
+                    'cancel_at_period_end' => false,
+                ]);
+            } catch (\Exception $e) {
+                error('Could not reactivate the subscription. Please try again or contact support.', 502);
+            }
+        }
+        $db->prepare("UPDATE user_subscriptions SET status = 'active', cancellation_reason = NULL WHERE id = ?")
+            ->execute([$subscription['id']]);
+        success(['status' => 'active', 'message' => 'Subscription reactivated. Welcome back!']);
+        return;
+    }
+
+    // payment_failed / suspended: Stripe recovers automatically once the
+    // card is updated or the retry succeeds.
+    error('Update your payment method to reactivate your subscription. Your data is fully preserved.', 409);
+}
+
+function listUserInvoices(): void {
+    $auth = requireAuth();
+    $db = getDB();
+
+    $stmt = $db->prepare("
+        SELECT id, subscription_id, amount, method, type, status, stripe_invoice_id, created_at
+        FROM payments
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 100
+    ");
+    $stmt->execute([$auth['sub']]);
+
+    success(array_map(function($p) {
+        return [
+            'id' => (int)$p['id'],
+            'subscriptionId' => $p['subscription_id'] ? (int)$p['subscription_id'] : null,
+            'amount' => (float)$p['amount'],
+            'method' => $p['method'],
+            'type' => $p['type'],
+            'status' => $p['status'],
+            'date' => $p['created_at'],
+        ];
+    }, $stmt->fetchAll()));
 }
 // --- Admin Subscription Management ---
 
@@ -102,8 +216,8 @@ function adminListSubscriptions(): void {
     $db = getDB();
 
     $status = $_GET['status'] ?? '';
-    if ($status && !in_array($status, ['active', 'cancelled', 'expired'])) {
-        error('Filtro de estado inválido', 400);
+    if ($status && !in_array($status, ['active', 'cancelled', 'expired', 'payment_failed', 'pending_cancel', 'suspended'])) {
+        error('Invalid status filter', 400);
     }
 
     $where = [];
@@ -129,6 +243,17 @@ function adminListSubscriptions(): void {
     $subscriptions = $stmt->fetchAll();
 
     $result = array_map(function($s) {
+        $provider = null;
+        if (!empty($s['stripe_subscription_id'])) {
+            $provider = 'stripe';
+            $providerSubscriptionId = $s['stripe_subscription_id'];
+        } elseif (!empty($s['paypal_order_id'])) {
+            $provider = 'paypal';
+            $providerSubscriptionId = $s['paypal_order_id'];
+        } else {
+            $provider = 'manual';
+            $providerSubscriptionId = null;
+        }
         return [
             'id' => (int)$s['id'],
             'userId' => (int)$s['user_id'],
@@ -138,6 +263,8 @@ function adminListSubscriptions(): void {
             'billing' => $s['billing'],
             'price' => $s['billing'] === 'yearly' ? (float)$s['price_yearly'] : (float)$s['price_monthly'],
             'status' => $s['status'],
+            'provider' => $provider,
+            'providerSubscriptionId' => $providerSubscriptionId,
             'startedAt' => $s['starts_at'],
             'endsAt' => $s['ends_at'],
         ];
@@ -198,23 +325,36 @@ function adminCancelSubscription(string $id): void {
     $auth = requireRole('admin');
     $db = getDB();
 
-    $stmt = $db->prepare("SELECT id FROM user_subscriptions WHERE id = ?");
+    $stmt = $db->prepare("SELECT id, user_id, stripe_subscription_id FROM user_subscriptions WHERE id = ?");
     $stmt->execute([$id]);
-    if (!$stmt->fetch()) {
-        error('Suscripción no encontrada', 404);
+    $sub = $stmt->fetch();
+    if (!$sub) {
+        error('Subscription not found', 404);
+    }
+
+    // Cancel on the provider too, so the customer is never charged again.
+    if (!empty($sub['stripe_subscription_id']) && defined('STRIPE_SECRET_KEY') && STRIPE_SECRET_KEY && !str_contains(STRIPE_SECRET_KEY, 'placeholder')) {
+        try {
+            require_once __DIR__ . '/stripe.php';
+            \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
+            $stripeSub = \Stripe\Subscription::retrieve($sub['stripe_subscription_id']);
+            if ($stripeSub->status !== 'canceled') {
+                $stripeSub->cancel();
+            }
+        } catch (\Exception $e) {
+            error_log('adminCancelSubscription: Stripe cancel failed for ' . $sub['stripe_subscription_id'] . ': ' . $e->getMessage());
+        }
     }
 
     $db->prepare("UPDATE user_subscriptions SET status = 'cancelled', cancelled_at = NOW() WHERE id = ?")
         ->execute([$id]);
 
-    $subStmt = $db->prepare("SELECT user_id FROM user_subscriptions WHERE id = ?");
-    $subStmt->execute([$id]);
-    $userId = $subStmt->fetchColumn();
-    $db->prepare("INSERT INTO notifications (user_id, type, title, message, icon, link, created_at) VALUES (?, 'subscription', 'Suscripción cancelada', ?, 'CreditCard', '/client/dashboard', NOW())")->execute([$userId, 'Tu suscripción ha sido cancelada por el administrador.']);
+    require_once __DIR__ . '/../../helpers/notify.php';
+    notifyUser($db, (int)$sub['user_id'], 'subscription', 'Subscription cancelled', 'Your subscription has been cancelled by the administrator.', 'CreditCard', '/client/dashboard', []);
 
     logAdminAction($auth['sub'], 'cancel_subscription', 'subscription', (int)$id, null);
 
-    success(null, 'Suscripción cancelada');
+    success(null, 'Subscription cancelled');
 }
 
 function adminChangeSubscriptionPlan(string $id): void {
@@ -225,25 +365,25 @@ function adminChangeSubscriptionPlan(string $id): void {
     $rules = ['planId' => 'required'];
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $stmt = $db->prepare("SELECT id FROM user_subscriptions WHERE id = ?");
     $stmt->execute([$id]);
     if (!$stmt->fetch()) {
-        error('Suscripción no encontrada', 404);
+        error('Subscription not found', 404);
     }
 
     $stmt = $db->prepare("SELECT id FROM subscription_plans WHERE id = ?");
     $stmt->execute([$input['planId']]);
     if (!$stmt->fetch()) {
-        error('Plan no encontrado', 404);
+        error('Plan not found', 404);
     }
 
     $db->prepare("UPDATE user_subscriptions SET plan_id = ? WHERE id = ?")
         ->execute([$input['planId'], $id]);
 
-    success(null, 'Plan de suscripción actualizado');
+    success(null, 'Subscription plan updated');
 }
 
 function adminListPlans(): void {
@@ -309,7 +449,7 @@ function upsertPlan(array $input): array {
     $allRules = array_merge($rules, $extraRules);
     $errors = validate($input, $allRules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $status = $input['status'] ?? 'active';
@@ -323,7 +463,7 @@ function upsertPlan(array $input): array {
         $stmt = $db->prepare("SELECT id FROM subscription_plans WHERE id = ?");
         $stmt->execute([$input['id']]);
         if (!$stmt->fetch()) {
-            error('Plan no encontrado', 404);
+            error('Plan not found', 404);
         }
         $planId = (int)$input['id'];
 
@@ -372,9 +512,9 @@ function adminSavePlan(): void {
     $plan = upsertPlan($input);
     $isUpdate = !empty($input['id']);
     if ($isUpdate) {
-        success($plan, 'Plan actualizado');
+        success($plan, 'Plan updated');
     } else {
-        success($plan, 'Plan creado', 201);
+        success($plan, 'Plan created', 201);
     }
 }
 
@@ -383,7 +523,7 @@ function adminUpdatePlan(string $id): void {
     $input = getJsonInput();
     $input['id'] = (int)$id;
     $plan = upsertPlan($input);
-    success($plan, 'Plan actualizado');
+    success($plan, 'Plan updated');
 }
 
 function getSubscriptionInvoice(string $id): void {
@@ -393,9 +533,9 @@ function getSubscriptionInvoice(string $id): void {
     $stmt = $db->prepare("SELECT user_id FROM user_subscriptions WHERE id = ?");
     $stmt->execute([$subscriptionId]);
     $sub = $stmt->fetch();
-    if (!$sub) error('Suscripción no encontrada', 404);
+    if (!$sub) error('Subscription not found', 404);
     if ((int)$sub['user_id'] !== $auth['sub'] && $auth['role'] !== 'admin') {
-        error('No tienes permisos para ver esta factura', 403);
+        error('You do not have permission to view this invoice', 403);
     }
     require_once __DIR__ . '/../../helpers/invoice.php';
     $file = generateInvoicePdf($subscriptionId);
@@ -415,7 +555,7 @@ function createSubscription(): void {
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
@@ -430,13 +570,17 @@ function createSubscription(): void {
 
     $couponCode = $input['couponCode'] ?? null;
     $discountPct = 0;
+    if ($couponCode !== null && !is_string($couponCode)) {
+        error('Invalid coupon', 422);
+    }
     if ($couponCode) {
         $couponStmt = $db->prepare("SELECT * FROM coupons WHERE code = ? AND is_active = 1 AND (expires_at IS NULL OR expires_at > NOW()) AND (max_uses IS NULL OR current_uses < max_uses)");
         $couponStmt->execute([strtoupper($couponCode)]);
         $coupon = $couponStmt->fetch();
         if ($coupon) {
             $discountPct = (float)($coupon['discount_pct'] ?? 0);
-            $db->prepare("UPDATE coupons SET current_uses = current_uses + 1 WHERE id = ?")->execute([$coupon['id']]);
+            // Usage is consumed only in the checkout.session.completed webhook
+            // after payment succeeds — never before the payment happens.
         }
     }
 

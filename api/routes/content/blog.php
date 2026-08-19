@@ -47,7 +47,7 @@ function getArticle(string $slug): void {
     $stmt->execute([$slug]);
     $article = $stmt->fetch();
     if (!$article) {
-        error('Artículo no encontrado', 404);
+        error('Article not found', 404);
     }
     $article['tags'] = json_decode($article['tags'] ?? '[]', true);
     success($article);
@@ -56,11 +56,21 @@ function getArticle(string $slug): void {
 function createArticle(): void {
     $auth = requireRole('admin');
     $input = getJsonInput();
-    $rules = ['title' => 'required|string|min:1|max:255', 'content' => 'required|string|min:1'];
+    $rules = [
+        'title' => 'required|string|min:1|max:255',
+        'content' => 'required|string|min:1|max:100000',
+        'slug' => 'string|max:255',
+        'excerpt' => 'string|max:1000',
+        'coverImage' => 'string|max:255',
+        'category' => 'string|max:100',
+        'status' => 'in:draft,published,archived',
+    ];
     $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
+    if ($errors) error('Validation error', 422, $errors);
 
     $slug = $input['slug'] ?? strtolower(trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($input['title'])), '-'));
+    if ($slug === '') $slug = 'post-' . bin2hex(random_bytes(4));
+    $slug = mb_substr($slug, 0, 255);
     $db = getDB();
     $stmt = $db->prepare("
         INSERT INTO articles (author_id, title, slug, excerpt, content, cover_image, category, tags, status, published_at)
@@ -72,7 +82,7 @@ function createArticle(): void {
         json_encode($input['tags'] ?? []), $input['status'] ?? 'draft',
         $input['status'] === 'published' ? date('Y-m-d H:i:s') : null,
     ]);
-    success(['id' => (int)$db->lastInsertId(), 'slug' => $slug], 'Artículo creado', 201);
+    success(['id' => (int)$db->lastInsertId(), 'slug' => $slug], 'Article created', 201);
 }
 
 function updateArticle(string $id): void {
@@ -82,17 +92,21 @@ function updateArticle(string $id): void {
     $stmt = $db->prepare("SELECT id, author_id, published_at FROM articles WHERE id = ?");
     $stmt->execute([(int)$id]);
     $article = $stmt->fetch();
-    if (!$article) error('Artículo no encontrado', 404);
+    if (!$article) error('Article not found', 404);
     if ((int)$article['author_id'] !== $auth['sub'] && $auth['role'] !== 'admin') {
-        error('No tienes permisos para editar este artículo', 403);
+        error('You do not have permission to edit this article', 403);
     }
     $validationRules = [];
     if (isset($input['title'])) $validationRules['title'] = 'string|min:1|max:255';
-    if (isset($input['content'])) $validationRules['content'] = 'string|min:1';
-    if (isset($input['status'])) $validationRules['status'] = 'in:draft,published';
+    if (isset($input['content'])) $validationRules['content'] = 'string|min:1|max:100000';
+    if (isset($input['status'])) $validationRules['status'] = 'in:draft,published,archived';
+    if (isset($input['excerpt'])) $validationRules['excerpt'] = 'string|max:1000';
+    if (isset($input['coverImage'])) $validationRules['coverImage'] = 'string|max:255';
+    if (isset($input['category'])) $validationRules['category'] = 'string|max:100';
+    if (isset($input['slug'])) $validationRules['slug'] = 'string|max:255';
     if ($validationRules) {
         $errors = validate($input, $validationRules);
-        if ($errors) error('Error de validación', 422, $errors);
+        if ($errors) error('Validation error', 422, $errors);
     }
     $fieldMap = [
         'title' => 'title',
@@ -124,11 +138,11 @@ function updateArticle(string $id): void {
             $updates[] = "published_at = NOW()";
         }
     }
-    if (empty($updates)) error('No hay campos para actualizar', 400);
+    if (empty($updates)) error('No fields to update', 400);
     $updates[] = "updated_at = NOW()";
     $params[] = (int)$id;
     $db->prepare("UPDATE articles SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
-    success(null, 'Artículo actualizado');
+    success(null, 'Article updated');
 }
 
 function deleteArticle(string $id): void {
@@ -137,10 +151,10 @@ function deleteArticle(string $id): void {
     $stmt = $db->prepare("SELECT id, author_id FROM articles WHERE id = ?");
     $stmt->execute([(int)$id]);
     $article = $stmt->fetch();
-    if (!$article) error('Artículo no encontrado', 404);
+    if (!$article) error('Article not found', 404);
     if ((int)$article['author_id'] !== $auth['sub'] && $auth['role'] !== 'admin') {
-        error('No tienes permisos para eliminar este artículo', 403);
+        error('You do not have permission to delete this article', 403);
     }
     $db->prepare("DELETE FROM articles WHERE id = ?")->execute([(int)$id]);
-    success(null, 'Artículo eliminado');
+    success(null, 'Article deleted');
 }

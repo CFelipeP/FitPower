@@ -3,7 +3,7 @@ function listLeaderboard(): void {
     $auth = tryAuth();
     $db = getDB();
     $period = $_GET['period'] ?? 'total';
-    $limit = min((int)($_GET['limit'] ?? 100), 200);
+    $limit = max(1, min((int)($_GET['limit'] ?? 100), 200));
     
     $orderBy = match($period) {
         'workouts' => 'workouts_completed DESC',

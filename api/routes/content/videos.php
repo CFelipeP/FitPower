@@ -35,7 +35,7 @@ function listVideos(): void {
 
     $params[] = $limit;
     $params[] = $offset;
-    $stmt = $db->prepare("SELECT v.*, u.first_name AS coach_first_name, u.last_name AS coach_last_name FROM video_library v LEFT JOIN users u ON u.id = v.coach_id $whereClause ORDER BY v.created_at DESC LIMIT ? OFFSET ?");
+    $stmt = $db->prepare("SELECT v.*, u.first_name AS coach_first_name, u.last_name AS coach_last_name, el.name AS exercise_name FROM video_library v LEFT JOIN users u ON u.id = v.coach_id LEFT JOIN exercise_library el ON el.id = v.exercise_id $whereClause ORDER BY v.created_at DESC LIMIT ? OFFSET ?");
     $stmt->execute($params);
     $videos = array_map(function($v) {
         return [
@@ -46,6 +46,7 @@ function listVideos(): void {
             'thumbnailUrl' => $v['thumbnail_url'],
             'category' => $v['category'],
             'exerciseId' => $v['exercise_id'] ? (int)$v['exercise_id'] : null,
+            'exerciseName' => $v['exercise_name'],
             'coachId' => $v['coach_id'] ? (int)$v['coach_id'] : null,
             'coachName' => trim(($v['coach_first_name'] ?? '') . ' ' . ($v['coach_last_name'] ?? '')) ?: null,
             'durationSeconds' => (int)$v['duration_seconds'],
@@ -68,7 +69,7 @@ function listVideos(): void {
 function uploadVideo(): void {
     $auth = requireAuth();
     if (!in_array($auth['role'] ?? '', ['admin', 'coach'], true)) {
-        error('Solo administradores y entrenadores pueden subir videos', 403);
+        error('Only administrators and coaches can upload videos', 403);
     }
 
     $title = trim($_POST['title'] ?? '');
@@ -76,9 +77,16 @@ function uploadVideo(): void {
         $originalName = $_FILES['video']['name'] ?? 'video';
         $title = pathinfo($originalName, PATHINFO_FILENAME);
     }
+    if (mb_strlen($title) > 255) {
+        $title = mb_substr($title, 0, 255);
+    }
+    $description = trim((string)($_POST['description'] ?? ''));
+    if (mb_strlen($description) > 5000) {
+        error('The description is too long', 422);
+    }
 
     if (!isset($_FILES['video']) || $_FILES['video']['error'] !== UPLOAD_ERR_OK) {
-        error('Error al subir el archivo de video', 400);
+        error('Error uploading the video file', 400);
     }
 
     $allowedMimes = ['video/mp4', 'video/webm', 'video/quicktime'];
@@ -87,12 +95,12 @@ function uploadVideo(): void {
     finfo_close($finfo);
 
     if (!in_array($mimeType, $allowedMimes, true)) {
-        error('Tipo de video no permitido. Solo MP4, WebM y MOV', 422);
+        error('Video type not allowed. Only MP4, WebM and MOV', 422);
     }
 
     $maxSize = 500 * 1024 * 1024;
     if ($_FILES['video']['size'] > $maxSize) {
-        error('El video excede el tamaño máximo de 500MB', 422);
+        error('The video exceeds the maximum size of 500MB', 422);
     }
 
     $uploadDir = __DIR__ . '/../../uploads/videos/';
@@ -105,7 +113,7 @@ function uploadVideo(): void {
     $destination = $uploadDir . $filename;
 
     if (!move_uploaded_file($_FILES['video']['tmp_name'], $destination)) {
-        error('Error al guardar el archivo', 500);
+        error('Error saving the file', 500);
     }
 
     $filePath = 'uploads/videos/' . $filename;
@@ -156,13 +164,13 @@ function uploadVideo(): void {
         'id' => $id,
         'title' => $title,
         'filePath' => $filePath,
-    ], 'Video subido exitosamente', 201);
+    ], 'Video uploaded successfully', 201);
 }
 
 function deleteVideo(string $id): void {
     $auth = requireAuth();
     if (!in_array($auth['role'] ?? '', ['admin', 'coach'], true)) {
-        error('No tienes permisos para eliminar videos', 403);
+        error('You do not have permission to delete videos', 403);
     }
 
     $db = getDB();
@@ -171,7 +179,7 @@ function deleteVideo(string $id): void {
     $video = $stmt->fetch();
 
     if (!$video) {
-        error('Video no encontrado', 404);
+        error('Video not found', 404);
     }
 
     $filePath = __DIR__ . '/../../' . $video['file_path'];
@@ -182,13 +190,13 @@ function deleteVideo(string $id): void {
     $stmt = $db->prepare("DELETE FROM video_library WHERE id = ?");
     $stmt->execute([$id]);
 
-    success(null, 'Video eliminado');
+    success(null, 'Video deleted');
 }
 
 function updateVideo(string $id): void {
     $auth = requireAuth();
     if (!in_array($auth['role'] ?? '', ['admin', 'coach'], true)) {
-        error('No tienes permisos para editar videos', 403);
+        error('You do not have permission to edit videos', 403);
     }
 
     $db = getDB();
@@ -197,51 +205,63 @@ function updateVideo(string $id): void {
     $video = $stmt->fetch();
 
     if (!$video) {
-        error('Video no encontrado', 404);
+        error('Video not found', 404);
     }
 
     $input = getJsonInput();
-    $title = trim($input['title'] ?? '');
-    $description = trim($input['description'] ?? '');
+    $title = trim((string)($input['title'] ?? ''));
+    $description = trim((string)($input['description'] ?? ''));
     $category = $input['category'] ?? $video['category'];
     $isFeatured = isset($input['is_featured']) ? ($input['is_featured'] ? 1 : 0) : $video['is_featured'];
+    // tags must be a JSON string for the JSON column; arrays would crash PDO.
     $tags = $input['tags'] ?? $video['tags'];
+    if (is_array($tags)) $tags = json_encode($tags);
+
+    // Exercise link: coaches attach a training video to an exercise, and that
+    // exercise (with its video) goes into Programs for clients to use.
+    $exerciseId = array_key_exists('exercise_id', $input)
+        ? (($input['exercise_id'] !== null && $input['exercise_id'] !== '') ? (int)$input['exercise_id'] : null)
+        : ($video['exercise_id'] ? (int)$video['exercise_id'] : null);
 
     if ($title !== '') {
+        if (mb_strlen($title) > 255) error('The title is too long', 422);
+        if (mb_strlen($description) > 5000) error('The description is too long', 422);
+        if (!is_string($tags) || mb_strlen($tags) > 1000) $tags = $video['tags'];
         $validCategories = ['exercise_demo', 'coach_feedback', 'coaching_session', 'educational', 'exercise_demo'];
         if (!in_array($category, $validCategories, true)) {
             $category = $video['category'];
         }
 
         $stmt = $db->prepare(
-            "UPDATE video_library SET title = ?, description = ?, category = ?, is_featured = ?, tags = ? WHERE id = ?"
+            "UPDATE video_library SET title = ?, description = ?, category = ?, is_featured = ?, tags = ?, exercise_id = ? WHERE id = ?"
         );
-        $stmt->execute([$title, $description, $category, $isFeatured, $tags, $id]);
+        $stmt->execute([$title, $description, $category, $isFeatured, $tags, $exerciseId, $id]);
 
         success([
             'id' => (int)$id,
             'title' => $title,
             'description' => $description,
             'category' => $category,
-        ], 'Video actualizado');
+            'exerciseId' => $exerciseId,
+        ], 'Video updated');
     } else {
-        error('El título es requerido', 422);
+        error('The title is required', 422);
     }
 }
 
 function createFeedback(): void {
     $auth = requireAuth();
     if (!in_array($auth['role'] ?? '', ['admin', 'coach'], true)) {
-        error('Solo entrenadores pueden enviar feedback', 403);
+        error('Only coaches can send feedback', 403);
     }
 
     $clientId = (int)($_POST['client_id'] ?? 0);
     if (!$clientId) {
-        error('El ID del cliente es requerido', 422);
+        error('The client ID is required', 422);
     }
 
     if (!isset($_FILES['video']) || $_FILES['video']['error'] !== UPLOAD_ERR_OK) {
-        error('Error al subir el archivo de video', 400);
+        error('Error uploading the video file', 400);
     }
 
     $allowedMimes = ['video/mp4', 'video/webm', 'video/quicktime'];
@@ -250,12 +270,12 @@ function createFeedback(): void {
     finfo_close($finfo);
 
     if (!in_array($mimeType, $allowedMimes, true)) {
-        error('Tipo de video no permitido. Solo MP4, WebM y MOV', 422);
+        error('Video type not allowed. Only MP4, WebM and MOV', 422);
     }
 
     $maxSize = 500 * 1024 * 1024;
     if ($_FILES['video']['size'] > $maxSize) {
-        error('El video excede el tamaño máximo de 500MB', 422);
+        error('The video exceeds the maximum size of 500MB', 422);
     }
 
     $uploadDir = __DIR__ . '/../../uploads/video-feedback/';
@@ -268,7 +288,7 @@ function createFeedback(): void {
     $destination = $uploadDir . $filename;
 
     if (!move_uploaded_file($_FILES['video']['tmp_name'], $destination)) {
-        error('Error al guardar el archivo', 500);
+        error('Error saving the file', 500);
     }
 
     $videoUrl = 'uploads/video-feedback/' . $filename;
@@ -291,7 +311,7 @@ function createFeedback(): void {
     success([
         'id' => (int)$db->lastInsertId(),
         'videoUrl' => $videoUrl,
-    ], 'Feedback enviado exitosamente', 201);
+    ], 'Feedback sent successfully', 201);
 }
 
 function getFeedback(string $clientId): void {
@@ -300,7 +320,7 @@ function getFeedback(string $clientId): void {
     $currentUserId = (int)$auth['sub'];
 
     if ($auth['role'] === 'client' && $currentUserId !== (int)$clientId) {
-        error('No tienes permisos para ver este feedback', 403);
+        error('You do not have permission to view this feedback', 403);
     }
 
     $stmt = $db->prepare(
@@ -339,7 +359,7 @@ function getFeedback(string $clientId): void {
 function sendVideoFeedback(): void {
     $auth = requireAuth();
     if (!in_array($auth['role'] ?? '', ['admin', 'coach'], true)) {
-        error('Solo entrenadores pueden enviar feedback', 403);
+        error('Only coaches can send feedback', 403);
     }
 
     $input = getJsonInput();
@@ -351,7 +371,7 @@ function sendVideoFeedback(): void {
     ];
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
@@ -359,14 +379,14 @@ function sendVideoFeedback(): void {
     $clientStmt = $db->prepare("SELECT id FROM users WHERE id = ? AND role = 'client'");
     $clientStmt->execute([(int)$input['clientId']]);
     if (!$clientStmt->fetch()) {
-        error('Cliente no encontrado', 404);
+        error('Client not found', 404);
     }
 
     $videoStmt = $db->prepare("SELECT file_path FROM video_library WHERE id = ?");
     $videoStmt->execute([(int)$input['videoId']]);
     $video = $videoStmt->fetch();
     if (!$video) {
-        error('Video no encontrado', 404);
+        error('Video not found', 404);
     }
 
     $stmt = $db->prepare(
@@ -383,10 +403,10 @@ function sendVideoFeedback(): void {
     $feedbackId = (int)$db->lastInsertId();
 
     require_once __DIR__ . '/../../helpers/activity.php';
-    logActivity((int)$auth['sub'], 'feedback', 'Feedback de video enviado', 'Video', '#10b981', 'Sent', 'bg-success');
+    logActivity((int)$auth['sub'], 'feedback', 'Video feedback sent', 'Video', '#10b981', 'Sent', 'bg-success');
 
     success([
         'id' => $feedbackId,
         'videoUrl' => $video['file_path'],
-    ], 'Feedback enviado exitosamente', 201);
+    ], 'Feedback sent successfully', 201);
 }

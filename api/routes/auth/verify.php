@@ -5,7 +5,7 @@ function verifyEmail(): void {
 
     $errors = validate($input, ['token' => 'required|string']);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
@@ -14,13 +14,13 @@ function verifyEmail(): void {
     $user = $stmt->fetch();
 
     if (!$user) {
-        error('Token inválido o ya verificado', 400);
+        error('Invalid or already verified token', 400);
     }
 
     $db->prepare("UPDATE users SET email_verified_at = NOW(), remember_token = NULL WHERE id = ?")
         ->execute([$user['id']]);
 
-    success(null, 'Email verificado exitosamente');
+    success(null, 'Email verified successfully');
 }
 
 function resendVerification(): void {
@@ -28,7 +28,7 @@ function resendVerification(): void {
 
     $errors = validate($input, ['email' => 'required|email']);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
@@ -37,12 +37,12 @@ function resendVerification(): void {
     $user = $stmt->fetch();
 
     if (!$user) {
-        success(null, 'Si el email existe, recibirás un nuevo enlace de verificación');
+        success(null, 'If the email exists, you will receive a new verification link');
         return;
     }
 
     if ($user['email_verified_at']) {
-        error('El email ya fue verificado', 400);
+        error('The email has already been verified', 400);
     }
 
     $token = bin2hex(random_bytes(32));
@@ -72,5 +72,5 @@ function resendVerification(): void {
         }
     } catch (\Throwable $e) {}
 
-    success(null, 'Email de verificación reenviado');
+    success(null, 'Verification email resent');
 }

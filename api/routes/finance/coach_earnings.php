@@ -29,13 +29,13 @@ function requestPayout(): void {
     $auth = requireRole('coach');
     $input = getJsonInput();
     $amount = isset($input['amount']) ? (float)$input['amount'] : 0;
-    if ($amount <= 0) error('Monto inválido', 422);
+    if ($amount <= 0) error('Invalid amount', 422);
     $db = getDB();
     // Check available balance
     $bal = $db->prepare("SELECT COALESCE(SUM(amount), 0) as total FROM coach_earnings WHERE coach_id = ? AND status = 'available'");
     $bal->execute([$auth['sub']]);
     $available = (float)$bal->fetch()['total'];
-    if ($amount > $available) error('Saldo insuficiente. Disponible: ' . $available, 400);
+    if ($amount > $available) error('Insufficient balance. Available: ' . $available, 400);
     // Select earnings to mark as paid (oldest first), capping at requested amount
     $rows = $db->prepare("SELECT id, amount FROM coach_earnings WHERE coach_id = ? AND status = 'available' ORDER BY created_at ASC, id ASC");
     $rows->execute([$auth['sub']]);
@@ -47,7 +47,7 @@ function requestPayout(): void {
         $remaining -= (float)$r['amount'];
     }
     if (empty($earningIds)) {
-        error('Sin ganancias disponibles', 400);
+        error('No earnings available', 400);
     }
     $db->beginTransaction();
     try {
@@ -60,9 +60,9 @@ function requestPayout(): void {
         $db->commit();
     } catch (Throwable $e) {
         $db->rollBack();
-        error('No se pudo procesar el payout', 500);
+        error('Could not process the payout', 500);
     }
-    success(['id' => $payoutId], 'Payout solicitado', 201);
+    success(['id' => $payoutId], 'Payout requested', 201);
 }
 
 function adminListPayouts(): void {
@@ -89,9 +89,11 @@ function adminApprovePayout(string $id): void {
     $stmt = $db->prepare("SELECT * FROM coach_payouts WHERE id = ? AND status = 'pending'");
     $stmt->execute([(int)$id]);
     $payout = $stmt->fetch();
-    if (!$payout) error('Payout no encontrado o ya procesado', 404);
+    if (!$payout) error('Payout not found or already processed', 404);
+    $transferId = isset($input['stripeTransferId']) ? (string)$input['stripeTransferId'] : ('manual_' . bin2hex(random_bytes(8)));
+    if (mb_strlen($transferId) > 255) error('stripeTransferId is too long', 422);
     $db->prepare("UPDATE coach_payouts SET status = 'paid', paid_at = NOW(), stripe_transfer_id = ? WHERE id = ?")
-        ->execute([$input['stripeTransferId'] ?? 'manual_' . bin2hex(random_bytes(8)), (int)$id]);
+        ->execute([$transferId, (int)$id]);
     logAdminAction((int)$auth['sub'], 'approve_payout', 'payout', (int)$id, ['amount' => (float)$payout['amount'], 'coach_id' => (int)$payout['coach_id']]);
-    success(null, 'Payout aprobado');
+    success(null, 'Payout approved');
 }

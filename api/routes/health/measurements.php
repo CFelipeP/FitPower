@@ -33,6 +33,8 @@ function getMeasurements(): void {
 function saveMeasurements(): void {
     $auth = requireAuth();
     $input = getJsonInput();
+    $errors = validate($input, ['date' => 'date']);
+    if ($errors) error('Validation error', 422, $errors);
     $date = $input['date'] ?? date('Y-m-d');
     $db = getDB();
     $fields = ['weight_kg', 'body_fat_pct', 'waist_cm', 'hip_cm', 'chest_cm',
@@ -62,10 +64,10 @@ function saveMeasurements(): void {
             $params[] = $val;
         }
     }
-    if (empty($sets)) error('No hay campos para guardar', 400);
+    if (empty($sets)) error('No fields to save', 400);
     $db->prepare("INSERT INTO body_measurements (user_id, date, " . implode(', ', array_map(fn($s) => explode(' = ', $s)[0], $sets)) . ") 
         VALUES (?, ?, " . implode(', ', array_fill(0, count($sets), '?')) . ")
         ON DUPLICATE KEY UPDATE " . implode(', ', $sets))
         ->execute(array_merge([$auth['sub'], $date], $params));
-    success(null, 'Medidas guardadas');
+    success(null, 'Measurements saved');
 }

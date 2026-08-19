@@ -3,6 +3,16 @@
 function submitContact(): void {
     $input = getJsonInput();
 
+    // Spam protection: strict per-IP limit on the public form + honeypot.
+    rateLimit(3);
+
+    $honeypot = $input['website'] ?? '';
+    if ($honeypot !== '') {
+        // Bots fill hidden fields. Pretend success to avoid tipping them off.
+        success(null, 'Message sent successfully', 201);
+        return;
+    }
+
     $rules = [
         'firstName' => 'required|string|min:1|max:100',
         'email' => 'required|email',
@@ -12,10 +22,22 @@ function submitContact(): void {
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
+
+    // Duplicate detection: identical message from the same email within 10 minutes.
+    $dupStmt = $db->prepare("
+        SELECT 1 FROM contact_messages
+        WHERE email = ? AND message = ? AND created_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+        LIMIT 1
+    ");
+    $dupStmt->execute([$input['email'], $input['message']]);
+    if ($dupStmt->fetchColumn()) {
+        success(null, 'Message sent successfully', 201);
+        return;
+    }
 
     $db->prepare("
         INSERT INTO contact_messages (first_name, email, subject, message)
@@ -32,10 +54,10 @@ function submitContact(): void {
     if ($admin) {
         $db->prepare("
             INSERT INTO notifications (user_id, type, title, message, icon, icon_color)
-            VALUES (?, 'contact', 'Nuevo mensaje de contacto', ?, 'MessageCircle', '#f97316')
+            VALUES (?, 'contact', 'New contact message', ?, 'MessageCircle', '#f97316')
         ")->execute([
             $admin['id'],
-            'De ' . $input['firstName'] . ': ' . mb_substr($input['message'], 0, 100),
+            'From ' . $input['firstName'] . ': ' . mb_substr($input['message'], 0, 100),
         ]);
 
         try {
@@ -60,7 +82,7 @@ function submitContact(): void {
         } catch (\Throwable $e) {}
     }
 
-    success(null, 'Mensaje enviado correctamente', 201);
+    success(null, 'Message sent successfully', 201);
 }
 
 function adminListMessages(): void {
@@ -76,7 +98,7 @@ function adminGetMessage(string $id): void {
     $stmt = $db->prepare("SELECT * FROM contact_messages WHERE id = ?");
     $stmt->execute([(int)$id]);
     $msg = $stmt->fetch();
-    if (!$msg) error('Mensaje no encontrado', 404);
+    if (!$msg) error('Message not found', 404);
     // Mark as read
     $db->prepare("UPDATE contact_messages SET is_read = 1 WHERE id = ?")->execute([(int)$id]);
     success($msg);
@@ -86,20 +108,21 @@ function adminMarkMessageRead(string $id): void {
     requireRole('admin');
     $db = getDB();
     $db->prepare("UPDATE contact_messages SET is_read = 1 WHERE id = ?")->execute([(int)$id]);
-    success(null, 'Marcado como leído');
+    success(null, 'Marked as read');
 }
 
 function adminReplyMessage(string $id): void {
     $auth = requireRole('admin');
     $input = getJsonInput();
-    $message = $input['message'] ?? '';
-    if (!trim($message)) error('Mensaje requerido', 422);
+    $message = trim((string)($input['message'] ?? ''));
+    if ($message === '') error('Message required', 422);
+    if (mb_strlen($message) > 10000) error('The message is too long (max. 10000 characters)', 422);
     $db = getDB();
     $stmt = $db->prepare("SELECT * FROM contact_messages WHERE id = ?");
     $stmt->execute([(int)$id]);
     $msg = $stmt->fetch();
-    if (!$msg) error('Mensaje no encontrado', 404);
+    if (!$msg) error('Message not found', 404);
     $db->prepare("UPDATE contact_messages SET admin_reply = ?, replied_at = NOW(), replied_by = ? WHERE id = ?")
         ->execute([$message, $auth['sub'], (int)$id]);
-    success(null, 'Respuesta enviada');
+    success(null, 'Reply sent');
 }

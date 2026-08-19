@@ -11,9 +11,17 @@ function listClientMealPlans(string $clientId): void {
 function createMealPlan(string $clientId): void {
     $auth = requireRole('coach');
     $input = getJsonInput();
-    $rules = ['name' => 'required|string|min:1', 'startDate' => 'required|string'];
+    $rules = [
+        'name' => 'required|string|min:1|max:255',
+        'startDate' => 'required|date',
+        'endDate' => 'date',
+        'dailyCalories' => 'numeric|min_value:0|max_value:99999',
+        'proteinG' => 'numeric|min_value:0|max_value:9999',
+        'carbsG' => 'numeric|min_value:0|max_value:9999',
+        'fatG' => 'numeric|min_value:0|max_value:9999',
+    ];
     $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
+    if ($errors) error('Validation error', 422, $errors);
     $db = getDB();
     // Deactivate existing plans
     $db->prepare("UPDATE meal_plans SET is_active = 0 WHERE client_id = ?")->execute([(int)$clientId]);
@@ -26,7 +34,7 @@ function createMealPlan(string $clientId): void {
             isset($input['fatG']) ? (int)$input['fatG'] : null,
             $input['startDate'], $input['endDate'] ?? null,
         ]);
-    success(['id' => (int)$db->lastInsertId()], 'Plan creado', 201);
+    success(['id' => (int)$db->lastInsertId()], 'Meal plan created', 201);
 }
 
 function getCurrentMealPlan(): void {

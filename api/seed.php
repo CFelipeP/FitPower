@@ -89,7 +89,7 @@ $db->exec("INSERT INTO specializations (slug, name) VALUES
     ('crossfit', 'CrossFit')");
 
 $db->exec("INSERT INTO languages (name) VALUES
-    ('English'), ('Español'), ('Português'), ('Français'), ('Deutsch'),
+    ('English'), ('Português'), ('Français'), ('Deutsch'),
     ('Italiano'), ('日本語'), ('中文'), ('العربية'), ('हिन्दी')");
 
 $db->exec("INSERT INTO certifications (slug, name) VALUES
@@ -119,7 +119,9 @@ echo "  Lookup data inserted.\n\n";
 // ============================================================
 echo "[3/7] Creating users and trainer...\n";
 
-$password = password_hash('Prueba123xd', PASSWORD_BCRYPT);
+// Unique random password per user: shared/known seed passwords are a
+// credential-stuffing hazard even in development environments.
+$userPasswords = [];
 
 $userStmt = $db->prepare(
     "INSERT INTO users (first_name, last_name, email, role, password, fitness_level, primary_goal, training_days, email_verified_at, status, created_at, updated_at)
@@ -136,7 +138,10 @@ $users = [
 
 $userIds = [];
 foreach ($users as $u) {
-    $userStmt->execute([$u[0], $u[1], $u[2], $u[3], $password, $u[4], $u[5], $u[6], $now, $u[7], $now, $now]);
+    $plain = bin2hex(random_bytes(8)) . '!Aa1';
+    $userPasswords[$u[2]] = $plain;
+    $hash = password_hash($plain, PASSWORD_BCRYPT);
+    $userStmt->execute([$u[0], $u[1], $u[2], $u[3], $hash, $u[4], $u[5], $u[6], $now, $u[7], $now, $now]);
     $uid = (int)$db->lastInsertId();
     $userIds[] = $uid;
     echo "  ✓ {$u[0]} {$u[1]} <{$u[2]}> (id={$uid})\n";
@@ -603,14 +608,14 @@ $settingsStmt = $db->prepare(
     "INSERT IGNORE INTO platform_settings (setting_key, setting_value, description) VALUES (?, ?, ?)"
 );
 $settingsData = [
-    ['platform_name', 'FitPower', 'Nombre de la plataforma'],
-    ['support_email', 'support@fitpower.app', 'Email de soporte'],
-    ['default_language', 'es', 'Idioma por defecto'],
-    ['timezone', 'America/Mexico_City', 'Zona horaria'],
-    ['max_users', '10000', 'Máximo de usuarios permitidos'],
-    ['max_storage_gb', '50', 'Almacenamiento máximo en GB'],
-    ['api_rate_limit', '60', 'Límite de peticiones por minuto'],
-    ['file_upload_max_mb', '25', 'Tamaño máximo de archivo en MB'],
+    ['platform_name', 'FitPower', 'Platform name'],
+    ['support_email', 'support@fitpower.app', 'Support email'],
+    ['default_language', 'en', 'Default language'],
+    ['timezone', 'America/Mexico_City', 'Timezone'],
+    ['max_users', '10000', 'Maximum allowed users'],
+    ['max_storage_gb', '50', 'Maximum storage in GB'],
+    ['api_rate_limit', '60', 'Requests per minute limit'],
+    ['file_upload_max_mb', '25', 'Maximum file size in MB'],
 ];
 foreach ($settingsData as $s) { $settingsStmt->execute($s); }
 echo "  ✓ platform settings\n";
@@ -664,4 +669,7 @@ echo " Articles: " . count($articles) . "\n";
 echo " Media assets: " . count($mediaAssets) . "\n";
 echo " Audit log entries: " . count($auditLogs) . "\n";
 echo "====================================\n";
-echo "\nAll passwords: Prueba123xd\n";
+echo "\nGenerated passwords (dev only):\n";
+foreach ($userPasswords as $email => $pw) {
+    echo "  $email => $pw\n";
+}

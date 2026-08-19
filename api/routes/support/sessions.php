@@ -3,11 +3,19 @@
 const SESSION_TYPES = ['group', '1on1', 'video', 'strength', 'hypertrophy', 'cardio', 'hiit', 'flexibility'];
 
 function fetchSessionOr404(PDO $db, string $id): array {
-    $stmt = $db->prepare("SELECT s.* FROM sessions s WHERE s.id = ?");
+    $stmt = $db->prepare("
+        SELECT s.*,
+            CONCAT(t.first_name, ' ', t.last_name) as trainer_name,
+            p.name as program_name
+        FROM sessions s
+        LEFT JOIN trainers t ON t.id = s.trainer_id
+        LEFT JOIN programs p ON p.id = s.program_id
+        WHERE s.id = ?
+    ");
     $stmt->execute([$id]);
     $session = $stmt->fetch();
     if (!$session) {
-        error('Sesión no encontrada', 404);
+        error('Session not found', 404);
     }
     return $session;
 }
@@ -27,12 +35,22 @@ function canAccessSession(array $auth, PDO $db, array $session): bool {
 
     $stmt = $db->prepare("SELECT 1 FROM session_participants WHERE session_id = ? AND user_id = ?");
     $stmt->execute([(int)$session['id'], $auth['sub']]);
-    return (bool)$stmt->fetchColumn();
+    if ($stmt->fetchColumn()) return true;
+
+    // A client may also access sessions (workouts) that belong to a Program
+    // they are actively enrolled in.
+    if (!empty($session['program_id'])) {
+        $upStmt = $db->prepare("SELECT 1 FROM user_programs WHERE user_id = ? AND program_id = ? AND status = 'active'");
+        $upStmt->execute([(int)$auth['sub'], (int)$session['program_id']]);
+        return (bool)$upStmt->fetchColumn();
+    }
+
+    return false;
 }
 
 function assertSessionAccess(array $auth, PDO $db, array $session): void {
     if (!canAccessSession($auth, $db, $session)) {
-        error('No tienes permisos para acceder a esta sesión', 403);
+        error('You do not have permission to access this session', 403);
     }
 }
 
@@ -79,9 +97,73 @@ function loadExercises(PDO $db, array $sessionIds): array {
             'weight' => $ex['weight'],
             'notes' => $ex['notes'],
             'sortOrder' => (int)$ex['sort_order'],
+            'exerciseId' => $ex['exercise_id'] !== null ? (int)$ex['exercise_id'] : null,
         ];
     }
     return $bySession;
+}
+
+/** Loads guided-workout progress (session_id => decoded object) for a user. */
+function loadSessionProgress(PDO $db, array $sessionIds, int $userId): array {
+    if (empty($sessionIds)) return [];
+    $placeholders = implode(',', array_fill(0, count($sessionIds), '?'));
+    $params = array_merge($sessionIds, [$userId]);
+    $stmt = $db->prepare("
+        SELECT session_id, progress, completed FROM session_progress
+        WHERE session_id IN ($placeholders) AND user_id = ?
+    ");
+    $stmt->execute($params);
+    $out = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $out[(int)$row['session_id']] = [
+            'progress' => $row['progress'] ? json_decode($row['progress'], true) : null,
+            'completed' => (bool)$row['completed'],
+        ];
+    }
+    return $out;
+}
+
+/**
+ * Saves the guided-workout progress snapshot for a session.
+ * QA-audit fix: GuidedWorkout called PUT /sessions/{id}/progress which did not exist.
+ */
+function saveSessionProgress(string $id): void {
+    $auth = requireAuth();
+    $input = getJsonInput();
+    $db = getDB();
+
+    $session = fetchSessionOr404($db, $id);
+    assertSessionAccess($auth, $db, $session);
+
+    $progress = $input['progress'] ?? null;
+    if ($progress !== null && !is_array($progress)) {
+        error('progress must be an object', 422);
+    }
+    $completed = !empty($input['completed']) ? 1 : 0;
+
+    $stmt = $db->prepare("
+        INSERT INTO session_progress (session_id, user_id, progress, completed)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE progress = VALUES(progress), completed = VALUES(completed), updated_at = NOW()
+    ");
+    $stmt->execute([(int)$id, $auth['sub'], $progress !== null ? json_encode($progress) : null, $completed]);
+
+    // Persist real start/completion timestamps on the session itself and keep
+    // program progress in sync. Both are idempotent.
+    if ($completed) {
+        $db->prepare("UPDATE sessions SET status = 'completed', completed_at = COALESCE(completed_at, NOW()) WHERE id = ? AND status <> 'completed'")
+            ->execute([(int)$id]);
+    } else {
+        $db->prepare("UPDATE sessions SET status = 'in_progress', started_at = COALESCE(started_at, NOW()) WHERE id = ? AND status = 'scheduled'")
+            ->execute([(int)$id]);
+    }
+
+    if ($completed && !empty($session['program_id'])) {
+        require_once __DIR__ . '/../../helpers/program_progress.php';
+        recomputeProgramProgress($db, (int)$auth['sub'], (int)$session['program_id']);
+    }
+
+    success(['saved' => true, 'completed' => (bool)$completed]);
 }
 
 function listSessions(): void {
@@ -131,10 +213,13 @@ function listSessions(): void {
 
     $sessionIds = array_map(function ($s) { return (int)$s['id']; }, $sessions);
     $exercisesBySession = loadExercises($db, $sessionIds);
+    $progressBySession = loadSessionProgress($db, $sessionIds, (int)$auth['sub']);
 
-    $result = array_map(function ($s) use ($exercisesBySession) {
+    $result = array_map(function ($s) use ($exercisesBySession, $progressBySession) {
         $mapped = mapSession($s);
         $mapped['exercises'] = $exercisesBySession[(int)$s['id']] ?? [];
+        $mapped['progress'] = $progressBySession[(int)$s['id']]['progress'] ?? null;
+        $mapped['progressCompleted'] = $progressBySession[(int)$s['id']]['completed'] ?? false;
         return $mapped;
     }, $sessions);
 
@@ -154,8 +239,9 @@ function sessionAccessFilter(array $auth, PDO $db): array {
     }
 
     return [
-        '(s.user_id = ? OR EXISTS (SELECT 1 FROM session_participants sp WHERE sp.session_id = s.id AND sp.user_id = ?))',
-        [$auth['sub'], $auth['sub']],
+        '(s.user_id = ? OR EXISTS (SELECT 1 FROM session_participants sp WHERE sp.session_id = s.id AND sp.user_id = ?)
+          OR EXISTS (SELECT 1 FROM user_programs up WHERE up.user_id = ? AND up.status = \'active\' AND up.program_id = s.program_id))',
+        [$auth['sub'], $auth['sub'], $auth['sub']],
     ];
 }
 
@@ -164,31 +250,54 @@ function createSession(): void {
     $input = getJsonInput();
     $role = $auth['role'] ?? 'client';
 
+    // Users do not compose workouts; only coaches/admins may attach exercises
+    // when creating a session.
+    if ($role === 'client' && !empty($input['exercises']) && is_array($input['exercises'])) {
+        error('You do not have permission to add exercises', 403);
+    }
+
     $rules = [
         'title' => 'required|string|min:1|max:255',
-        'date' => 'required|string',
+        'date' => 'required|date',
         'description' => 'string|max:2000',
-        'startTime' => 'string|max:10',
-        'endTime' => 'string|max:10',
+        'startTime' => 'time',
+        'endTime' => 'time',
         'type' => 'in:group,1on1,video,strength,hypertrophy,cardio,hiit,flexibility',
         'status' => 'in:scheduled,completed,cancelled',
         'rpe' => 'numeric|min_value:1|max_value:10',
         'rpeNotes' => 'string|max:1000',
+        'trainerId' => 'numeric|min_value:1',
+        'programId' => 'numeric|min_value:1',
     ];
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
 
     $userId = null;
-    $trainerId = $input['trainerId'] ?? null;
+    $trainerId = null;
+    $bookedTrainerId = $input['trainerId'] ?? null;
 
     if ($role === 'client') {
         $userId = (int)$auth['sub'];
-        $trainerId = null;
+        // A client may book with a specific coach (from the coach profile or
+        // availability widget). Validate the trainer exists and keep the link
+        // so the coach actually sees the booking in their schedule.
+        if ($bookedTrainerId !== null && $bookedTrainerId !== '') {
+            $tStmt = $db->prepare("SELECT t.id, t.user_id, t.status FROM trainers t WHERE t.id = ?");
+            $tStmt->execute([(int)$bookedTrainerId]);
+            $trainerRow = $tStmt->fetch();
+            if (!$trainerRow) {
+                error('Coach not found', 404);
+            }
+            if ($trainerRow['status'] !== 'approved') {
+                error('This coach is not accepting bookings at this time', 400);
+            }
+            $trainerId = (int)$trainerRow['id'];
+        }
     } elseif ($role === 'coach') {
         $stmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
         $stmt->execute([$auth['sub']]);
@@ -215,25 +324,73 @@ function createSession(): void {
 
     $sessionId = (int)$db->lastInsertId();
 
+    // Notify the coach when a client books a session with them.
+    if ($role === 'client' && $trainerId !== null) {
+        try {
+            $notifStmt = $db->prepare("
+                SELECT user_id FROM trainers WHERE id = ?
+            ");
+            $notifStmt->execute([$trainerId]);
+            $coachUserId = (int)$notifStmt->fetchColumn();
+            if ($coachUserId > 0) {
+                $userNameStmt = $db->prepare("SELECT CONCAT(first_name, ' ', last_name) FROM users WHERE id = ?");
+                $userNameStmt->execute([$userId]);
+                $clientName = (string)$userNameStmt->fetchColumn();
+                $db->prepare("INSERT INTO notifications (user_id, type, title, message, icon, icon_color, link, created_at)
+                    VALUES (?, 'session', 'New session booked', ?, 'CalendarDays', '#f97316', ?, NOW())")
+                    ->execute([
+                        $coachUserId,
+                        $clientName . ' booked "' . ($input['title'] ?? 'Session') . '" on ' . $input['date'],
+                        '/coach/dashboard',
+                    ]);
+            }
+        } catch (\PDOException $e) {
+            // Notification is best-effort; never fail the booking because of it.
+            error_log('createSession booking notification failed: ' . $e->getMessage());
+        }
+    }
+
     if (!empty($input['exercises'])) {
+        if (!is_array($input['exercises'])) {
+            error('exercises must be an array', 422);
+        }
         $exStmt = $db->prepare("
-            INSERT INTO exercises (session_id, name, sets, reps, weight, notes, sort_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO exercises (session_id, name, sets, reps, weight, notes, sort_order, exercise_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
         foreach ($input['exercises'] as $i => $ex) {
+            if (!is_array($ex)) continue;
+            $name = isset($ex['name']) ? trim((string)$ex['name']) : '';
+            if ($name === '' || mbStrlenCompat($name) > 255) continue;
+            $sets = isset($ex['sets']) && $ex['sets'] !== '' && is_numeric($ex['sets']) ? min(255, max(0, (int)$ex['sets'])) : null;
+            $reps = isset($ex['reps']) && $ex['reps'] !== '' ? mb_substr((string)$ex['reps'], 0, 50) : null;
+            $weight = isset($ex['weight']) && $ex['weight'] !== '' ? mb_substr((string)$ex['weight'], 0, 50) : null;
+            $notes = isset($ex['notes']) && $ex['notes'] !== '' ? mb_substr((string)$ex['notes'], 0, 1000) : null;
+            $exerciseId = isset($ex['exerciseId']) && is_numeric($ex['exerciseId']) ? (int)$ex['exerciseId'] : null;
             $exStmt->execute([
                 $sessionId,
-                $ex['name'] ?? '',
-                $ex['sets'] ?? null,
-                $ex['reps'] ?? null,
-                $ex['weight'] ?? null,
-                $ex['notes'] ?? null,
+                $name,
+                $sets,
+                $reps,
+                $weight,
+                $notes,
                 $i + 1,
+                $exerciseId,
             ]);
         }
     }
 
-    success(['id' => $sessionId], 'Sesión creada', 201);
+    // Return the complete session so clients can render it immediately
+    // without a refetch.
+    $created = fetchSessionOr404($db, (string)$sessionId);
+    $mapped = mapSession($created);
+    $bySession = loadExercises($db, [$sessionId]);
+    $mapped['exercises'] = $bySession[$sessionId] ?? [];
+    $prog = loadSessionProgress($db, [(int)$sessionId], (int)$auth['sub']);
+    $mapped['progress'] = $prog[(int)$sessionId]['progress'] ?? null;
+    $mapped['progressCompleted'] = $prog[(int)$sessionId]['completed'] ?? false;
+
+    success($mapped, 'Session created', 201);
 }
 
 function updateSession(string $id): void {
@@ -247,19 +404,21 @@ function updateSession(string $id): void {
 
     $validationRules = [];
     if (isset($input['title'])) $validationRules['title'] = 'string|min:1|max:255';
-    if (isset($input['date'])) $validationRules['date'] = 'string';
+    if (isset($input['date'])) $validationRules['date'] = 'date';
     if (isset($input['description'])) $validationRules['description'] = 'string|max:2000';
-    if (isset($input['startTime'])) $validationRules['startTime'] = 'string|max:10';
-    if (isset($input['endTime'])) $validationRules['endTime'] = 'string|max:10';
+    if (isset($input['startTime'])) $validationRules['startTime'] = 'time';
+    if (isset($input['endTime'])) $validationRules['endTime'] = 'time';
     if (isset($input['type'])) $validationRules['type'] = 'in:group,1on1,video,strength,hypertrophy,cardio,hiit,flexibility';
     if (isset($input['status'])) $validationRules['status'] = 'in:scheduled,completed,cancelled';
     if (isset($input['rpe'])) $validationRules['rpe'] = 'numeric|min_value:1|max_value:10';
     if (isset($input['rpeNotes'])) $validationRules['rpeNotes'] = 'string|max:1000';
+    if (isset($input['programId'])) $validationRules['programId'] = 'numeric|min_value:1';
+    if (isset($input['trainerId'])) $validationRules['trainerId'] = 'numeric|min_value:1';
 
     if ($validationRules) {
         $errors = validate($input, $validationRules);
         if ($errors) {
-            error('Error de validación', 422, $errors);
+            error('Validation error', 422, $errors);
         }
     }
 
@@ -293,19 +452,51 @@ function updateSession(string $id): void {
             ->execute($params);
     }
 
+    // Persist the real completion timestamp (idempotent) and refresh the user's
+    // program progress whenever a program workout is completed. session_progress
+    // is the single source of truth for per-user completion, so the status path
+    // converges with the guided-workout progress path.
+    if (!empty($input['status']) && $input['status'] === 'completed') {
+        $db->prepare("UPDATE sessions SET completed_at = COALESCE(completed_at, NOW()) WHERE id = ?")
+            ->execute([$id]);
+        $db->prepare("
+            INSERT INTO session_progress (session_id, user_id, progress, completed, updated_at)
+            VALUES (?, ?, NULL, 1, NOW())
+            ON DUPLICATE KEY UPDATE completed = 1, updated_at = NOW()
+        ")->execute([(int)$id, (int)$auth['sub']]);
+        if (!empty($session['program_id'])) {
+            require_once __DIR__ . '/../../helpers/program_progress.php';
+            recomputeProgramProgress($db, (int)$auth['sub'], (int)$session['program_id']);
+        }
+    }
+
     if (!empty($input['status']) && $input['status'] === 'completed') {
         $userId = $auth['sub'];
         $db->prepare("INSERT INTO leaderboard_entries (user_id, total_points, workouts_completed, updated_at) 
             VALUES (?, 10, 1, NOW()) 
             ON DUPLICATE KEY UPDATE total_points = total_points + 10, workouts_completed = workouts_completed + 1, updated_at = NOW()")
             ->execute([$userId]);
+        // Mark the user's participation as completed so coach dashboards and
+        // weekly volume reflect the workout.
+        try {
+            $db->prepare("UPDATE session_participants SET status = 'completed' WHERE session_id = ? AND user_id = ? AND status = 'registered'")
+                ->execute([(int)$id, $userId]);
+        } catch (\PDOException $e) {
+            error_log('updateSession participant completion failed: ' . $e->getMessage());
+        }
         require_once __DIR__ . '/../gamification/achievements.php';
         checkAndUnlockAchievements();
         require_once __DIR__ . '/../../helpers/activity.php';
-        logActivity($auth['sub'], 'workout', 'Sesión completada: ' . ($session['title'] ?? 'Session'), 'Dumbbell', '#10b981', 'Done', 'bg-success');
+        logActivity($auth['sub'], 'workout', 'Session completed: ' . ($session['title'] ?? 'Session'), 'Dumbbell', '#10b981', 'Done', 'bg-success');
     }
 
-    success(null, 'Sesión actualizada');
+    // Return the updated session so clients can reflect changes immediately.
+    $fresh = fetchSessionOr404($db, $id);
+    $mapped = mapSession($fresh);
+    $bySession = loadExercises($db, [(int)$id]);
+    $mapped['exercises'] = $bySession[(int)$id] ?? [];
+
+    success($mapped, 'Session updated');
 }
 
 function deleteSession(string $id): void {
@@ -316,11 +507,13 @@ function deleteSession(string $id): void {
     assertSessionAccess($auth, $db, $session);
 
     $db->prepare("DELETE FROM sessions WHERE id = ?")->execute([$id]);
-    success(null, 'Sesión eliminada');
+    success(null, 'Session deleted');
 }
 
 function addSessionExercise(string $sessionId): void {
-    $auth = requireAuth();
+    // Users do not compose workouts: only coaches/admins add exercises to a
+    // session. A user executes the exercises the coach already configured.
+    $auth = requireRole('admin', 'coach');
     $input = getJsonInput();
     $db = getDB();
 
@@ -333,11 +526,12 @@ function addSessionExercise(string $sessionId): void {
         'reps' => 'string|max:50',
         'weight' => 'string|max:50',
         'notes' => 'string|max:1000',
+        'exerciseId' => 'numeric|min_value:1',
     ];
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $sortStmt = $db->prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM exercises WHERE session_id = ?");
@@ -345,8 +539,8 @@ function addSessionExercise(string $sessionId): void {
     $sortOrder = (int)$sortStmt->fetchColumn();
 
     $stmt = $db->prepare("
-        INSERT INTO exercises (session_id, name, sets, reps, weight, notes, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO exercises (session_id, name, sets, reps, weight, notes, sort_order, exercise_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmt->execute([
         $sessionId,
@@ -356,6 +550,7 @@ function addSessionExercise(string $sessionId): void {
         $input['weight'] ?? null,
         $input['notes'] ?? null,
         $sortOrder,
+        isset($input['exerciseId']) && $input['exerciseId'] !== '' ? (int)$input['exerciseId'] : null,
     ]);
 
     $exerciseId = (int)$db->lastInsertId();
@@ -368,7 +563,8 @@ function addSessionExercise(string $sessionId): void {
         'weight' => $input['weight'] ?? null,
         'notes' => $input['notes'] ?? null,
         'sortOrder' => $sortOrder,
-    ], 'Ejercicio agregado', 201);
+        'exerciseId' => isset($input['exerciseId']) && $input['exerciseId'] !== '' ? (int)$input['exerciseId'] : null,
+    ], 'Exercise added', 201);
 }
 
 function deleteSessionExercise(string $sessionId, string $exerciseId): void {
@@ -381,9 +577,9 @@ function deleteSessionExercise(string $sessionId, string $exerciseId): void {
     $stmt = $db->prepare("SELECT id FROM exercises WHERE id = ? AND session_id = ?");
     $stmt->execute([$exerciseId, $sessionId]);
     if (!$stmt->fetch()) {
-        error('Ejercicio no encontrado', 404);
+        error('Exercise not found', 404);
     }
 
     $db->prepare("DELETE FROM exercises WHERE id = ? AND session_id = ?")->execute([$exerciseId, $sessionId]);
-    success(null, 'Ejercicio eliminado');
+    success(null, 'Exercise deleted');
 }

@@ -42,18 +42,18 @@ function adminUploadMedia(): void {
     $db = getDB();
 
     if (empty($_FILES['file'])) {
-        error('No se envió ningún archivo', 422);
+        error('No file was provided', 422);
     }
 
     $file = $_FILES['file'];
     if ($file['error'] !== UPLOAD_ERR_OK) {
-        error('Error al subir el archivo', 500);
+        error('Error uploading the file', 500);
     }
 
     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'mp4', 'webm', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'zip'];
     if (!in_array($ext, $allowed, true)) {
-        error('Formato no permitido', 422);
+        error('Format not allowed', 422);
     }
 
     $imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
@@ -70,7 +70,7 @@ function adminUploadMedia(): void {
     $dest = $dir . '/' . $filename;
 
     if (!move_uploaded_file($file['tmp_name'], $dest)) {
-        error('Error al guardar el archivo', 500);
+        error('Error saving the file', 500);
     }
 
     $mimeType = mime_content_type($dest) ?: 'application/octet-stream';
@@ -94,7 +94,7 @@ function adminUploadMedia(): void {
         'file_path' => 'uploads/media/' . $filename,
         'file_type' => $fileType,
         'file_size' => $file['size'],
-    ], 'Archivo subido', 201);
+    ], 'File uploaded', 201);
 }
 
 function adminDeleteMedia(string $id): void {
@@ -106,7 +106,7 @@ function adminDeleteMedia(string $id): void {
     $asset = $stmt->fetch();
 
     if (!$asset) {
-        error('Archivo no encontrado', 404);
+        error('File not found', 404);
     }
 
     $filePath = UPLOAD_DIR . '/' . ltrim($asset['file_path'], '/');
@@ -115,5 +115,5 @@ function adminDeleteMedia(string $id): void {
     }
 
     $db->prepare("DELETE FROM media_assets WHERE id = ?")->execute([(int)$id]);
-    success(null, 'Archivo eliminado');
+    success(null, 'File deleted');
 }

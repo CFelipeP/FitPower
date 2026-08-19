@@ -98,21 +98,30 @@ function createTicket(): void {
     $rules = [
         'subject' => 'required|string|min:1|max:255',
         'message' => 'required|string|min:1|max:10000',
+        'priority' => 'numeric|min_value:0|max_value:5',
     ];
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
+    $priority = isset($input['priority']) && is_numeric($input['priority']) ? (int)$input['priority'] : 0;
+
+    // Priority support is a Pro+ feature: requests above the default are
+    // rejected server-side, never trusted from the client.
+    if ($priority > 0) {
+        require_once __DIR__ . '/../../helpers/features.php';
+        requireFeature($db, (int)$auth['sub'], 'priority_support');
+    }
 
     $db->prepare("
-        INSERT INTO support_tickets (user_id, subject, message, severity)
-        VALUES (?, ?, ?, 'open')
-    ")->execute([$auth['sub'], $input['subject'], $input['message']]);
+        INSERT INTO support_tickets (user_id, subject, message, severity, priority)
+        VALUES (?, ?, ?, 'open', ?)
+    ")->execute([$auth['sub'], $input['subject'], $input['message'], $priority]);
 
-    success(['id' => (int)$db->lastInsertId()], 'Ticket creado', 201);
+    success(['id' => (int)$db->lastInsertId()], 'Ticket created', 201);
 }
 
 function updateTicket(string $id): void {
@@ -126,11 +135,11 @@ function updateTicket(string $id): void {
     $ticket = $stmt->fetch();
 
     if (!$ticket) {
-        error('Ticket no encontrado', 404);
+        error('Ticket not found', 404);
     }
 
     if (!$isAdmin && $ticket['user_id'] != $auth['sub']) {
-        error('No tienes permisos para modificar este ticket', 403);
+        error('You do not have permission to modify this ticket', 403);
     }
 
     $updates = [];
@@ -139,7 +148,7 @@ function updateTicket(string $id): void {
     if (isset($input['severity'])) {
         $errors = validate(['severity' => $input['severity']], ['severity' => 'in:open,in_progress,critical,resolved,closed']);
         if ($errors) {
-            error('Error de validación', 422, $errors);
+            error('Validation error', 422, $errors);
         }
         $updates[] = "severity = ?";
         $params[] = $input['severity'];
@@ -150,7 +159,7 @@ function updateTicket(string $id): void {
             $stmt = $db->prepare("SELECT id FROM users WHERE id = ?");
             $stmt->execute([$input['assigned_to']]);
             if (!$stmt->fetch()) {
-                error('Usuario asignado no encontrado', 404);
+                error('Assigned user not found', 404);
             }
             $updates[] = "assigned_to = ?";
             $params[] = $input['assigned_to'];
@@ -158,7 +167,7 @@ function updateTicket(string $id): void {
         if (isset($input['admin_note'])) {
             $errors = validate(['admin_note' => $input['admin_note']], ['admin_note' => 'string|max:1000']);
             if ($errors) {
-                error('Error de validación', 422, $errors);
+                error('Validation error', 422, $errors);
             }
             $updates[] = "admin_note = ?";
             $params[] = $input['admin_note'];
@@ -166,14 +175,14 @@ function updateTicket(string $id): void {
     }
 
     if (empty($updates)) {
-        error('No hay campos para actualizar', 400);
+        error('No fields to update', 400);
     }
 
     $params[] = $id;
     $db->prepare("UPDATE support_tickets SET " . implode(', ', $updates) . " WHERE id = ?")
         ->execute($params);
 
-    success(null, 'Ticket actualizado');
+    success(null, 'Ticket updated');
 }
 
 // --- Admin Ticket Management ---
@@ -192,7 +201,7 @@ function adminUpdateTicket(string $id): void {
     $stmt->execute([$id]);
     $ticket = $stmt->fetch();
     if (!$ticket) {
-        error('Ticket no encontrado', 404);
+        error('Ticket not found', 404);
     }
 
     $updates = [];
@@ -202,7 +211,7 @@ function adminUpdateTicket(string $id): void {
     if ($statusValue !== null) {
         $errors = validate(['status' => $statusValue], ['status' => 'in:open,in_progress,critical,resolved,closed']);
         if ($errors) {
-            error('Error de validación', 422, $errors);
+            error('Validation error', 422, $errors);
         }
         $updates[] = "severity = ?";
         $params[] = $statusValue;
@@ -213,7 +222,7 @@ function adminUpdateTicket(string $id): void {
         $stmt = $db->prepare("SELECT id FROM users WHERE id = ?");
         $stmt->execute([$assignedTo]);
         if (!$stmt->fetch()) {
-            error('Usuario asignado no encontrado', 404);
+            error('Assigned user not found', 404);
         }
         $updates[] = "assigned_to = ?";
         $params[] = $assignedTo;
@@ -223,14 +232,14 @@ function adminUpdateTicket(string $id): void {
         $adminNote = $input['adminNote'] ?? $input['admin_note'];
         $errors = validate(['admin_note' => $adminNote], ['admin_note' => 'string|max:1000']);
         if ($errors) {
-            error('Error de validación', 422, $errors);
+            error('Validation error', 422, $errors);
         }
         $updates[] = "admin_note = ?";
         $params[] = $adminNote;
     }
 
     if (empty($updates)) {
-        error('No hay campos para actualizar', 400);
+        error('No fields to update', 400);
     }
 
     $params[] = $id;
@@ -239,7 +248,7 @@ function adminUpdateTicket(string $id): void {
 
     logAdminAction($auth['sub'], 'update_ticket', 'ticket', (int)$id, ['status' => $statusValue ?? null]);
 
-    success(null, 'Ticket actualizado');
+    success(null, 'Ticket updated');
 }
 
 function adminReplyTicket(string $id): void {
@@ -250,13 +259,13 @@ function adminReplyTicket(string $id): void {
     $rules = ['message' => 'required|string|min:1|max:10000'];
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $stmt = $db->prepare("SELECT id FROM support_tickets WHERE id = ?");
     $stmt->execute([$id]);
     if (!$stmt->fetch()) {
-        error('Ticket no encontrado', 404);
+        error('Ticket not found', 404);
     }
 
     $stmt = $db->prepare("
@@ -268,7 +277,7 @@ function adminReplyTicket(string $id): void {
     $ticketStmt = $db->prepare("SELECT user_id FROM support_tickets WHERE id = ?");
     $ticketStmt->execute([$id]);
     $ticketOwnerId = $ticketStmt->fetchColumn();
-    $db->prepare("INSERT INTO notifications (user_id, type, title, message, icon, link, created_at) VALUES (?, 'ticket', 'Respuesta a tu ticket', ?, 'MessageCircle', '/client/dashboard', NOW())")->execute([$ticketOwnerId, 'El administrador ha respondido a tu ticket #' . $id]);
+    $db->prepare("INSERT INTO notifications (user_id, type, title, message, icon, link, created_at) VALUES (?, 'ticket', 'Reply to your ticket', ?, 'MessageCircle', '/client/dashboard', NOW())")->execute([$ticketOwnerId, 'An administrator has replied to your ticket #' . $id]);
 
     $db->prepare("UPDATE support_tickets SET severity = 'in_progress', updated_at = NOW() WHERE id = ? AND severity NOT IN ('resolved', 'closed')")
         ->execute([$id]);
@@ -288,7 +297,7 @@ function adminReplyTicket(string $id): void {
                 'createdAt' => $r['created_at'],
             ];
         }, $replies),
-    ], 'Respuesta agregada', 201);
+    ], 'Reply added', 201);
 }
 
 function adminGetTicketReplies(string $id): void {
@@ -298,7 +307,7 @@ function adminGetTicketReplies(string $id): void {
     $stmt = $db->prepare("SELECT id FROM support_tickets WHERE id = ?");
     $stmt->execute([$id]);
     if (!$stmt->fetch()) {
-        error('Ticket no encontrado', 404);
+        error('Ticket not found', 404);
     }
 
     $stmt = $db->prepare("
@@ -320,4 +329,54 @@ function adminGetTicketReplies(string $id): void {
             'createdAt' => $r['created_at'],
         ];
     }, $replies));
+}
+
+/**
+ * Lets the ticket owner (client or coach) reply to their own ticket.
+ * QA-audit fix: ClientTickets/CoachTickets called POST /tickets/{id}/reply
+ * which did not exist.
+ */
+function replyToTicket(string $id): void {
+    $auth = requireAuth();
+    $input = getJsonInput();
+    $db = getDB();
+
+    $rules = ['message' => 'required|string|min:1|max:10000'];
+    $errors = validate($input, $rules);
+    if ($errors) {
+        error('Validation error', 422, $errors);
+    }
+
+    $stmt = $db->prepare("SELECT user_id FROM support_tickets WHERE id = ?");
+    $stmt->execute([$id]);
+    $ticket = $stmt->fetch();
+    if (!$ticket) {
+        error('Ticket not found', 404);
+    }
+    if ((int)$ticket['user_id'] !== $auth['sub'] && $auth['role'] !== 'admin') {
+        error('You do not have permission to reply to this ticket', 403);
+    }
+
+    $db->prepare("INSERT INTO ticket_replies (ticket_id, user_id, message, is_admin)
+        VALUES (?, ?, ?, 0)")
+        ->execute([$id, $auth['sub'], $input['message']]);
+
+    // Re-open the ticket so support staff sees there is a new reply.
+    $db->prepare("UPDATE support_tickets SET severity = 'open', updated_at = NOW() WHERE id = ? AND severity = 'in_progress'")
+        ->execute([$id]);
+
+    $stmt = $db->prepare("SELECT * FROM ticket_replies WHERE ticket_id = ? ORDER BY created_at ASC");
+    $stmt->execute([$id]);
+    $replies = $stmt->fetchAll();
+
+    success([
+        'replies' => array_map(function($r) {
+            return [
+                'id' => (int)$r['id'],
+                'userId' => (int)$r['user_id'],
+                'message' => $r['message'],
+                'createdAt' => $r['created_at'],
+            ];
+        }, $replies),
+    ], 'Reply added', 201);
 }

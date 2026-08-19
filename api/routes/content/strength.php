@@ -3,9 +3,14 @@
 function calculateOneRm(): void {
     $auth = requireAuth();
     $input = getJsonInput();
-    $rules = ['weight' => 'required|numeric|min_value:1', 'reps' => 'required|numeric|min_value:1|max_value:30'];
+    $rules = [
+        'weight' => 'required|numeric|min_value:1|max_value:2000',
+        'reps' => 'required|numeric|min_value:1|max_value:30',
+        'formula' => 'in:epley,brzycki',
+        'exerciseId' => 'numeric|min_value:1',
+    ];
     $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
+    if ($errors) error('Validation error', 422, $errors);
     $weight = (float)$input['weight'];
     $reps = (int)$input['reps'];
     $formula = $input['formula'] ?? 'epley';
@@ -21,9 +26,13 @@ function calculateOneRm(): void {
     // Save if exercise_id provided
     if (!empty($input['exerciseId'])) {
         $db = getDB();
-        $db->prepare("INSERT INTO estimated_one_rms (user_id, exercise_id, estimated_1rm, formula_used) VALUES (?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE estimated_1rm = VALUES(estimated_1rm), formula_used = VALUES(formula_used), calculated_at = NOW()")
-            ->execute([$auth['sub'], (int)$input['exerciseId'], round($estimated, 2), $formula]);
+        $exCheck = $db->prepare("SELECT id FROM exercise_library WHERE id = ?");
+        $exCheck->execute([(int)$input['exerciseId']]);
+        if ($exCheck->fetch()) {
+            $db->prepare("INSERT INTO estimated_one_rms (user_id, exercise_id, estimated_1rm, formula_used) VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE estimated_1rm = VALUES(estimated_1rm), formula_used = VALUES(formula_used), calculated_at = NOW()")
+                ->execute([$auth['sub'], (int)$input['exerciseId'], round($estimated, 2), $formula]);
+        }
     }
     
     success(['estimated1RM' => round($estimated, 2), 'formula' => $formula, 'reps' => $reps, 'weight' => $weight]);
@@ -57,7 +66,7 @@ function suggestProgression(string $exerciseId): void {
     $db = getDB();
     // Get last 5 logs for this exercise
     $stmt = $db->prepare("
-        SELECT wl.weight_used, wl.reps, wl.rpe, wl.created_at
+        SELECT wl.weight_used, wl.reps_completed AS reps, wl.rpe, wl.created_at
         FROM workout_logs wl
         WHERE wl.user_id = ? AND wl.exercise_id = ?
         ORDER BY wl.created_at DESC LIMIT 5

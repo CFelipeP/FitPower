@@ -29,7 +29,7 @@ log "================================================"
 echo ""
 
 # ---- 1. System Updates & Build Tools ----
-log "[1/9] Installing system packages..."
+log "[1/13] Installing system packages..."
 
 sudo apt-get update -qq
 sudo apt-get install -y -qq \
@@ -38,7 +38,7 @@ sudo apt-get install -y -qq \
     libssl-dev
 
 # ---- 2. MariaDB ----
-log "[2/9] Installing MariaDB..."
+log "[2/13] Installing MariaDB..."
 if systemctl is-active --quiet mariadb 2>/dev/null || systemctl is-active --quiet mysql 2>/dev/null; then
     ok "MariaDB already running"
 else
@@ -49,7 +49,7 @@ else
 fi
 
 # ---- 3. PHP 8.2+ ----
-log "[3/9] Installing PHP..."
+log "[3/13] Installing PHP..."
 PHP_VERSION=""
 if command -v php8.3 &>/dev/null; then
     PHP_VERSION="8.3"
@@ -76,8 +76,20 @@ sudo apt-get install -y -qq \
 
 ok "PHP $PHP_VERSION installed"
 
+# Tune PHP for FitPower (uploads up to 50 MB: videos, progress photos, certs)
+PHP_INI="/etc/php/${PHP_VERSION}/fpm/php.ini"
+if [ -f "$PHP_INI" ]; then
+    sudo sed -i 's/^upload_max_filesize = .*/upload_max_filesize = 50M/' "$PHP_INI"
+    sudo sed -i 's/^post_max_size = .*/post_max_size = 55M/' "$PHP_INI"
+    sudo sed -i 's/^max_execution_time = .*/max_execution_time = 300/' "$PHP_INI"
+    sudo sed -i 's/^memory_limit = .*/memory_limit = 256M/' "$PHP_INI"
+    # Enable opcache for production performance
+    sudo sed -i 's/^;opcache.enable=1/opcache.enable=1/' "$PHP_INI"
+    ok "PHP upload/opcache tuned"
+fi
+
 # ---- 4. Node.js 20 LTS ----
-log "[4/9] Installing Node.js 20 LTS..."
+log "[4/13] Installing Node.js 20 LTS..."
 if command -v node &>/dev/null && node -v | grep -q "v20"; then
     ok "Node.js $(node -v) already installed"
 else
@@ -87,7 +99,7 @@ else
 fi
 
 # ---- 5. Nginx ----
-log "[5/9] Installing Nginx..."
+log "[5/13] Installing Nginx..."
 if systemctl is-active --quiet nginx 2>/dev/null; then
     ok "Nginx already running"
 else
@@ -98,7 +110,7 @@ else
 fi
 
 # ---- 6. PM2 ----
-log "[6/9] Installing PM2..."
+log "[6/13] Installing PM2..."
 if command -v pm2 &>/dev/null; then
     ok "PM2 already installed"
 else
@@ -106,15 +118,25 @@ else
     ok "PM2 installed"
 fi
 
+# ---- 6b. Composer ----
+if command -v composer &>/dev/null; then
+    ok "Composer already installed"
+else
+    curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php
+    sudo php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+    rm -f /tmp/composer-setup.php
+    ok "Composer installed"
+fi
+
 # ---- 7. Create directory structure ----
-log "[7/9] Creating directory structure..."
+log "[7/13] Creating directory structure..."
 sudo mkdir -p "$FITPOWER_DIR/api/uploads/progress_photos"
 sudo mkdir -p "$FITPOWER_DIR/api/uploads/videos"
 sudo mkdir -p "$FITPOWER_DIR/api/uploads/video-feedback"
 sudo mkdir -p "$FITPOWER_DIR/public"
 
 # ---- 8. Nginx config ----
-log "[8/9] Configuring Nginx..."
+log "[8/13] Configuring Nginx..."
 
 PHP_SOCK=$(find /run/php/ -name "php*-fpm.sock" 2>/dev/null | head -1)
 if [ -z "$PHP_SOCK" ]; then
@@ -132,10 +154,12 @@ server {
     gzip_types text/plain text/css application/json application/javascript text/xml;
     gzip_min_length 256;
 
+    client_max_body_size 50m;
+
     # Security
     add_header X-Frame-Options DENY;
     add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
+    add_header Referrer-Policy strict-origin-when-cross-origin;
 
     # API -> PHP-FPM
     location /api/ {
@@ -154,25 +178,44 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
-    # WebSocket: Chat
-    location /chat {
+    # WebSocket: Chat (the frontend uses /ws/chat)
+    location /ws/chat {
         proxy_pass http://127.0.0.1:5180;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_read_timeout 86400;
     }
 
-    # WebSocket: Mediasoup signaling
-    location /mediasoup {
+    # WebSocket: Mediasoup signaling (the frontend uses /ws/mediasoup)
+    location /ws/mediasoup {
         proxy_pass http://127.0.0.1:5181;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_read_timeout 86400;
+    }
+
+    # Legacy paths without the /ws prefix (kept for older builds)
+    location /chat {
+        proxy_pass http://127.0.0.1:5180;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 86400;
+    }
+
+    location /mediasoup {
+        proxy_pass http://127.0.0.1:5181;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
         proxy_read_timeout 86400;
     }
 
@@ -184,7 +227,7 @@ server {
     }
 
     # Service workers & manifest - no cache
-    location ~ ^/(service-worker\.js|firebase-messaging-sw\.js|manifest\.json)$ {
+    location ~ ^/(service-worker\.js|firebase-messaging-sw\.js|manifest\.json|offline\.html)$ {
         expires off;
         add_header Cache-Control "no-cache, must-revalidate";
     }
@@ -200,47 +243,105 @@ sudo systemctl restart php${PHP_VERSION}-fpm
 sudo systemctl reload nginx
 ok "Nginx configured"
 
-# ---- 9. Instructions ----
+# ---- 9. Database user, schema and migrations ----
+log "[9/13] Setting up database..."
+DB_APP_PASS="${DB_APP_PASS:-}"
+if [ -z "$DB_APP_PASS" ]; then
+    err "DB_APP_PASS is not set. Export DB_APP_PASS before running this script."
+    exit 1
+fi
+
+DB_EXISTS=$(sudo mysql -u root -e "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='fitpower'" 2>/dev/null || true)
+if [ -z "$DB_EXISTS" ]; then
+    sudo mysql -u root <<SQL
+CREATE DATABASE IF NOT EXISTS fitpower CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'fitpower'@'localhost' IDENTIFIED BY '${DB_APP_PASS}';
+GRANT ALL PRIVILEGES ON fitpower.* TO 'fitpower'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+    ok "Database 'fitpower' and user 'fitpower' created"
+else
+    ok "Database 'fitpower' already exists"
+fi
+
+if [ -f "$FITPOWER_DIR/api/database/schema.sql" ]; then
+    sudo mysql -u fitpower -p"$DB_APP_PASS" fitpower < "$FITPOWER_DIR/api/database/schema.sql" 2>/dev/null || \
+    warn "schema.sql already applied or had minor errors (migrations will fill the gaps)"
+fi
+
+if [ -d "$FITPOWER_DIR/api/database/migrations" ]; then
+    log "Running migrations..."
+    (cd "$FITPOWER_DIR/api" && php migrate.php)
+    ok "Migrations applied"
+fi
+
+# ---- 10. Node services (chat, mediasoup, push) ----
+log "[10/13] Installing Node service dependencies..."
+if [ -f "$FITPOWER_DIR/package.json" ]; then
+    (cd "$FITPOWER_DIR" && npm install --omit=dev --no-audit --no-fund)
+    ok "Node dependencies installed"
+else
+    warn "package.json not found at $FITPOWER_DIR â€” copy the Node server files (chat-server.js, mediasoup-server.js, chat-auth.js, push-server.cjs, package.json) there first."
+fi
+
+if command -v pm2 &>/dev/null; then
+    log "[11/13] Starting services with PM2..."
+    if [ -f "$FITPOWER_DIR/ecosystem.config.cjs" ]; then
+        pm2 start "$FITPOWER_DIR/ecosystem.config.cjs" || pm2 restart all
+        pm2 save
+        sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u "$APP_USER" --hp "/home/$APP_USER" 2>/dev/null || true
+        ok "PM2 services started"
+    else
+        warn "ecosystem.config.cjs not found â€” start services manually."
+    fi
+fi
+
+# ---- 12. Reminders cron ----
+log "[12/13] Installing reminders cron..."
+if [ -n "${INTERNAL_API_SECRET:-}" ]; then
+    sudo bash -c "cat > /etc/cron.d/fitpower-reminders" <<CRON
+# FitPower check-in & session reminders (every 30 minutes)
+*/30 * * * * root curl -s -m 30 -X POST http://127.0.0.1/api/system/reminders -H 'X-Internal-Secret: ${INTERNAL_API_SECRET}' -H 'Content-Type: application/json' >/dev/null 2>&1
+CRON
+    ok "Reminders cron installed (every 30 min)"
+else
+    warn "INTERNAL_API_SECRET not set - reminders cron skipped. Export it and re-run this step."
+fi
+
+# ---- Instructions ----
 echo ""
 log "================================================"
 log "  SETUP COMPLETE"
 log "================================================"
 echo ""
-log "Now you need to:"
+log "Now deploy the application files:"
 echo ""
-echo "  1. Copy your application files:"
-echo "       cd ~"
-echo "       git clone <your-repo> fitpower-source"
-echo "       cd fitpower-source"
+echo "  The application expects this layout:"
+echo "    $FITPOWER_DIR/public/    -> frontend build (dist/*)"
+echo "    $FITPOWER_DIR/api/       -> PHP API (api/*)"
+echo "    $FITPOWER_DIR/           -> Node servers + package.json"
 echo ""
-echo "  2. Build the frontend:"
-echo "       cd FitPower"
-echo "       npm install"
-echo "       npm run build"
+echo "  1. Copy the files (example):"
+echo "       sudo cp -r FitPower/dist/* $FITPOWER_DIR/public/"
+echo "       sudo cp -r api/* $FITPOWER_DIR/api/"
+echo "       sudo cp FitPower/{package.json,package-lock.json,chat-server.js,mediasoup-server.js,chat-auth.js,ecosystem.config.cjs} $FITPOWER_DIR/"
+echo "       sudo cp FitPower/public/push-server.cjs $FITPOWER_DIR/push-server.cjs"
 echo ""
-echo "  3. Deploy files:"
-echo "       sudo cp -r dist/* $FITPOWER_DIR/public/"
-echo "       sudo cp -r ../api/* $FITPOWER_DIR/api/"
-echo "       sudo cp ecosystem.config.cjs $FITPOWER_DIR/"
-echo "       cp .env $FITPOWER_DIR/api/.env"
+echo "  2. Install API dependencies:"
+echo "       cd $FITPOWER_DIR/api && sudo composer install --no-dev --optimize-autoloader"
+echo "       cd $FITPOWER_DIR && sudo npm install --omit=dev"
 echo ""
-echo "  4. Install API dependencies:"
-echo "       cd $FITPOWER_DIR/api"
-echo "       sudo composer install --no-dev --optimize-autoloader"
+echo "  3. Create the environment file $FITPOWER_DIR/api/.env with"
+echo "     DB_HOST=localhost, DB_NAME=fitpower, DB_USER=fitpower,"
+echo "     DB_PASS=<your DB_APP_PASS>, JWT_SECRET=<random 64 chars>,"
+echo "     INTERNAL_API_SECRET=<random>, APP_URL=http://<rpi-ip>"
 echo ""
-echo "  5. Set up database:"
-echo "       sudo mysql -u root < $FITPOWER_DIR/api/database/schema.sql"
-echo ""
-echo "  6. Install Node dependencies (production only):"
-echo "       cd $FITPOWER_DIR"
-echo "       npm install --omit=dev"
-echo ""
-echo "  7. Start services with PM2:"
-echo "       pm2 start ecosystem.config.cjs"
+echo "  4. Start services:"
+echo "       pm2 start $FITPOWER_DIR/ecosystem.config.cjs"
 echo "       pm2 save"
-echo "       pm2 startup   # auto-start on boot"
 echo ""
-echo "  8. Open http://<rpi-ip> in your browser"
+echo "  5. Health check:"
+echo "       curl http://127.0.0.1/api/health"
 echo ""
 echo "  See deploy/README-rpi.md for detailed instructions."
 echo ""

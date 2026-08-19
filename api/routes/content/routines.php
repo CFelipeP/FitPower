@@ -1,9 +1,18 @@
 <?php
 
+require_once __DIR__ . '/../../helpers/features.php';
+
 function getDailyRoutine(): void {
     $auth = requireAuth();
     $db = getDB();
+    // AI-powered smart routine generation is a Pro+ feature (server-side gate).
+    requireFeature($db, (int)$auth['sub'], 'ai_programming');
     $date = $_GET['date'] ?? date('Y-m-d');
+    // Guard against junk dates into the DATE column.
+    $d = DateTime::createFromFormat('Y-m-d', $date);
+    if (!$d || $d->format('Y-m-d') !== $date) {
+        $date = date('Y-m-d');
+    }
 
     $stmt = $db->prepare("SELECT * FROM smart_routines WHERE user_id = ? AND routine_date = ?");
     $stmt->execute([$auth['sub'], $date]);
@@ -52,11 +61,14 @@ function getDailyRoutine(): void {
 function completeRoutine(): void {
     $auth = requireAuth();
     $input = getJsonInput();
+    $db = getDB();
+    // Completing a smart routine is part of the AI-powered programming feature.
+    requireFeature($db, (int)$auth['sub'], 'ai_programming');
 
-    $rules = ['date' => 'string'];
+    $rules = ['date' => 'date'];
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $date = $input['date'] ?? date('Y-m-d');
@@ -65,12 +77,9 @@ function completeRoutine(): void {
     $db->prepare("UPDATE smart_routines SET is_completed = 1, completed_at = NOW() WHERE user_id = ? AND routine_date = ?")
         ->execute([$auth['sub'], $date]);
 
-    updateLeaderboardPoints($auth['sub'], 'workouts_completed', 20);
+    require_once __DIR__ . '/../community/leaderboard.php';
+    updateLeaderboardPoints($auth['sub'], 'workouts_completed', 15);
 
-    $db->prepare("INSERT INTO leaderboard_entries (user_id, points, workouts_completed, updated_at) 
-        VALUES (?, 15, 1, NOW()) 
-        ON DUPLICATE KEY UPDATE points = points + 15, workouts_completed = workouts_completed + 1, updated_at = NOW()")
-        ->execute([$auth['sub']]);
     require_once __DIR__ . '/../gamification/achievements.php';
     checkAndUnlockAchievements();
 
@@ -78,9 +87,9 @@ function completeRoutine(): void {
     $routineStmt->execute([$auth['sub'], $date]);
     $routine = $routineStmt->fetch();
     require_once __DIR__ . '/../../helpers/activity.php';
-    logActivity($auth['sub'], 'workout', 'Rutina completada: ' . ($routine['title'] ?? 'Daily Routine'), 'Dumbbell', '#10b981', 'Done', 'bg-success');
+    logActivity($auth['sub'], 'workout', 'Routine completed: ' . ($routine['title'] ?? 'Daily Routine'), 'Dumbbell', '#10b981', 'Done', 'bg-success');
 
-    success(null, 'Rutina completada');
+    success(null, 'Routine completed');
 }
 
 function generateExercises(string $level, string $goal, string $focus): array {

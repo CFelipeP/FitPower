@@ -6,7 +6,7 @@ function deleteAccount(): void {
 
     $errors = validate($input, ['password' => 'required|string']);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
@@ -15,10 +15,10 @@ function deleteAccount(): void {
     $user = $stmt->fetch();
 
     if (!$user || !password_verify($input['password'], $user['password'])) {
-        error('Contraseña incorrecta', 401);
+        error('Incorrect password', 401);
     }
 
     $db->prepare("DELETE FROM users WHERE id = ?")->execute([$auth['sub']]);
 
-    success(null, 'Cuenta eliminada exitosamente');
+    success(null, 'Account deleted successfully');
 }

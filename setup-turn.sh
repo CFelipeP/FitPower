@@ -1,13 +1,13 @@
 #!/bin/bash
 # ============================================
 # FITPOWER + TURN (coturn) + NGROK
-# PARA LLAMADAS DESDE CUALQUIER PAÍS
+# FOR CALLS FROM ANY COUNTRY
 # ============================================
 set -e
 
 PI_IP="192.168.0.222"
 PI_USER="sotomayorpi"
-NGROK_TOKEN=""  # Déjalo vacío, lo pones después
+NGROK_TOKEN=""  # Leave empty, fill it in later
 TURN_SECRET="${TURN_SECRET:-$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p)}"
 export TURN_SECRET
 
@@ -16,12 +16,12 @@ echo "  FitPower + TURN Server + ngrok"
 echo "========================================"
 echo ""
 
-# ---------- 1. INSTALAR COTURN ----------
-echo "[1/8] Instalando coturn (TURN server)..."
+# ---------- 1. INSTALL COTURN ----------
+echo "[1/8] Installing coturn (TURN server)..."
 sudo apt update
 sudo apt install -y coturn
 
-# Configurar coturn
+# Configure coturn
 sudo tee /etc/turnserver.conf > /dev/null <<TURNEOF
 listening-port=3478
 tls-listening-port=5349
@@ -42,10 +42,10 @@ TURNEOF
 # Habilitar y arrancar
 sudo sed -i 's/#TURNSERVER_ENABLED=1/TURNSERVER_ENABLED=1/' /etc/default/coturn
 sudo systemctl restart coturn
-echo "  coturn corriendo en puerto 3478 (TCP)"
+echo "  coturn running on port 3478 (TCP)"
 
-# ---------- 2. INSTALAR DEPENDENCIAS ----------
-echo "[2/8] Verificando Node.js y PHP..."
+# ---------- 2. INSTALL DEPENDENCIES ----------
+echo "[2/8] Checking Node.js and PHP..."
 if ! command -v node &> /dev/null; then
     curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
     sudo apt install -y nodejs
@@ -55,13 +55,13 @@ if ! command -v php &> /dev/null; then
 fi
 
 # ---------- 3. PREPARAR PROYECTO ----------
-echo "[3/8] Instalando proyecto..."
+echo "[3/8] Installing project..."
 cd ~/fitpower
 npm install
 sudo npm install -g pm2
 
 # ---------- 4. CREAR REVERSE PROXY (Node) ----------
-echo "[4/8] Creando reverse proxy unificado..."
+echo "[4/8] Creating unified reverse proxy..."
 cat > proxy-server.js << 'PROXYEOF'
 import http from 'http'
 import fs from 'fs'
@@ -75,7 +75,7 @@ const API_TARGET = 'http://127.0.0.1:8088'
 const MEDIASOUP_TARGET = 'http://127.0.0.1:5181'
 const CHAT_TARGET = 'http://127.0.0.1:5180'
 
-// Cargar http-proxy manualmente
+// Load http-proxy manually
 const proxy = http.createServer((req, res) => {
     // API
     if (req.url.startsWith('/api')) {
@@ -130,10 +130,10 @@ proxy.on('upgrade', (req, socket, head) => {
 })
 PROXYEOF
 
-echo "  Proxy creado en puerto 8080"
+echo "  Proxy created on port 8080"
 
 # ---------- 5. CREAR SERVICIOS PM2 ----------
-echo "[5/8] Iniciando servicios..."
+echo "[5/8] Starting services..."
 
 pm2 delete all 2>/dev/null || true
 
@@ -151,39 +151,39 @@ pm2 start proxy-server.js --name proxy
 
 pm2 save
 
-# ---------- 6. CONFIGURAR MEDIASOUP CON TURN ----------
-echo "[6/8] Configurando TURN en mediasoup..."
-# Modificar createWebRtcTransport para incluir TURN
-# Ya lo hacemos mediante variable de entorno
+# ---------- 6. CONFIGURE MEDIASOUP WITH TURN ----------
+echo "[6/8] Configuring TURN in mediasoup..."
+# Modify createWebRtcTransport to include TURN
+# This is already done via environment variable
 
 # ---------- 7. NGROK ----------
-echo "[7/8] Configurando ngrok..."
+echo "[7/8] Configuring ngrok..."
 if ! command -v ngrok &> /dev/null; then
-    echo "  Descarga ngrok desde: https://ngrok.com/download"
-    echo "  O instala con:"
+    echo "  Download ngrok from: https://ngrok.com/download"
+    echo "  Or install with:"
     echo "    curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc"
     echo "    echo 'deb https://ngrok-agent.s3.amazonaws.com buster main' | sudo tee /etc/apt/sources.list.d/ngrok.list"
     echo "    sudo apt update && sudo apt install ngrok"
     echo ""
-    read -p "  ¿Ya instalaste ngrok? (s/n): " ngrok_ok
-    if [ "$ngrok_ok" != "s" ]; then
-        echo "  Instálalo y vuelve a correr este script"
+    read -p "  Have you installed ngrok yet? (y/n): " ngrok_ok
+    if [ "$ngrok_ok" != "y" ]; then
+        echo "  Install it and run this script again"
         exit 1
     fi
 fi
 
 if [ -z "$NGROK_TOKEN" ]; then
-    read -p "  Ingresa tu token de ngrok (https://dashboard.ngrok.com): " NGROK_TOKEN
+    read -p "  Enter your ngrok token (https://dashboard.ngrok.com): " NGROK_TOKEN
 fi
 ngrok config add-authtoken $NGROK_TOKEN
 
 # ---------- 8. MOSTRAR INSTRUCCIONES ----------
 echo ""
 echo "========================================"
-echo "  INSTRUCCIONES FINALES"
+echo "  FINAL INSTRUCTIONS"
 echo "========================================"
 echo ""
-echo "  EJECUTA NGROK (3 terminales o usa screen):"
+echo "  RUN NGROK (3 terminals or use screen):"
 echo ""
 echo "  Terminal 1 - Frontend + API + WebSockets:"
 echo "    ngrok http 8080"
@@ -193,13 +193,13 @@ echo "  Terminal 2 - TURN server:"
 echo "    ngrok tcp 3478"
 echo "    → URL: tcp://x.tcp.ngrok.io:xxxxx"
 echo ""
-echo "  LUEGO configura en mediasoup-server.js:"
-echo '    process.env.MEDIASOUP_ANNOUNCED_IP = "IP_PUBLICA_O_NGROK_TCP"'
+echo "  THEN configure in mediasoup-server.js:"
+echo '    process.env.MEDIASOUP_ANNOUNCED_IP = "PUBLIC_IP_OR_NGROK_TCP"'
 echo ""
-echo "  NOTA: La IP anunciada debe ser la URL del túnel TCP de ngrok"
-echo "  o la IP pública de tu router si tienes puertos abiertos."
+echo "  NOTE: The announced IP must be the ngrok TCP tunnel URL"
+echo "  or the public IP of your router if you have ports open."
 echo ""
-echo "  === PARA TUS USUARIOS ==="
-echo "  Abren: https://xxxx.ngrok.io  (la URL de ngrok HTTP)"
+echo "  === FOR YOUR USERS ==="
+echo "  They open: https://xxxx.ngrok.io  (the ngrok HTTP URL)"
 echo ""
 echo "========================================"

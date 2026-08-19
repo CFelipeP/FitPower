@@ -78,7 +78,7 @@ function getClientNutrition(string $id): void {
     $stmt->execute([$userId, $date]);
     $data = $stmt->fetch();
     if (!$data) {
-        success(['date' => $date, 'message' => 'Sin datos para esta fecha']);
+        success(['date' => $date, 'message' => 'No data for this date']);
         return;
     }
     success([
@@ -101,26 +101,123 @@ function getClientNutrition(string $id): void {
 function assignClientRoutine(string $id): void {
     $auth = requireRole('coach', 'admin');
     $input = getJsonInput();
-    $rules = ['sessionId' => 'required|numeric'];
-    $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
     $db = getDB();
     $userId = (int)$id;
     if ($auth['role'] !== 'admin') {
         verifyCoachClient($auth['sub'], $userId);
     }
-    $stmt = $db->prepare("SELECT id, title FROM sessions WHERE id = ?");
-    $stmt->execute([(int)$input['sessionId']]);
-    $session = $stmt->fetch();
-    if (!$session) error('Sesión no encontrada', 404);
-    $chk = $db->prepare("SELECT id FROM session_participants WHERE session_id = ? AND user_id = ?");
-    $chk->execute([$session['id'], $userId]);
-    if ($chk->fetch()) error('El cliente ya tiene asignada esta rutina', 409);
-    $db->prepare("INSERT INTO session_participants (session_id, user_id, status) VALUES (?, ?, 'registered')")
-        ->execute([$session['id'], $userId]);
-    $db->prepare("INSERT INTO notifications (user_id, type, title, message) VALUES (?, 'routine', 'Nueva rutina asignada', ?)")
-        ->execute([$userId, 'Se te ha asignado la rutina: ' . $session['title']]);
-    success(null, 'Rutina asignada', 201);
+
+    // Legacy flow: assign an already-existing session by id.
+    if (!empty($input['sessionId'])) {
+        $rules = ['sessionId' => 'required|numeric'];
+        $errors = validate($input, $rules);
+        if ($errors) error('Validation error', 422, $errors);
+        $stmt = $db->prepare("SELECT id, title FROM sessions WHERE id = ?");
+        $stmt->execute([(int)$input['sessionId']]);
+        $session = $stmt->fetch();
+        if (!$session) error('Session not found', 404);
+        $chk = $db->prepare("SELECT id FROM session_participants WHERE session_id = ? AND user_id = ?");
+        $chk->execute([$session['id'], $userId]);
+        if ($chk->fetch()) error('The client already has this routine assigned', 409);
+        $db->prepare("INSERT INTO session_participants (session_id, user_id, status) VALUES (?, ?, 'registered')")
+            ->execute([$session['id'], $userId]);
+        $db->prepare("INSERT INTO notifications (user_id, type, title, message) VALUES (?, 'routine', 'New routine assigned', ?)")
+            ->execute([$userId, 'You have been assigned the routine: ' . $session['title']]);
+        success(null, 'Routine assigned', 201);
+        return;
+    }
+
+    // Full routine assignment: date + title + exercises. Creates a session
+    // owned by the coach, linked to the client, that shows up in the client's
+    // "next workout" and the coach's calendar.
+    $rules = [
+        'date' => 'required|date',
+        'title' => 'required|string|min:1|max:255',
+        'focusArea' => 'string|max:100',
+        'duration' => 'numeric|min_value:1|max_value:600',
+        'exercises' => 'array',
+    ];
+    $errors = validate($input, $rules);
+    if ($errors) error('Validation error', 422, $errors);
+
+    $exercises = array_values(array_filter($input['exercises'] ?? [], function ($ex) {
+        return is_array($ex) && !empty(trim((string)($ex['name'] ?? '')));
+    }));
+    if (empty($exercises)) {
+        error('Add at least one exercise', 422);
+    }
+
+    $trainerId = null;
+    if ($auth['role'] === 'coach') {
+        $tStmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
+        $tStmt->execute([$auth['sub']]);
+        $trainerId = $tStmt->fetchColumn();
+        if (!$trainerId) error('Trainer profile not found', 404);
+    }
+
+    $startTime = null;
+    if (!empty($input['duration'])) {
+        $startTime = '09:00:00';
+    }
+    $endTime = null;
+    if (!empty($input['duration']) && $startTime) {
+        $end = new DateTime($startTime);
+        $end->modify('+' . (int)$input['duration'] . ' minutes');
+        $endTime = $end->format('H:i:s');
+    }
+    $focusArea = !empty($input['focusArea']) ? (string)$input['focusArea'] : null;
+    $description = ($focusArea ? 'Focus: ' . ucfirst(str_replace('_', ' ', $focusArea)) . '. ' : '')
+        . 'Custom routine assigned by your coach.';
+
+    $db->beginTransaction();
+    try {
+        $db->prepare("
+            INSERT INTO sessions (user_id, trainer_id, title, description, date, start_time, end_time, type, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'strength', 'scheduled')
+        ")->execute([$userId, $trainerId, $input['title'], $description, $input['date'], $startTime, $endTime]);
+        $sessionId = (int)$db->lastInsertId();
+
+        $exStmt = $db->prepare("
+            INSERT INTO exercises (session_id, name, sets, reps, notes, sort_order, exercise_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ");
+        foreach ($exercises as $i => $ex) {
+            $name = trim((string)$ex['name']);
+            if (mbStrlenCompat($name) > 255) continue;
+            $sets = isset($ex['sets']) && $ex['sets'] !== '' && $ex['sets'] !== null && is_numeric($ex['sets']) ? min(255, max(0, (int)$ex['sets'])) : null;
+            $reps = !empty($ex['reps']) ? mb_substr((string)$ex['reps'], 0, 50) : null;
+            $rest = !empty($ex['restTime']) ? mb_substr((string)$ex['restTime'], 0, 50) : null;
+            $notes = $rest !== null ? ('Rest: ' . $rest) : null;
+            $exerciseId = isset($ex['exerciseId']) && is_numeric($ex['exerciseId']) ? (int)$ex['exerciseId'] : null;
+            $exStmt->execute([
+                $sessionId,
+                $name,
+                $sets,
+                $reps,
+                $notes,
+                $i + 1,
+                $exerciseId,
+            ]);
+        }
+
+        $db->prepare("INSERT INTO session_participants (session_id, user_id, status) VALUES (?, ?, 'registered')")
+            ->execute([$sessionId, $userId]);
+
+        $db->prepare("INSERT INTO notifications (user_id, type, title, message, icon, icon_color, link, created_at)
+            VALUES (?, 'routine', 'New routine assigned', ?, 'Dumbbell', '#10b981', '/client/dashboard', NOW())")
+            ->execute([
+                $userId,
+                'Your coach assigned you "' . $input['title'] . '" for ' . $input['date'] . '. Check your next workout!',
+            ]);
+
+        $db->commit();
+    } catch (\Throwable $e) {
+        $db->rollBack();
+        error_log('assignClientRoutine failed: ' . $e->getMessage());
+        error('Could not assign the routine', 500);
+    }
+
+    success(['id' => $sessionId], 'Routine assigned', 201);
 }
 
 function connectStripe(): void {
@@ -129,15 +226,15 @@ function connectStripe(): void {
     $stmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
     $stmt->execute([$auth['sub']]);
     $trainer = $stmt->fetch();
-    if (!$trainer) error('Perfil de entrenador no encontrado', 404);
+    if (!$trainer) error('Trainer profile not found', 404);
     $trainerId = (int)$trainer['id'];
     if (!defined('STRIPE_SECRET_KEY') || !STRIPE_SECRET_KEY) {
-        error('Stripe no está configurado', 500);
+        error('Stripe is not configured', 500);
     }
     require_once __DIR__ . '/../../helpers/stripe_connect.php';
     $result = createStripeConnectAccount($trainerId, $auth['sub']);
-    if (!$result) error('Error al crear cuenta de Stripe', 500);
-    success($result, 'Enlace de onboarding generado');
+    if (!$result) error('Error creating Stripe account', 500);
+    success($result, 'Onboarding link generated');
 }
 
 function getPayouts(): void {
@@ -416,19 +513,32 @@ function getClientDailySummary(string $id): void {
     ]);
 }
 
-function verifyCoachClient(int $coachUserId, int $clientUserId): void {
+/**
+ * True when the coach has a real relationship with the client:
+ * an active enrollment in a program owned by the coach's trainer,
+ * or any session tied to the coach's trainer for that client.
+ */
+function coachHasClient(int $coachUserId, int $clientUserId): bool {
     $db = getDB();
     $trainerStmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
     $trainerStmt->execute([$coachUserId]);
-    $trainerId = $trainerStmt->fetchColumn();
-    if (!$trainerId) error('Perfil de entrenador no encontrado', 404);
-    $trainerId = (int)$trainerId;
+    $trainerId = (int)$trainerStmt->fetchColumn();
+    if (!$trainerId) return false;
+
     $chk = $db->prepare("SELECT up.id FROM user_programs up JOIN programs p ON p.id = up.program_id WHERE up.user_id = ? AND p.trainer_id = ? AND up.status = 'active'");
     $chk->execute([$clientUserId, $trainerId]);
-    if (!$chk->fetch()) {
-        $chk2 = $db->prepare("SELECT id FROM users WHERE id = ? AND role = 'client'");
-        $chk2->execute([$clientUserId]);
-        if (!$chk2->fetch()) error('Cliente no encontrado', 404);
+    if ($chk->fetch()) return true;
+
+    $chk2 = $db->prepare("SELECT id FROM sessions WHERE user_id = ? AND trainer_id = ? LIMIT 1");
+    $chk2->execute([$clientUserId, $trainerId]);
+    if ($chk2->fetch()) return true;
+
+    return false;
+}
+
+function verifyCoachClient(int $coachUserId, int $clientUserId): void {
+    if (!coachHasClient($coachUserId, $clientUserId)) {
+        error('You do not have permission to access this client', 403);
     }
 }
 
@@ -467,7 +577,7 @@ function createClientNote(string $id): void {
     $input = getJsonInput();
     $rules = ['title' => 'required|max:255'];
     $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
+    if ($errors) error('Validation error', 422, $errors);
     $db = getDB();
     $userId = (int)$id;
     if ($auth['role'] !== 'admin') {
@@ -480,7 +590,7 @@ function createClientNote(string $id): void {
     $db->prepare("INSERT INTO client_notes (coach_id, client_id, title, content, category) VALUES (?, ?, ?, ?, ?)")
         ->execute([$coachId, $userId, $title, $content, $category]);
     $noteId = (int)$db->lastInsertId();
-    success(['id' => $noteId, 'title' => $title, 'content' => $content, 'category' => $category], 'Nota creada', 201);
+    success(['id' => $noteId, 'title' => $title, 'content' => $content, 'category' => $category], 'Note created', 201);
 }
 
 function deleteClientNote(string $id): void {
@@ -490,7 +600,29 @@ function deleteClientNote(string $id): void {
     $coachId = $auth['sub'];
     $stmt = $db->prepare("SELECT id FROM client_notes WHERE id = ? AND coach_id = ?");
     $stmt->execute([$noteId, $coachId]);
-    if (!$stmt->fetch()) error('Nota no encontrada', 404);
+    if (!$stmt->fetch()) error('Note not found', 404);
     $db->prepare("DELETE FROM client_notes WHERE id = ? AND coach_id = ?")->execute([$noteId, $coachId]);
-    success(null, 'Nota eliminada');
+    success(null, 'Note deleted');
+}
+
+/**
+ * Stripe Connect onboarding status for the coach UI.
+ * QA-audit fix: CoachConnectResult/CoachEarningsPanel called
+ * GET /coach/connect-status which did not exist.
+ */
+function getConnectStatus(): void {
+    $auth = requireRole('coach', 'admin');
+    $db = getDB();
+    $stmt = $db->prepare("SELECT stripe_account_id, stripe_connect_account_id, stripe_connect_onboarding_complete, stripe_connect_onboarding_url FROM trainers WHERE user_id = ?");
+    $stmt->execute([$auth['sub']]);
+    $t = $stmt->fetch();
+    if (!$t) error('Trainer profile not found', 404);
+    $accountId = $t['stripe_connect_account_id'] ?? ($t['stripe_account_id'] ?? null);
+    success([
+        'connected' => (bool)$accountId && !empty($t['stripe_connect_onboarding_complete']),
+        'onboardingComplete' => (bool)$t['stripe_connect_onboarding_complete'],
+        'accountId' => $accountId,
+        'onboardingUrl' => $t['stripe_connect_onboarding_url'],
+        'stripeConfigured' => defined('STRIPE_SECRET_KEY') && !empty(STRIPE_SECRET_KEY) && !str_starts_with(STRIPE_SECRET_KEY, 'sk_test_placeholder'),
+    ]);
 }

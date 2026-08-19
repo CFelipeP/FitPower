@@ -32,11 +32,12 @@ function saveCheckin(): void {
         'sleepHours' => 'numeric|min_value:0|max_value:24',
         'energyLevel' => 'numeric|min_value:1|max_value:10',
         'notes' => 'string|max:1000',
+        'date' => 'date',
     ];
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
@@ -77,9 +78,9 @@ function saveCheckin(): void {
     checkAndUnlockAchievements();
 
     require_once __DIR__ . '/../../helpers/activity.php';
-    logActivity($auth['sub'], 'checkin', 'Check-in del día completado', 'Heart', '#ec4899', 'Done', 'bg-success');
+    logActivity($auth['sub'], 'checkin', 'Daily check-in completed', 'Heart', '#ec4899', 'Done', 'bg-success');
 
-    success(null, 'Check-in guardado');
+    success(null, 'Check-in saved');
 }
 
 function listCheckins(): void {

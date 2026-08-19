@@ -565,7 +565,7 @@ CREATE TABLE `languages` (
 
 LOCK TABLES `languages` WRITE;
 /*!40000 ALTER TABLE `languages` DISABLE KEYS */;
-INSERT INTO `languages` VALUES (5,'Deutsch'),(1,'English'),(2,'Español'),(4,'Français'),(6,'Italiano'),(3,'Português'),(9,'العربية'),(10,'हिन्दी'),(8,'中文'),(7,'日本語');
+INSERT INTO `languages` VALUES (5,'Deutsch'),(1,'English'),(4,'Français'),(6,'Italiano'),(3,'Português'),(9,'العربية'),(10,'हिन्दी'),(8,'中文'),(7,'日本語');
 /*!40000 ALTER TABLE `languages` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -629,7 +629,7 @@ CREATE TABLE `messages` (
 
 LOCK TABLES `messages` WRITE;
 /*!40000 ALTER TABLE `messages` DISABLE KEYS */;
-INSERT INTO `messages` VALUES (1,1,2,'Hola maria','2026-06-05 09:15:34'),(2,1,3,'Hola Alex','2026-06-05 09:16:13'),(3,1,2,'Que tal? veo que estas un poco mal de forma','2026-06-05 09:17:17'),(4,1,3,'no he comido we xd','2026-06-05 09:17:24'),(5,1,2,'xd','2026-06-06 15:57:47'),(6,1,3,'hola','2026-06-06 17:24:16'),(7,1,2,'a','2026-06-06 17:26:05');
+INSERT INTO `messages` VALUES (1,1,2,'Hello Maria','2026-06-05 09:15:34'),(2,1,3,'Hello Alex','2026-06-05 09:16:13'),(3,1,2,'How are you? I see you are a bit out of shape','2026-06-05 09:17:17'),(4,1,3,'I have not eaten yet lol','2026-06-05 09:17:24'),(5,1,2,'lol','2026-06-06 15:57:47'),(6,1,3,'hello','2026-06-06 17:24:16'),(7,1,2,'a','2026-06-06 17:26:05');
 /*!40000 ALTER TABLE `messages` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1607,7 +1607,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (1,'Admin','User','admin@fitpower.com','admin','$2y$10$7VFxpUQkESaidvj.t5SVuuaOftSoTIVpZdFRQNXB/bT1jcbwHljry','advanced','wellness',5,NULL,'2026-06-05 14:53:00',NULL,'active','2026-06-05 14:53:00','2026-06-05 14:53:00',NULL,NULL),(2,'Alex','Rivera','alex.rivera@fitpower.com','coach','$2y$10$7VFxpUQkESaidvj.t5SVuuaOftSoTIVpZdFRQNXB/bT1jcbwHljry','advanced','muscle',6,NULL,'2026-06-05 14:53:00',NULL,'active','2026-06-05 14:53:00','2026-06-05 14:53:00',NULL,NULL),(3,'Maria','Garcia','maria.garcia@fitpower.com','client','$2y$10$7VFxpUQkESaidvj.t5SVuuaOftSoTIVpZdFRQNXB/bT1jcbwHljry','intermediate','fat-loss',4,NULL,'2026-06-05 14:53:00',NULL,'active','2026-06-05 14:53:00','2026-06-05 14:53:00',NULL,NULL),(4,'Juan','Perez','juan.perez@fitpower.com','client','$2y$10$7VFxpUQkESaidvj.t5SVuuaOftSoTIVpZdFRQNXB/bT1jcbwHljry','intermediate','muscle',5,NULL,'2026-06-05 14:53:00',NULL,'active','2026-06-05 14:53:00','2026-06-05 14:53:00',NULL,NULL),(5,'Laura','Martinez','laura.martinez@fitpower.com','client','$2y$10$7VFxpUQkESaidvj.t5SVuuaOftSoTIVpZdFRQNXB/bT1jcbwHljry','beginner','wellness',3,NULL,'2026-06-05 14:53:00',NULL,'active','2026-06-05 14:53:00','2026-06-05 14:53:00',NULL,NULL);
+INSERT INTO `users` VALUES (1,'Admin','User','admin@fitpower.com','admin','$2y$10$4FrJfiv9g9MkEFLjKr2Ryub6iQ05bT/DMxo/bfMKVmXhJt7l5aJ2.','advanced','wellness',5,NULL,'2026-06-05 14:53:00',NULL,'active','2026-06-05 14:53:00','2026-06-05 14:53:00',NULL,NULL),(2,'Alex','Rivera','alex.rivera@fitpower.com','coach','$2y$10$YhFeQgkC5fZ59Zk45bv/YO/LYqM53Qk97SvA.kRdIlYfh/940O7cy','advanced','muscle',6,NULL,'2026-06-05 14:53:00',NULL,'active','2026-06-05 14:53:00','2026-06-05 14:53:00',NULL,NULL),(3,'Maria','Garcia','maria.garcia@fitpower.com','client','$2y$10$4BlQVjPXH3IIxyg/Pa0y.eTT21uvza8AwO9Ulbc6/GxLTctQlQcRa','intermediate','fat-loss',4,NULL,'2026-06-05 14:53:00',NULL,'active','2026-06-05 14:53:00','2026-06-05 14:53:00',NULL,NULL),(4,'Juan','Perez','juan.perez@fitpower.com','client','$2y$10$O9h2zYK403LGi4.tj/95RuX3TERnbpqvC3qGapy.qxxbnhDJ9BQ6S','intermediate','muscle',5,NULL,'2026-06-05 14:53:00',NULL,'active','2026-06-05 14:53:00','2026-06-05 14:53:00',NULL,NULL),(5,'Laura','Martinez','laura.martinez@fitpower.com','client','$2y$10$Adt1f/5Kcsy/LPnZDOe7yuUDhxYWbkmjzYSml2fKTMf2cFRrvdbw6','beginner','wellness',3,NULL,'2026-06-05 14:53:00',NULL,'active','2026-06-05 14:53:00','2026-06-05 14:53:00',NULL,NULL);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 

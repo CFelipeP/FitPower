@@ -387,7 +387,7 @@ function coachDashboard(): void {
     $trainerId = $trainerStmt->fetchColumn();
 
     if (!$trainerId) {
-        error('Perfil de entrenador no encontrado', 404);
+        error('Trainer profile not found', 404);
     }
 
     $trainerId = (int)$trainerId;
@@ -444,11 +444,18 @@ function coachDashboard(): void {
         ];
     }
 
-    // Weekly volume
+    // Weekly volume: coach sessions (incl. client bookings now attributed to
+    // the coach) plus sessions with completed participants, counted once each.
     $weekStmt = $db->prepare("
-        SELECT DATE_FORMAT(date, '%a') as day, COUNT(*) as count
-        FROM sessions WHERE trainer_id = ? AND date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-        GROUP BY date ORDER BY date
+        SELECT DATE_FORMAT(d.date, '%a') as day, COUNT(*) as count
+        FROM (
+            SELECT DISTINCT s.id, s.date
+            FROM sessions s
+            LEFT JOIN session_participants sp ON sp.session_id = s.id AND sp.status = 'completed'
+            WHERE s.trainer_id = ? AND s.date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+              AND (s.status IN ('scheduled', 'completed') OR sp.id IS NOT NULL)
+        ) d
+        GROUP BY d.date ORDER BY d.date
     ");
     $weekStmt->execute([$trainerId]);
     $weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -619,47 +626,60 @@ function coachDashboard(): void {
         ];
     }
 
-    // Recent payouts from payments table
-    $payoutStmt = $db->prepare("
-        SELECT p.amount, p.created_at, p.status
-        FROM payments p
-        WHERE p.status = 'completed'
-        ORDER BY p.created_at DESC LIMIT 4
-    ");
-    $payoutStmt->execute();
+    // Recent payouts: only the coach's own earnings (never platform-wide
+    // payment data). coach_earnings is the per-coach ledger.
     $recentPayouts = [];
-    foreach ($payoutStmt as $pay) {
-        $recentPayouts[] = [
-            'date' => date('M j, Y', strtotime($pay['created_at'])),
-            'amount' => '$' . number_format((float)$pay['amount'], 0),
-            'status' => ucfirst($pay['status']),
-        ];
+    $earningsTotal = 0.0;
+    $subRev = 0;
+    $coachRev = 0;
+    $prodRev = 0;
+    $pendingPayout = 0;
+    $thisMonth = 0.0;
+    $lastMonth = 0.0;
+    try {
+        $payoutStmt = $db->prepare("
+            SELECT ce.amount, ce.created_at, ce.status
+            FROM coach_earnings ce
+            WHERE ce.coach_id = ?
+            ORDER BY ce.created_at DESC LIMIT 4
+        ");
+        $payoutStmt->execute([$auth['sub']]);
+        foreach ($payoutStmt as $pay) {
+            $recentPayouts[] = [
+                'date' => date('M j, Y', strtotime($pay['created_at'])),
+                'amount' => '$' . number_format((float)$pay['amount'], 0),
+                'status' => ucfirst($pay['status']),
+            ];
+        }
+
+        // Earnings totals scoped to this coach.
+        $earnStmt = $db->prepare("
+            SELECT
+                COALESCE(SUM(amount), 0) as earnings_total,
+                COALESCE(SUM(CASE WHEN type = 'group_session' THEN amount ELSE 0 END), 0) as sub_rev,
+                COALESCE(SUM(CASE WHEN type IN ('session', 'other') THEN amount ELSE 0 END), 0) as coach_rev,
+                COALESCE(SUM(CASE WHEN type = 'program_royalty' THEN amount ELSE 0 END), 0) as prod_rev,
+                COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) as pending_payout,
+                COALESCE(SUM(CASE WHEN status IN ('available', 'paid') AND created_at >= DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH, '%Y-%m-01') THEN amount ELSE 0 END), 0) as this_month,
+                COALESCE(SUM(CASE WHEN status IN ('available', 'paid') AND created_at >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01') AND created_at < DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH, '%Y-%m-01') THEN amount ELSE 0 END), 0) as last_month
+            FROM coach_earnings
+            WHERE coach_id = ?
+        ");
+        $earnStmt->execute([$auth['sub']]);
+        $earnRow = $earnStmt->fetch();
+        $earningsTotal = (float)($earnRow['earnings_total'] ?? 0);
+        $subRev = (int)($earnRow['sub_rev'] ?? 0);
+        $coachRev = (int)($earnRow['coach_rev'] ?? 0);
+        $prodRev = (int)($earnRow['prod_rev'] ?? 0);
+        $pendingPayout = (int)($earnRow['pending_payout'] ?? 0);
+        $thisMonth = (float)($earnRow['this_month'] ?? 0);
+        $lastMonth = (float)($earnRow['last_month'] ?? 0);
+    } catch (\PDOException $e) {
+        // coach_earnings table may not exist yet in legacy installs: fall
+        // back to zeroed metrics instead of leaking platform-wide payments.
+        error_log('coachDashboard earnings query failed: ' . $e->getMessage());
     }
 
-
-    // Earnings totals
-    $earnRow = $db->query("
-        SELECT
-            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed') as earnings_total,
-            (SELECT COALESCE(SUM(p.amount), 0) FROM payments p JOIN user_subscriptions us ON us.id = p.subscription_id WHERE p.status = 'completed' AND p.type = 'subscription') as sub_rev,
-            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed' AND type = 'coaching') as coach_rev,
-            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed' AND type = 'product') as prod_rev,
-            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'pending') as pending_payout
-    ")->fetch();
-    $earningsTotal = (float)$earnRow['earnings_total'];
-    $subRev = (int)$earnRow['sub_rev'];
-    $coachRev = (int)$earnRow['coach_rev'];
-    $prodRev = (int)$earnRow['prod_rev'];
-    $pendingPayout = (int)$earnRow['pending_payout'];
-
-    // Calculate MoM growth from payments
-    $growthRow = $db->query("
-        SELECT
-            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed' AND created_at >= DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH, '%Y-%m-01')) as this_month,
-            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed' AND created_at >= DATE_FORMAT(CURDATE() - INTERVAL 2 MONTH, '%Y-%m-01') AND created_at < DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH, '%Y-%m-01')) as last_month
-    ")->fetch();
-    $thisMonth = (float)$growthRow['this_month'];
-    $lastMonth = (float)$growthRow['last_month'];
     $growthPct = $lastMonth > 0 ? round(($thisMonth - $lastMonth) / $lastMonth * 100) : 0;
     $growthText = ($growthPct >= 0 ? '+' : '') . $growthPct . '% MoM';
 
@@ -708,6 +728,19 @@ function clientDashboard(): void {
     $auth = requireRole('client', 'coach', 'admin');
     $userId = $auth['sub'];
     $db = getDB();
+
+    // Coach application status (visible to the applicant in their dashboard).
+    $coachApplication = null;
+    try {
+        $appStmt = $db->prepare("SELECT status FROM trainers WHERE user_id = ?");
+        $appStmt->execute([$userId]);
+        $appStatus = $appStmt->fetchColumn();
+        if ($appStatus !== false) {
+            $coachApplication = ['status' => $appStatus];
+        }
+    } catch (\PDOException $e) {
+        // trainers table may not exist yet in legacy installs
+    }
 
     $nutrition = $db->prepare("SELECT * FROM nutrition_logs WHERE user_id = ? AND log_date = ?");
     $nutrition->execute([$userId, date('Y-m-d')]);
@@ -908,6 +941,7 @@ function clientDashboard(): void {
 
     success([
         'userName' => $userName,
+        'coachApplication' => $coachApplication,
         'kpis' => [
             'calories' => $calories,
             'workouts' => $workoutsDone . '/' . $workoutTarget,

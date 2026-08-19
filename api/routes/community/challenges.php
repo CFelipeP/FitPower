@@ -61,9 +61,9 @@ function joinChallenge(int $challengeId): void {
     $stmt->execute([$challengeId]);
     $challenge = $stmt->fetch();
 
-    if (!$challenge) error('Challenge no encontrado', 404);
+    if (!$challenge) error('Challenge not found', 404);
     if ($challenge['status'] !== 'active' && $challenge['status'] !== 'upcoming') {
-        error('Este challenge no está disponible para unirse', 400);
+        error('This challenge is not available to join', 400);
     }
 
     $countStmt = $db->prepare("SELECT COUNT(*) FROM challenge_participants WHERE challenge_id = ?");
@@ -71,12 +71,12 @@ function joinChallenge(int $challengeId): void {
     $currentCount = (int)$countStmt->fetchColumn();
 
     if ($challenge['max_participants'] && $currentCount >= $challenge['max_participants']) {
-        error('El challenge ha alcanzado el máximo de participantes', 400);
+        error('The challenge has reached the maximum number of participants', 400);
     }
 
     $checkStmt = $db->prepare("SELECT id FROM challenge_participants WHERE challenge_id = ? AND user_id = ?");
     $checkStmt->execute([$challengeId, $auth['sub']]);
-    if ($checkStmt->fetch()) error('Ya estás inscrito en este challenge', 400);
+    if ($checkStmt->fetch()) error('You are already enrolled in this challenge', 400);
 
     $db->prepare("INSERT INTO challenge_participants (challenge_id, user_id) VALUES (?, ?)")
         ->execute([$challengeId, $auth['sub']]);
@@ -87,9 +87,9 @@ function joinChallenge(int $challengeId): void {
     $chStmt->execute([$challengeId]);
     $chTitle = $chStmt->fetchColumn();
     require_once __DIR__ . '/../../helpers/activity.php';
-    logActivity($auth['sub'], 'challenge', 'Te has unido al desafío: ' . $chTitle, 'Trophy', '#f59e0b', 'New', 'bg-warning');
+    logActivity($auth['sub'], 'challenge', 'You joined the challenge: ' . $chTitle, 'Trophy', '#f59e0b', 'New', 'bg-warning');
 
-    success(null, 'Te has unido al challenge', 201);
+    success(null, 'You joined the challenge', 201);
 }
 
 function leaveChallenge(int $challengeId): void {
@@ -98,12 +98,12 @@ function leaveChallenge(int $challengeId): void {
 
     $stmt = $db->prepare("SELECT id FROM challenge_participants WHERE challenge_id = ? AND user_id = ?");
     $stmt->execute([$challengeId, $auth['sub']]);
-    if (!$stmt->fetch()) error('No estás inscrito en este challenge', 400);
+    if (!$stmt->fetch()) error('You are not enrolled in this challenge', 400);
 
     $db->prepare("DELETE FROM challenge_participants WHERE challenge_id = ? AND user_id = ?")
         ->execute([$challengeId, $auth['sub']]);
 
-    success(null, 'Has salido del challenge');
+    success(null, 'You left the challenge');
 }
 
 function updateProgress(int $challengeId, int $userId, array $data): void {
@@ -115,14 +115,14 @@ function updateProgress(int $challengeId, int $userId, array $data): void {
         $roleStmt->execute([$auth['sub']]);
         $user = $roleStmt->fetch();
         if (!$user || ($user['role'] !== 'admin' && $user['role'] !== 'coach')) {
-            error('No tienes permisos para actualizar el progreso de otro usuario', 403);
+            error('You do not have permission to update another user\'s progress', 403);
         }
     }
 
     $chkStmt = $db->prepare("SELECT cp.id, c.goal_value FROM challenge_participants cp JOIN challenges c ON c.id = cp.challenge_id WHERE cp.challenge_id = ? AND cp.user_id = ?");
     $chkStmt->execute([$challengeId, $userId]);
     $row = $chkStmt->fetch();
-    if (!$row) error('Participación no encontrada', 404);
+    if (!$row) error('Participation not found', 404);
 
     $progress = max(0, (int)($data['progress'] ?? 0));
     $goalValue = (int)$row['goal_value'];
@@ -130,7 +130,7 @@ function updateProgress(int $challengeId, int $userId, array $data): void {
     $db->prepare("UPDATE challenge_participants SET progress = ?, completed_at = CASE WHEN ? >= ? AND ? > 0 THEN NOW() ELSE NULL END WHERE challenge_id = ? AND user_id = ?")
         ->execute([$progress, $progress, $goalValue, $goalValue, $challengeId, $userId]);
 
-    success(null, 'Progreso actualizado');
+    success(null, 'Progress updated');
 }
 
 function createChallenge(): void {
@@ -139,16 +139,22 @@ function createChallenge(): void {
     $rules = [
         'title' => 'required|string|min:3|max:255',
         'description' => 'string|max:5000',
-        'goalType' => 'required|in:workouts,minutes,weight,custom',
-        'goalValue' => 'required|numeric|min_value:1',
+        'category' => 'in:strength,cardio,nutrition,mindset,habit',
+        'goalType' => 'required|in:reps,minutes,days,distance,weight,custom',
+        'goalValue' => 'required|numeric|min_value:1|max_value:999999999',
+        'startDate' => 'date',
+        'endDate' => 'date',
+        'status' => 'in:active,upcoming,completed,cancelled',
+        'maxParticipants' => 'numeric|min_value:1|max_value:1000000',
     ];
     $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
+    if ($errors) error('Validation error', 422, $errors);
     $db = getDB();
-    $stmt = $db->prepare("INSERT INTO challenges (title, description, goal_type, goal_value, start_date, end_date, is_featured, max_participants, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt = $db->prepare("INSERT INTO challenges (title, description, category, goal_type, goal_value, start_date, end_date, is_featured, max_participants, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([
         $input['title'],
         $input['description'] ?? null,
+        $input['category'] ?? 'strength',
         $input['goalType'],
         (int)$input['goalValue'],
         $input['startDate'] ?? null,
@@ -160,7 +166,7 @@ function createChallenge(): void {
     ]);
     $id = (int)$db->lastInsertId();
     logAdminAction($auth['sub'], 'create', 'challenge', $id);
-    success(['id' => $id], 'Challenge creado', 201);
+    success(['id' => $id], 'Challenge created', 201);
 }
 
 function updateChallenge(string $id): void {
@@ -169,7 +175,23 @@ function updateChallenge(string $id): void {
     $db = getDB();
     $stmt = $db->prepare("SELECT id FROM challenges WHERE id = ?");
     $stmt->execute([(int)$id]);
-    if (!$stmt->fetch()) error('Challenge no encontrado', 404);
+    if (!$stmt->fetch()) error('Challenge not found', 404);
+
+    $rules = [];
+    if (isset($input['title'])) $rules['title'] = 'string|min:3|max:255';
+    if (isset($input['description'])) $rules['description'] = 'string|max:5000';
+    if (isset($input['goalType'])) $rules['goalType'] = 'in:reps,minutes,days,distance,weight,custom';
+    if (isset($input['goalValue'])) $rules['goalValue'] = 'numeric|min_value:1|max_value:999999999';
+    if (isset($input['startDate'])) $rules['startDate'] = 'date';
+    if (isset($input['endDate'])) $rules['endDate'] = 'date';
+    if (isset($input['status'])) $rules['status'] = 'in:active,upcoming,completed,cancelled';
+    if (isset($input['maxParticipants'])) $rules['maxParticipants'] = 'numeric|min_value:1|max_value:1000000';
+    if (isset($input['isFeatured'])) $rules['isFeatured'] = 'boolean';
+    if ($rules) {
+        $errors = validate($input, $rules);
+        if ($errors) error('Validation error', 422, $errors);
+    }
+
     $fieldMap = [
         'title' => 'title',
         'description' => 'description',
@@ -186,14 +208,14 @@ function updateChallenge(string $id): void {
     foreach ($fieldMap as $inputKey => $dbColumn) {
         if (isset($input[$inputKey])) {
             $updates[] = "$dbColumn = ?";
-            $params[] = $input[$inputKey];
+            $params[] = $inputKey === 'isFeatured' ? (int)$input[$inputKey] : $input[$inputKey];
         }
     }
-    if (empty($updates)) error('No hay campos para actualizar', 400);
+    if (empty($updates)) error('No fields to update', 400);
     $params[] = (int)$id;
     $db->prepare("UPDATE challenges SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
     logAdminAction($auth['sub'], 'update', 'challenge', (int)$id);
-    success(null, 'Challenge actualizado');
+    success(null, 'Challenge updated');
 }
 
 function deleteChallenge(string $id): void {
@@ -201,9 +223,9 @@ function deleteChallenge(string $id): void {
     $db = getDB();
     $stmt = $db->prepare("SELECT id FROM challenges WHERE id = ?");
     $stmt->execute([(int)$id]);
-    if (!$stmt->fetch()) error('Challenge no encontrado', 404);
+    if (!$stmt->fetch()) error('Challenge not found', 404);
     $db->prepare("DELETE FROM challenge_participants WHERE challenge_id = ?")->execute([(int)$id]);
     $db->prepare("DELETE FROM challenges WHERE id = ?")->execute([(int)$id]);
     logAdminAction($auth['sub'], 'delete', 'challenge', (int)$id);
-    success(null, 'Challenge eliminado');
+    success(null, 'Challenge deleted');
 }

@@ -26,13 +26,17 @@ function listHabits(): void {
 function createHabit(): void {
     $auth = requireAuth();
     $input = getJsonInput();
-    $rules = ['name' => 'required|string|min:1|max:255'];
+    $rules = [
+        'name' => 'required|string|min:1|max:255',
+        'icon' => 'string|max:50',
+        'color' => 'string|max:20',
+    ];
     $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
+    if ($errors) error('Validation error', 422, $errors);
     $db = getDB();
     $db->prepare("INSERT INTO habits (user_id, name, icon, color) VALUES (?, ?, ?, ?)")
         ->execute([$auth['sub'], $input['name'], $input['icon'] ?? 'check', $input['color'] ?? '#4CAF50']);
-    success(['id' => (int)$db->lastInsertId()], 'Hábito creado', 201);
+    success(['id' => (int)$db->lastInsertId()], 'Habit created', 201);
 }
 
 function deleteHabit(string $id): void {
@@ -40,23 +44,26 @@ function deleteHabit(string $id): void {
     $db = getDB();
     $stmt = $db->prepare("SELECT id FROM habits WHERE id = ? AND user_id = ?");
     $stmt->execute([(int)$id, $auth['sub']]);
-    if (!$stmt->fetch()) error('Hábito no encontrado', 404);
+    if (!$stmt->fetch()) error('Habit not found', 404);
     $db->prepare("DELETE FROM habits WHERE id = ? AND user_id = ?")->execute([(int)$id, $auth['sub']]);
-    success(null, 'Hábito eliminado');
+    success(null, 'Habit deleted');
 }
 
 function toggleHabit(): void {
     $auth = requireAuth();
     $input = getJsonInput();
-    $habitId = $input['habitId'] ?? 0;
+    $habitId = (int)($input['habitId'] ?? 0);
+    if (!$habitId) error('habitId required', 422);
+    $errors = validate($input, ['date' => 'date']);
+    if ($errors) error('Validation error', 422, $errors);
     $date = $input['date'] ?? date('Y-m-d');
     $completed = filter_var($input['completed'] ?? true, FILTER_VALIDATE_BOOLEAN);
     $db = getDB();
     $chk = $db->prepare("SELECT id FROM habits WHERE id = ? AND user_id = ?");
     $chk->execute([(int)$habitId, $auth['sub']]);
-    if (!$chk->fetch()) error('Hábito no encontrado', 404);
+    if (!$chk->fetch()) error('Habit not found', 404);
     $db->prepare("INSERT INTO habit_logs (habit_id, user_id, date, completed) VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE completed = VALUES(completed)")
         ->execute([(int)$habitId, $auth['sub'], $date, $completed ? 1 : 0]);
-    success(null, $completed ? 'Hábito completado' : 'Hábito desmarcado');
+    success(null, $completed ? 'Habit completed' : 'Habit unchecked');
 }

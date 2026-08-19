@@ -4,19 +4,50 @@ function listNotifications(): void {
     $auth = requireAuth();
     $userId = $auth['sub'];
     $db = getDB();
-    $stmt = $db->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50");
-    $stmt->execute([$userId]);
+
+    $page = max(1, (int)($_GET['page'] ?? 1));
+    $perPage = min(50, max(1, (int)($_GET['perPage'] ?? 20)));
+    $offset = ($page - 1) * $perPage;
+    $unreadOnly = ($_GET['unread'] ?? '') === 'true';
+
+    $where = 'user_id = ?';
+    $params = [$userId];
+    if ($unreadOnly) {
+        $where .= ' AND is_read = 0';
+    }
+
+    // Count for pagination + unread badge.
+    $countStmt = $db->prepare("SELECT COUNT(*) FROM notifications WHERE $where");
+    $countStmt->execute($params);
+    $total = (int)$countStmt->fetchColumn();
+    $hasMore = $offset + $perPage < $total;
+
+    $unreadStmt = $db->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0");
+    $unreadStmt->execute([$userId]);
+    $unreadCount = (int)$unreadStmt->fetchColumn();
+
+    $stmt = $db->prepare("SELECT * FROM notifications WHERE $where ORDER BY created_at DESC LIMIT $perPage OFFSET $offset");
+    $stmt->execute($params);
     $result = array_map(function($n) {
         return [
             'id' => (int)$n['id'],
             'type' => $n['type'],
             'title' => $n['title'],
             'body' => $n['message'],
+            'link' => $n['link'] ?? null,
             'read_at' => $n['is_read'] ? $n['created_at'] : null,
             'createdAt' => $n['created_at'],
         ];
     }, $stmt->fetchAll());
-    success($result);
+
+    success([
+        'notifications' => $result,
+        'hasMore' => $hasMore,
+        'total' => $total,
+        'unreadCount' => $unreadCount,
+        'page' => $page,
+        'perPage' => $perPage,
+    ]);
 }
 
 function markRead(array $params): void {
@@ -26,7 +57,7 @@ function markRead(array $params): void {
     $db = getDB();
     $db->prepare("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?")
         ->execute([$id, $userId]);
-    success(null, 'Notificación marcada como leída');
+    success(null, 'Notification marked as read');
 }
 
 function markAllRead(): void {
@@ -35,31 +66,67 @@ function markAllRead(): void {
     $db = getDB();
     $db->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?")
         ->execute([$userId]);
-    success(null, 'Todas marcadas como leídas');
+    success(null, 'All marked as read');
+}
+
+function deleteNotification(array $params): void {
+    $auth = requireAuth();
+    $userId = $auth['sub'];
+    $id = (int)$params['id'];
+    $db = getDB();
+    $db->prepare("DELETE FROM notifications WHERE id = ? AND user_id = ?")
+        ->execute([$id, $userId]);
+    success(null, 'Notification deleted');
+}
+
+function deleteAllNotifications(): void {
+    $auth = requireAuth();
+    $userId = $auth['sub'];
+    $db = getDB();
+    $db->prepare("DELETE FROM notifications WHERE user_id = ?")
+        ->execute([$userId]);
+    success(null, 'All notifications deleted');
 }
 
 function createNotification(): void {
     requireRole('admin');
     $input = getJsonInput();
     $userId = (int)($input['userId'] ?? 0);
-    if (!$userId) error('userId requerido', 422);
+    if (!$userId) error('userId required', 422);
+
+    $errors = validate($input, [
+        'title' => 'required|string|min:1|max:255',
+        'body' => 'string|max:5000',
+        'type' => 'string|max:50',
+    ]);
+    if ($errors) error('Validation error', 422, $errors);
+
     $db = getDB();
+    $userCheck = $db->prepare("SELECT id FROM users WHERE id = ?");
+    $userCheck->execute([$userId]);
+    if (!$userCheck->fetch()) error('User not found', 404);
+
     $db->prepare("INSERT INTO notifications (user_id, type, title, message) VALUES (?, ?, ?, ?)")
         ->execute([
             $userId,
             $input['type'] ?? 'general',
-            $input['title'] ?? '',
+            $input['title'],
             $input['body'] ?? '',
         ]);
-    success(['id' => (int)$db->lastInsertId()], 'Notificación creada', 201);
+    success(['id' => (int)$db->lastInsertId()], 'Notification created', 201);
 }
 
 function broadcastNotification(): void {
     requireRole('admin');
     $input = getJsonInput();
-    $rules = ['title' => 'required|string|min:1', 'body' => 'required|string|min:1'];
+    $rules = [
+        'title' => 'required|string|min:1|max:255',
+        'body' => 'required|string|min:1|max:5000',
+        'type' => 'string|max:50',
+        'role' => 'string|max:20',
+    ];
     $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
+    if ($errors) error('Validation error', 422, $errors);
     $db = getDB();
     $role = $input['role'] ?? '';
     $where = "WHERE status = 'active'";
@@ -91,5 +158,5 @@ function broadcastNotification(): void {
         curl_exec($ch);
         curl_close($ch);
     } catch (\Throwable $e) {}
-    success(['sent' => count($users)], 'Notificación transmitida', 201);
+    success(['sent' => count($users)], 'Notification sent', 201);
 }

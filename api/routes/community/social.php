@@ -53,28 +53,39 @@ function getFeed() {
 function createPost() {
     $auth = requireAuth();
     $input = getJsonInput();
-    $content = $input['content'] ?? '';
-    $type = $input['type'] ?? 'status';
-    
-    if (!trim($content)) error('Content is required');
-    
+
+    $errors = validate($input, [
+        'content' => 'required|string|max:5000',
+        'type' => 'string|max:50',
+    ]);
+    if ($errors) error('Validation error', 422, $errors);
+
+    $content = trim($input['content']);
+    $type = isset($input['type']) ? trim($input['type']) : 'status';
+    if ($type === '') $type = 'status';
+
     $db = getDB();
     $stmt = $db->prepare("INSERT INTO social_posts (user_id, content, type) VALUES (?, ?, ?)");
     $stmt->execute([$auth['sub'], $content, $type]);
-    
+
     success(['id' => $db->lastInsertId()], 201);
 }
 
 function toggleLike() {
     $auth = requireAuth();
     $input = getJsonInput();
-    $postId = $input['post_id'] ?? null;
-    if (!$postId) error('Post ID required');
-    
+    $postId = (int)($input['post_id'] ?? 0);
+    if (!$postId) error('Post ID required', 422);
+
     $db = getDB();
+    // The post must exist (FK insert would 500 otherwise).
+    $postCheck = $db->prepare("SELECT id FROM social_posts WHERE id = ?");
+    $postCheck->execute([$postId]);
+    if (!$postCheck->fetch()) error('Post not found', 404);
+
     $check = $db->prepare("SELECT id FROM social_likes WHERE post_id = ? AND user_id = ?");
     $check->execute([$postId, $auth['sub']]);
-    
+
     if ($check->fetch()) {
         $db->prepare("DELETE FROM social_likes WHERE post_id = ? AND user_id = ?")->execute([$postId, $auth['sub']]);
         $db->prepare("UPDATE social_posts SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = ?")->execute([$postId]);
@@ -89,17 +100,21 @@ function toggleLike() {
 function addComment() {
     $auth = requireAuth();
     $input = getJsonInput();
-    $postId = $input['post_id'] ?? null;
-    $content = $input['content'] ?? '';
-    
-    if (!$postId) error('Post ID required');
-    if (!trim($content)) error('Comment content required');
-    
+    $postId = (int)($input['post_id'] ?? 0);
+    if (!$postId) error('Post ID required', 422);
+
+    $errors = validate($input, ['content' => 'required|string|max:2000']);
+    if ($errors) error('Validation error', 422, $errors);
+
     $db = getDB();
+    $postCheck = $db->prepare("SELECT id FROM social_posts WHERE id = ?");
+    $postCheck->execute([$postId]);
+    if (!$postCheck->fetch()) error('Post not found', 404);
+
     $stmt = $db->prepare("INSERT INTO social_comments (post_id, user_id, content) VALUES (?, ?, ?)");
-    $stmt->execute([$postId, $auth['sub'], $content]);
+    $stmt->execute([$postId, $auth['sub'], trim($input['content'])]);
     $db->prepare("UPDATE social_posts SET comments_count = comments_count + 1 WHERE id = ?")->execute([$postId]);
-    
+
     success(['id' => $db->lastInsertId()], 201);
 }
 
@@ -120,11 +135,15 @@ function getComments($postId) {
 function followUser() {
     $auth = requireAuth();
     $input = getJsonInput();
-    $followingId = $input['user_id'] ?? null;
-    if (!$followingId) error('User ID required');
-    if ($followingId == $auth['sub']) error('Cannot follow yourself');
-    
+    $followingId = (int)($input['user_id'] ?? 0);
+    if (!$followingId) error('User ID required', 422);
+    if ($followingId === (int)$auth['sub']) error('Cannot follow yourself', 422);
+
     $db = getDB();
+    $userCheck = $db->prepare("SELECT id FROM users WHERE id = ? AND status != 'suspended'");
+    $userCheck->execute([$followingId]);
+    if (!$userCheck->fetch()) error('User not found', 404);
+
     $db->prepare("INSERT IGNORE INTO followers (follower_id, following_id) VALUES (?, ?)")->execute([$auth['sub'], $followingId]);
     success(['following' => true]);
 }

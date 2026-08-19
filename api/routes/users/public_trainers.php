@@ -92,7 +92,7 @@ function publicGetTrainer(string $id): void {
     $trainer = $stmt->fetch();
 
     if (!$trainer) {
-        error('Entrenador no encontrado', 404);
+        error('Trainer not found', 404);
     }
 
     $specStmt = $db->prepare("

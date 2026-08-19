@@ -39,14 +39,14 @@ function uploadPhoto(): void {
     if (!empty($input['photoUrl'])) {
         $rules['photoUrl'] = 'string|max:500';
     } elseif (!empty($input['photoData'])) {
-        $rules['photoData'] = 'string';
+        $rules['photoData'] = 'string|max:15000000';
     } else {
-        error('Debe proporcionar una URL o una imagen', 422);
+        error('You must provide a URL or an image', 422);
     }
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     // Determine final photo URL
@@ -63,7 +63,7 @@ function uploadPhoto(): void {
         $data = preg_replace('/^data:image\/\w+;base64,/', '', $input['photoData']);
         $data = base64_decode($data, true);
         if ($data === false) {
-            error('Datos de imagen inválidos', 422);
+            error('Invalid image data', 422);
         }
         $filename = $userId . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
         file_put_contents($dir . '/' . $filename, $data);
@@ -81,7 +81,7 @@ function uploadPhoto(): void {
             $input['bodyWeight'] ?? null,
             $input['notes'] ?? null,
         ]);
-    success(['id' => (int)$db->lastInsertId(), 'photoUrl' => $photoUrl], 'Foto guardada', 201);
+    success(['id' => (int)$db->lastInsertId(), 'photoUrl' => $photoUrl], 'Photo saved', 201);
 }
 
 function deletePhoto(array $params): void {
@@ -91,7 +91,7 @@ function deletePhoto(array $params): void {
     $db = getDB();
     $stmt = $db->prepare("SELECT id FROM progress_photos WHERE id = ? AND user_id = ?");
     $stmt->execute([$id, $userId]);
-    if (!$stmt->fetch()) error('Foto no encontrada', 404);
+    if (!$stmt->fetch()) error('Photo not found', 404);
     $db->prepare("DELETE FROM progress_photos WHERE id = ? AND user_id = ?")->execute([$id, $userId]);
-    success(null, 'Foto eliminada');
+    success(null, 'Photo deleted');
 }

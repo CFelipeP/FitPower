@@ -3,11 +3,11 @@
 function processReminders() {
     $secret = INTERNAL_API_SECRET;
     if ($secret === '') {
-        error('Cron no configurado: define INTERNAL_API_SECRET', 503);
+        error('Cron not configured: define INTERNAL_API_SECRET', 503);
     }
     $provided = $_SERVER['HTTP_X_INTERNAL_SECRET'] ?? '';
     if (!hash_equals($secret, $provided)) {
-        error('Acceso denegado', 403);
+        error('Access denied', 403);
     }
 
     $db = getDB();

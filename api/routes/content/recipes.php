@@ -37,14 +37,24 @@ function createRecipe(): void {
     $input = getJsonInput();
     $rules = [
         'name' => 'required|string|min:1|max:255',
-        'calories' => 'sometimes|numeric|min:0|max:10000',
-        'protein' => 'sometimes|numeric|min:0|max:500',
-        'carbs' => 'sometimes|numeric|min:0|max:500',
-        'fat' => 'sometimes|numeric|min:0|max:500',
+        'description' => 'string|max:5000',
+        'mealType' => 'string|max:100',
+        'calories' => 'numeric|min_value:0|max_value:10000',
+        'protein' => 'numeric|min_value:0|max_value:500',
+        'carbs' => 'numeric|min_value:0|max_value:500',
+        'fat' => 'numeric|min_value:0|max_value:500',
+        'prepTime' => 'numeric|min_value:0|max_value:1000',
+        'difficulty' => 'in:easy,medium,hard',
+        'imageUrl' => 'string|max:255',
+        'instructions' => 'string|max:20000',
     ];
     $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
+    if ($errors) error('Validation error', 422, $errors);
     $db = getDB();
+    $ingredients = $input['ingredients'] ?? [];
+    if (!is_array($ingredients)) $ingredients = [];
+    $tags = $input['tags'] ?? [];
+    if (!is_array($tags)) $tags = [];
     $stmt = $db->prepare("INSERT INTO recipes (name, meal_type, description, calories, protein_g, carbs_g, fat_g, ingredients, instructions, image_url, prep_time_minutes, difficulty, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([
         $input['name'],
@@ -54,14 +64,14 @@ function createRecipe(): void {
         isset($input['protein']) ? (float)$input['protein'] : null,
         isset($input['carbs']) ? (float)$input['carbs'] : null,
         isset($input['fat']) ? (float)$input['fat'] : null,
-        isset($input['ingredients']) ? json_encode($input['ingredients']) : null,
+        json_encode($ingredients),
         $input['instructions'] ?? null,
         $input['imageUrl'] ?? null,
         isset($input['prepTime']) ? (int)$input['prepTime'] : null,
-        $input['difficulty'] ?? null,
-        isset($input['tags']) ? json_encode($input['tags']) : null,
+        $input['difficulty'] ?? 'easy',
+        json_encode($tags),
     ]);
-    success(['id' => (int)$db->lastInsertId()], 'Receta creada', 201);
+    success(['id' => (int)$db->lastInsertId()], 'Recipe created', 201);
 }
 
 function seedRecipes(): void {
@@ -87,7 +97,7 @@ function seedRecipes(): void {
             $count++;
         }
     }
-    success(['created' => $count], "$count recetas insertadas");
+    success(['created' => $count], "$count recipes inserted");
 }
 
 function updateRecipe(string $id): void {
@@ -96,7 +106,25 @@ function updateRecipe(string $id): void {
     $db = getDB();
     $stmt = $db->prepare("SELECT id FROM recipes WHERE id = ?");
     $stmt->execute([(int)$id]);
-    if (!$stmt->fetch()) error('Receta no encontrada', 404);
+    if (!$stmt->fetch()) error('Recipe not found', 404);
+
+    $rules = [];
+    if (isset($input['name'])) $rules['name'] = 'string|min:1|max:255';
+    if (isset($input['description'])) $rules['description'] = 'string|max:5000';
+    if (isset($input['mealType'])) $rules['mealType'] = 'string|max:100';
+    if (isset($input['calories'])) $rules['calories'] = 'numeric|min_value:0|max_value:10000';
+    if (isset($input['protein'])) $rules['protein'] = 'numeric|min_value:0|max_value:500';
+    if (isset($input['carbs'])) $rules['carbs'] = 'numeric|min_value:0|max_value:500';
+    if (isset($input['fat'])) $rules['fat'] = 'numeric|min_value:0|max_value:500';
+    if (isset($input['prepTime'])) $rules['prepTime'] = 'numeric|min_value:0|max_value:1000';
+    if (isset($input['difficulty'])) $rules['difficulty'] = 'in:easy,medium,hard';
+    if (isset($input['imageUrl'])) $rules['imageUrl'] = 'string|max:255';
+    if (isset($input['instructions'])) $rules['instructions'] = 'string|max:20000';
+    if ($rules) {
+        $errors = validate($input, $rules);
+        if ($errors) error('Validation error', 422, $errors);
+    }
+
     $fieldMap = [
         'name' => 'name',
         'description' => 'description',
@@ -116,13 +144,13 @@ function updateRecipe(string $id): void {
     foreach ($fieldMap as $inputKey => $dbColumn) {
         if (isset($input[$inputKey])) {
             $updates[] = "$dbColumn = ?";
-            $params[] = $inputKey === 'ingredients' ? json_encode($input[$inputKey]) : $input[$inputKey];
+            $params[] = $inputKey === 'ingredients' ? json_encode(is_array($input[$inputKey]) ? $input[$inputKey] : []) : $input[$inputKey];
         }
     }
-    if (empty($updates)) error('No hay campos para actualizar', 400);
+    if (empty($updates)) error('No fields to update', 400);
     $params[] = (int)$id;
     $db->prepare("UPDATE recipes SET " . implode(', ', $updates) . " WHERE id = ?")->execute($params);
-    success(null, 'Receta actualizada');
+    success(null, 'Recipe updated');
 }
 
 function deleteRecipe(string $id): void {
@@ -130,7 +158,7 @@ function deleteRecipe(string $id): void {
     $db = getDB();
     $stmt = $db->prepare("SELECT id FROM recipes WHERE id = ?");
     $stmt->execute([(int)$id]);
-    if (!$stmt->fetch()) error('Receta no encontrada', 404);
+    if (!$stmt->fetch()) error('Recipe not found', 404);
     $db->prepare("DELETE FROM recipes WHERE id = ?")->execute([(int)$id]);
-    success(null, 'Receta eliminada');
+    success(null, 'Recipe deleted');
 }

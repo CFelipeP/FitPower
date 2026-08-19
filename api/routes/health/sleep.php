@@ -20,13 +20,18 @@ function getSleep(): void {
 function saveSleep(): void {
     $auth = requireAuth();
     $input = getJsonInput();
-    $rules = ['hours' => 'required|numeric|min_value:0|max_value:24', 'quality' => 'in:poor,fair,good,great'];
+    $rules = [
+        'hours' => 'required|numeric|min_value:0|max_value:24',
+        'quality' => 'in:poor,fair,good,great',
+        'date' => 'date',
+        'notes' => 'string|max:1000',
+    ];
     $errors = validate($input, $rules);
-    if ($errors) error('Error de validación', 422, $errors);
+    if ($errors) error('Validation error', 422, $errors);
     $db = getDB();
     $date = $input['date'] ?? date('Y-m-d');
     $db->prepare("INSERT INTO sleep_logs (user_id, date, hours, quality, notes) VALUES (?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE hours = VALUES(hours), quality = VALUES(quality), notes = VALUES(notes)")
         ->execute([$auth['sub'], $date, $input['hours'], $input['quality'] ?? 'good', $input['notes'] ?? null]);
-    success(null, 'Sueño guardado');
+    success(null, 'Sleep saved');
 }

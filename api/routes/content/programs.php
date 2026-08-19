@@ -50,7 +50,20 @@ function listPrograms(): void {
     $stmt->execute($params);
     $programs = $stmt->fetchAll();
 
-    $programs = array_map(function($p) {
+    // Owner flag so the UI can show Edit/Delete only for programs the
+    // requesting user actually manages (coach → own trainer, admin → all).
+    // listPrograms is public; tryAuth() returns null for anonymous visitors.
+    $viewer = tryAuth();
+    $isAdmin = ($viewer['role'] ?? '') === 'admin';
+    $myTrainerId = null;
+    if (($viewer['role'] ?? '') === 'coach') {
+        $tStmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
+        $tStmt->execute([$viewer['sub']]);
+        $myTrainerId = (int)$tStmt->fetchColumn() ?: null;
+    }
+
+    $programs = array_map(function($p) use ($isAdmin, $myTrainerId) {
+        $trainerId = $p['trainer_id'] ? (int)$p['trainer_id'] : null;
         return [
             'id' => (int)$p['id'],
             'name' => $p['name'],
@@ -62,6 +75,8 @@ function listPrograms(): void {
             'enrollments' => (int)$p['enrollments'],
             'avgRating' => (float)$p['avg_rating'],
             'trainerName' => $p['trainer_name'],
+            'trainerId' => $trainerId,
+            'isOwner' => $isAdmin || ($myTrainerId !== null && $trainerId === $myTrainerId),
         ];
     }, $programs);
 
@@ -76,6 +91,7 @@ function listPrograms(): void {
 function getProgram(string $id): void {
     $auth = requireAuth();
     $db = getDB();
+    $role = $auth['role'] ?? 'client';
 
     $stmt = $db->prepare("
         SELECT p.*, CONCAT(t.first_name, ' ', t.last_name) as trainer_name
@@ -87,7 +103,15 @@ function getProgram(string $id): void {
     $program = $stmt->fetch();
 
     if (!$program) {
-        error('Programa no encontrado', 404);
+        error('Program not found', 404);
+    }
+
+    // Users may only open Programs they are actively enrolled in.
+    if ($role === 'client') {
+        require_once __DIR__ . '/../../helpers/program_access.php';
+        if (!userCanAccessProgram($db, (int)$auth['sub'], (int)$id)) {
+            error('You do not have permission to access this program', 403);
+        }
     }
 
     $sessionStmt = $db->prepare("
@@ -97,7 +121,7 @@ function getProgram(string $id): void {
     $sessionStmt->execute([$id]);
     $sessions = $sessionStmt->fetchAll();
 
-    success([
+    $payload = [
         'id' => (int)$program['id'],
         'trainerId' => $program['trainer_id'] ? (int)$program['trainer_id'] : null,
         'trainerName' => $program['trainer_name'],
@@ -112,7 +136,50 @@ function getProgram(string $id): void {
         'enrollments' => (int)$program['enrollments'],
         'status' => $program['status'],
         'sessions' => $sessions,
-    ]);
+    ];
+
+    // For enrolled clients the server derives real progress: completed workouts,
+    // percentage, week/day for each workout and the next pending workout.
+    if ($role === 'client') {
+        require_once __DIR__ . '/../../helpers/program_progress.php';
+        $workouts = loadProgramWorkouts($db, (int)$id);
+        $spw = max(1, (int)$program['sessions_per_week']);
+        $completion = loadProgramSessionCompletion($db, (int)$auth['sub'], (int)$id);
+
+        $weekBySession = [];
+        foreach ($workouts as $i => $w) {
+            $weekBySession[(int)$w['id']] = intdiv($i, $spw) + 1;
+        }
+
+        $sessionPayloads = [];
+        foreach ($sessions as $s) {
+            $sId = (int)$s['id'];
+            $done = !empty($completion[$sId]);
+            $sessionPayloads[] = [
+                'id' => $sId,
+                'title' => $s['title'],
+                'description' => $s['description'],
+                'date' => $s['date'],
+                'startTime' => $s['start_time'],
+                'endTime' => $s['end_time'],
+                'type' => $s['type'],
+                'status' => $s['status'],
+                'week' => $weekBySession[$sId] ?? null,
+                'day' => (($i = array_search($sId, array_column($workouts, 'id'), true)) !== false) ? ($i % $spw) + 1 : null,
+                'progressCompleted' => $done,
+            ];
+        }
+        $payload['sessions'] = $sessionPayloads;
+
+        $stats = recomputeProgramProgress($db, (int)$auth['sub'], (int)$id);
+        $payload['progressPct'] = $stats['progress'];
+        $payload['completedCount'] = $stats['completedCount'];
+        $payload['totalSessions'] = $stats['totalSessions'];
+        $payload['currentWeek'] = $stats['currentWeek'];
+        $payload['nextWorkout'] = $stats['nextWorkout'];
+    }
+
+    success($payload);
 }
 
 function createProgram(): void {
@@ -133,10 +200,19 @@ function createProgram(): void {
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
+
+    // Coaches' programs are always attributed to their trainer profile so
+    // they appear in their dashboard and are eligible for bulk assignment.
+    $trainerId = $input['trainerId'] ?? null;
+    if ($trainerId === null && ($auth['role'] ?? '') === 'coach') {
+        $tStmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
+        $tStmt->execute([$auth['sub']]);
+        $trainerId = $tStmt->fetchColumn() ?: null;
+    }
 
     $stmt = $db->prepare("
         INSERT INTO programs (trainer_id, name, description, tag, duration_minutes, weeks, sessions_per_week, difficulty, image, status)
@@ -144,7 +220,7 @@ function createProgram(): void {
     ");
 
     $stmt->execute([
-        $input['trainerId'] ?? null,
+        $trainerId,
         $input['name'],
         $input['description'] ?? null,
         $input['tag'] ?? null,
@@ -159,17 +235,28 @@ function createProgram(): void {
     success([
         'id' => (int)$db->lastInsertId(),
         'name' => $input['name'],
-    ], 'Programa creado', 201);
+    ], 'Program created', 201);
 }
 
 function updateProgram(string $id): void {
     $auth = requireRole('admin', 'coach');
     $db = getDB();
 
-    $stmt = $db->prepare("SELECT id FROM programs WHERE id = ?");
+    $stmt = $db->prepare("SELECT id, trainer_id FROM programs WHERE id = ?");
     $stmt->execute([$id]);
-    if (!$stmt->fetch()) {
-        error('Programa no encontrado', 404);
+    $program = $stmt->fetch();
+    if (!$program) {
+        error('Program not found', 404);
+    }
+
+    // Coaches may only edit programs they own (trainer profile matches).
+    if ($auth['role'] === 'coach') {
+        $tStmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
+        $tStmt->execute([$auth['sub']]);
+        $trainerId = (int)$tStmt->fetchColumn();
+        if (!$trainerId || (int)$program['trainer_id'] !== $trainerId) {
+            error('You do not have permission to modify this program', 403);
+        }
     }
 
     $input = getJsonInput();
@@ -188,7 +275,7 @@ function updateProgram(string $id): void {
     if ($validationRules) {
         $errors = validate($input, $validationRules);
         if ($errors) {
-            error('Error de validación', 422, $errors);
+            error('Validation error', 422, $errors);
         }
     }
 
@@ -216,28 +303,39 @@ function updateProgram(string $id): void {
     }
 
     if (empty($updates)) {
-        error('No hay campos para actualizar', 400);
+        error('No fields to update', 400);
     }
 
     $params[] = $id;
     $db->prepare("UPDATE programs SET " . implode(', ', $updates) . " WHERE id = ?")
         ->execute($params);
 
-    success(null, 'Programa actualizado');
+    success(null, 'Program updated');
 }
 
 function deleteProgram(string $id): void {
-    $auth = requireRole('admin');
+    $auth = requireRole('admin', 'coach');
     $db = getDB();
 
-    $stmt = $db->prepare("SELECT id FROM programs WHERE id = ?");
+    $stmt = $db->prepare("SELECT id, trainer_id FROM programs WHERE id = ?");
     $stmt->execute([$id]);
-    if (!$stmt->fetch()) {
-        error('Programa no encontrado', 404);
+    $program = $stmt->fetch();
+    if (!$program) {
+        error('Program not found', 404);
+    }
+
+    // Coaches may only delete programs they own (trainer profile matches).
+    if ($auth['role'] === 'coach') {
+        $tStmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
+        $tStmt->execute([$auth['sub']]);
+        $trainerId = (int)$tStmt->fetchColumn();
+        if (!$trainerId || (int)$program['trainer_id'] !== $trainerId) {
+            error('You do not have permission to delete this program', 403);
+        }
     }
 
     $db->prepare("DELETE FROM programs WHERE id = ?")->execute([$id]);
-    success(null, 'Programa eliminado');
+    success(null, 'Program deleted');
 }
 
 function enrollUser(): void {
@@ -245,21 +343,21 @@ function enrollUser(): void {
     $input = getJsonInput();
 
     $programId = $input['programId'] ?? $input['program_id'] ?? null;
-    if (!$programId) error('programId requerido', 422);
+    if (!$programId) error('programId is required', 422);
 
     $isAdminOrCoach = in_array($auth['role'] ?? '', ['admin', 'coach'], true);
     $userId = $isAdminOrCoach ? ($input['userId'] ?? null) : $auth['sub'];
 
-    if (!$userId) error('userId requerido', 422);
+    if (!$userId) error('userId is required', 422);
 
-    if ($isAdminOrCoach && !$input['userId']) error('userId requerido para admin/coach', 422);
+    if ($isAdminOrCoach && !$input['userId']) error('userId is required for admin/coach', 422);
 
     $db = getDB();
 
     $stmt = $db->prepare("SELECT id FROM user_programs WHERE user_id = ? AND program_id = ? AND status = 'active'");
     $stmt->execute([$userId, $programId]);
     if ($stmt->fetch()) {
-        error('El usuario ya está inscrito en este programa', 409);
+        error('The user is already enrolled in this program', 409);
     }
 
     $db->prepare("INSERT INTO user_programs (user_id, program_id, status) VALUES (?, ?, 'active')")
@@ -268,7 +366,74 @@ function enrollUser(): void {
     $db->prepare("UPDATE programs SET enrollments = enrollments + 1 WHERE id = ?")
         ->execute([$programId]);
 
-    success(null, 'Inscripción exitosa', 201);
+    // Tell the client they were enrolled (self-enroll or coach assignment).
+    try {
+        $progStmt = $db->prepare("SELECT name FROM programs WHERE id = ?");
+        $progStmt->execute([$programId]);
+        $progName = (string)$progStmt->fetchColumn();
+        $db->prepare("INSERT INTO notifications (user_id, type, title, message, icon, icon_color, link, created_at)
+            VALUES (?, 'program', 'Program assigned', ?, 'Dumbbell', '#10b981', '/client/dashboard', NOW())")
+            ->execute([$userId, 'You are now enrolled in "' . $progName . '". Start today from your dashboard!']);
+    } catch (\PDOException $e) {
+        error_log('enrollUser notification failed: ' . $e->getMessage());
+    }
+
+    success(null, 'Enrollment successful', 201);
+}
+
+function bulkEnrollProgram(string $id): void {
+    $auth = requireRole('admin', 'coach');
+    $input = getJsonInput();
+    $programId = (int)$id;
+    $userIds = $input['userIds'] ?? [];
+    if (!is_array($userIds) || empty($userIds)) error('userIds is required', 422);
+    if (count($userIds) > 100) error('Maximum 100 users per batch', 422);
+
+    $db = getDB();
+
+    $progStmt = $db->prepare("SELECT id, name, trainer_id FROM programs WHERE id = ?");
+    $progStmt->execute([$programId]);
+    $program = $progStmt->fetch();
+    if (!$program) error('Program not found', 404);
+
+    // Coaches may only bulk-assign their own programs.
+    if ($auth['role'] === 'coach') {
+        $tStmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
+        $tStmt->execute([$auth['sub']]);
+        $trainerId = (int)$tStmt->fetchColumn();
+        if (!$trainerId || (int)$program['trainer_id'] !== $trainerId) {
+            error('You do not have permission to access this program', 403);
+        }
+    }
+
+    $enrolled = 0;
+    $skipped = 0;
+    $db->beginTransaction();
+    try {
+        foreach (array_map('intval', $userIds) as $userId) {
+            if ($userId <= 0) { $skipped++; continue; }
+            $chk = $db->prepare("SELECT id FROM user_programs WHERE user_id = ? AND program_id = ? AND status = 'active'");
+            $chk->execute([$userId, $programId]);
+            if ($chk->fetch()) { $skipped++; continue; }
+            $db->prepare("INSERT INTO user_programs (user_id, program_id, status) VALUES (?, ?, 'active')")
+                ->execute([$userId, $programId]);
+            $db->prepare("INSERT INTO notifications (user_id, type, title, message, icon, icon_color, link, created_at)
+                VALUES (?, 'program', 'Program assigned', ?, 'Dumbbell', '#10b981', '/client/dashboard', NOW())")
+                ->execute([$userId, 'Your coach assigned you the program "' . $program['name'] . '".']);
+            $enrolled++;
+        }
+        if ($enrolled > 0) {
+            $db->prepare("UPDATE programs SET enrollments = enrollments + ? WHERE id = ?")
+                ->execute([$enrolled, $programId]);
+        }
+        $db->commit();
+    } catch (\Throwable $e) {
+        $db->rollBack();
+        error_log('bulkEnrollProgram failed: ' . $e->getMessage());
+        error('Could not complete the assignment', 500);
+    }
+
+    success(['enrolled' => $enrolled, 'skipped' => $skipped], "$enrolled clients enrolled" . ($skipped ? ", $skipped skipped (already enrolled or invalid)" : ''), 201);
 }
 
 function cloneProgram(string $id): void {
@@ -279,7 +444,7 @@ function cloneProgram(string $id): void {
     $stmt = $db->prepare("SELECT * FROM programs WHERE id = ?");
     $stmt->execute([(int)$id]);
     $original = $stmt->fetch();
-    if (!$original) error('Programa no encontrado', 404);
+    if (!$original) error('Program not found', 404);
 
     $trainerId = isset($input['trainer_id']) ? (int)$input['trainer_id'] : $original['trainer_id'];
 
@@ -295,7 +460,7 @@ function cloneProgram(string $id): void {
     ]);
 
     $newId = (int)$db->lastInsertId();
-    success(['id' => $newId], 'Programa clonado exitosamente', 201);
+    success(['id' => $newId], 'Program cloned successfully', 201);
 }
 
 function unenrollUser(string $id): void {
@@ -307,14 +472,14 @@ function unenrollUser(string $id): void {
     $enrollment = $stmt->fetch();
 
     if (!$enrollment) {
-        error('Inscripción no encontrada', 404);
+        error('Enrollment not found', 404);
     }
 
     $db->prepare("UPDATE user_programs SET status = 'cancelled' WHERE id = ?")->execute([$id]);
     $db->prepare("UPDATE programs SET enrollments = GREATEST(enrollments - 1, 0) WHERE id = ?")
         ->execute([$enrollment['program_id']]);
 
-    success(null, 'Inscripción cancelada');
+    success(null, 'Enrollment cancelled');
 }
 
 function selfEnroll(string $id): void {
@@ -323,14 +488,57 @@ function selfEnroll(string $id): void {
     $stmt = $db->prepare("SELECT id, status FROM programs WHERE id = ?");
     $stmt->execute([(int)$id]);
     $program = $stmt->fetch();
-    if (!$program) error('Programa no encontrado', 404);
-    if ($program['status'] !== 'active') error('El programa no está disponible', 400);
+    if (!$program) error('Program not found', 404);
+    if ($program['status'] !== 'active') error('The program is not available', 400);
     $chk = $db->prepare("SELECT id FROM user_programs WHERE user_id = ? AND program_id = ? AND status = 'active'");
     $chk->execute([$auth['sub'], (int)$id]);
-    if ($chk->fetch()) error('Ya estás inscrito en este programa', 409);
+    if ($chk->fetch()) error('You are already enrolled in this program', 409);
     $db->prepare("INSERT INTO user_programs (user_id, program_id, status) VALUES (?, ?, 'active')")
         ->execute([$auth['sub'], (int)$id]);
     $db->prepare("UPDATE programs SET enrollments = enrollments + 1 WHERE id = ?")
         ->execute([(int)$id]);
-    success(null, 'Inscripción exitosa', 201);
+    success(null, 'Enrollment successful', 201);
+}
+
+/**
+ * My Programs — the Programs the current user is actively enrolled in.
+ * Users never see the global catalog here; only what they can actually use.
+ */
+function listUserEnrollments(): void {
+    $auth = requireAuth();
+    $db = getDB();
+
+    $stmt = $db->prepare("
+        SELECT p.id, p.name, p.description, p.tag, p.difficulty, p.image,
+               p.weeks, p.sessions_per_week, p.duration_minutes, p.enrollments,
+               up.progress, up.current_week, up.status AS enrollment_status, up.started_at,
+               CONCAT(t.first_name, ' ', t.last_name) AS trainer_name
+        FROM user_programs up
+        JOIN programs p ON p.id = up.program_id
+        LEFT JOIN trainers t ON t.id = p.trainer_id
+        WHERE up.user_id = ? AND up.status = 'active'
+        ORDER BY up.started_at DESC
+    ");
+    $stmt->execute([$auth['sub']]);
+
+    $enrollments = array_map(function($p) {
+        return [
+            'id' => (int)$p['id'],
+            'name' => $p['name'],
+            'description' => $p['description'],
+            'tag' => $p['tag'],
+            'difficulty' => $p['difficulty'],
+            'image' => $p['image'],
+            'weeks' => (int)($p['weeks'] ?? 0),
+            'sessionsPerWeek' => (int)($p['sessions_per_week'] ?? 0),
+            'durationMinutes' => (int)($p['duration_minutes'] ?? 0),
+            'enrollments' => (int)$p['enrollments'],
+            'progress' => (float)($p['progress'] ?? 0),
+            'currentWeek' => (int)($p['current_week'] ?? 1),
+            'startedAt' => $p['started_at'],
+            'trainerName' => $p['trainer_name'],
+        ];
+    }, $stmt->fetchAll());
+
+    success($enrollments);
 }

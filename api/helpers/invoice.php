@@ -10,7 +10,7 @@ function generateInvoicePdf(int $subscriptionId): string {
     ");
     $stmt->execute([$subscriptionId]);
     $data = $stmt->fetch();
-    if (!$data) error('Suscripción no encontrada', 404);
+    if (!$data) error('Subscription not found', 404);
     
     // Simple invoice generation as HTML that can be converted to PDF
     $html = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>

@@ -79,7 +79,7 @@ function listUsers(): void {
 function getUser(string $id): void {
     $auth = requireAuth();
     if ((int)$id !== $auth['sub'] && $auth['role'] !== 'admin') {
-        error('No tienes permisos para ver este perfil', 403);
+        error('You do not have permission to view this profile', 403);
     }
     $db = getDB();
 
@@ -88,7 +88,7 @@ function getUser(string $id): void {
     $user = $stmt->fetch();
 
     if (!$user) {
-        error('Usuario no encontrado', 404);
+        error('User not found', 404);
     }
 
     $subscription = null;
@@ -146,11 +146,11 @@ function updateUser(string $id): void {
     $stmt = $db->prepare("SELECT id FROM users WHERE id = ?");
     $stmt->execute([$id]);
     if (!$stmt->fetch()) {
-        error('Usuario no encontrado', 404);
+        error('User not found', 404);
     }
 
     if ($auth['sub'] != $id && $auth['role'] !== 'admin') {
-        error('No tienes permisos para modificar este usuario', 403);
+        error('You do not have permission to modify this user', 403);
     }
 
     $input = getJsonInput();
@@ -166,7 +166,7 @@ function updateUser(string $id): void {
     if ($rules) {
         $errors = validate($input, $rules);
         if ($errors) {
-            error('Error de validación', 422, $errors);
+            error('Validation error', 422, $errors);
         }
     }
 
@@ -189,14 +189,14 @@ function updateUser(string $id): void {
     }
 
     if (empty($updates)) {
-        error('No hay campos para actualizar', 400);
+        error('No fields to update', 400);
     }
 
     $params[] = $id;
     $db->prepare("UPDATE users SET " . implode(', ', $updates) . " WHERE id = ?")
         ->execute($params);
 
-    success(null, 'Usuario actualizado');
+    success(null, 'User updated');
 }
 
 function listContacts(): void {
@@ -269,7 +269,7 @@ function adminGetUser(string $id): void {
     $user = $stmt->fetch();
 
     if (!$user) {
-        error('Usuario no encontrado', 404);
+        error('User not found', 404);
     }
 
     $subscription = null;
@@ -353,7 +353,7 @@ function adminUpdateUser(string $id): void {
     $targetUser = $stmt->fetch();
 
     if (!$targetUser) {
-        error('Usuario no encontrado', 404);
+        error('User not found', 404);
     }
 
     $input = getJsonInput();
@@ -372,17 +372,17 @@ function adminUpdateUser(string $id): void {
     if ($rules) {
         $errors = validate($input, $rules);
         if ($errors) {
-            error('Error de validación', 422, $errors);
+            error('Validation error', 422, $errors);
         }
     }
 
     // Prevent admin from suspending or demoting themselves
     if ($isSelf) {
         if (isset($input['status']) && $input['status'] === 'suspended') {
-            error('No puedes suspender tu propia cuenta', 403);
+            error('You cannot suspend your own account', 403);
         }
         if (isset($input['role']) && $input['role'] !== 'admin') {
-            error('No puedes cambiar tu propio rol de administrador', 403);
+            error('You cannot change your own admin role', 403);
         }
     }
 
@@ -390,7 +390,7 @@ function adminUpdateUser(string $id): void {
     if (isset($input['role']) && $input['role'] !== 'admin' && $targetUser['role'] === 'admin') {
         $adminCount = (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'active'")->fetchColumn();
         if ($adminCount <= 1) {
-            error('Debe haber al menos un administrador activo en el sistema', 409);
+            error('There must be at least one active administrator in the system', 409);
         }
     }
 
@@ -399,7 +399,7 @@ function adminUpdateUser(string $id): void {
         $stmt = $db->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
         $stmt->execute([$input['email'], $id]);
         if ($stmt->fetch()) {
-            error('El email ya está en uso por otro usuario', 409);
+            error('The email is already in use by another user', 409);
         }
     }
 
@@ -426,7 +426,7 @@ function adminUpdateUser(string $id): void {
     }
 
     if (empty($updates)) {
-        error('No hay campos para actualizar', 400);
+        error('No fields to update', 400);
     }
 
     $params[] = $id;
@@ -440,7 +440,7 @@ function adminUpdateUser(string $id): void {
         logAdminAction($auth['sub'], 'change_status', 'user', (int)$id, ['from' => $targetUser['status'], 'to' => $input['status']]);
     }
 
-    success(null, 'Usuario actualizado');
+    success(null, 'User updated');
 }
 
 function adminCreateUser(): void {
@@ -462,7 +462,7 @@ function adminCreateUser(): void {
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
@@ -470,7 +470,7 @@ function adminCreateUser(): void {
     $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
     $stmt->execute([$input['email']]);
     if ($stmt->fetch()) {
-        error('El email ya está registrado', 409);
+        error('Email already registered', 409);
     }
 
     $role = in_array($input['role'] ?? 'client', ['admin', 'coach', 'client'], true) ? $input['role'] : 'client';
@@ -497,7 +497,7 @@ function adminCreateUser(): void {
         $photo,
     ]);
 
-    success(['id' => (int)$db->lastInsertId()], 'Usuario creado', 201);
+    success(['id' => (int)$db->lastInsertId()], 'User created', 201);
 }
 
 function adminListCoaches(): void {
@@ -558,10 +558,10 @@ function adminApproveCoach(string $id): void {
     $user = $stmt->fetch();
 
     if (!$user) {
-        error('Usuario no encontrado', 404);
+        error('User not found', 404);
     }
     if (!in_array($user['role'], ['coach', 'client'], true)) {
-        error('El usuario no puede ser aprobado como coach', 400);
+        error('The user cannot be approved as a coach', 400);
     }
 
     $trainerStmt = $db->prepare("SELECT id FROM trainers WHERE user_id = ?");
@@ -569,14 +569,14 @@ function adminApproveCoach(string $id): void {
     $trainerId = $trainerStmt->fetchColumn();
 
     if (!$trainerId) {
-        error('El usuario no tiene perfil de entrenador', 400);
+        error('The user does not have a trainer profile', 400);
     }
 
     // Validate using the validator for consistency
     $status = $input['status'] ?? 'approved';
     $errorsValidate = validate(['status' => $status], ['status' => 'in:approved,rejected,suspended']);
     if ($errorsValidate) {
-        error('Estado inválido', 400, $errorsValidate);
+        error('Invalid state', 400, $errorsValidate);
     }
 
     $db->prepare("UPDATE trainers SET status = ? WHERE user_id = ?")->execute([$status, $id]);

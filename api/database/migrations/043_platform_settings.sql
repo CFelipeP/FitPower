@@ -10,11 +10,11 @@ CREATE TABLE IF NOT EXISTS platform_settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT IGNORE INTO platform_settings (setting_key, setting_value, description) VALUES
-('platform_name', 'FitPower', 'Nombre de la plataforma'),
-('support_email', 'support@fitpower.app', 'Email de soporte'),
-('default_language', 'es', 'Idioma por defecto'),
-('timezone', 'America/Mexico_City', 'Zona horaria'),
-('max_users', '10000', 'Máximo de usuarios permitidos'),
-('max_storage_gb', '50', 'Almacenamiento máximo en GB'),
-('api_rate_limit', '60', 'Límite de peticiones por minuto'),
-('file_upload_max_mb', '25', 'Tamaño máximo de archivo en MB');
+('platform_name', 'FitPower', 'Platform name'),
+('support_email', 'support@fitpower.app', 'Support email'),
+('default_language', 'en', 'Default language'),
+('timezone', 'America/Mexico_City', 'Timezone'),
+('max_users', '10000', 'Maximum allowed users'),
+('max_storage_gb', '50', 'Maximum storage in GB'),
+('api_rate_limit', '60', 'Requests per minute limit'),
+('file_upload_max_mb', '25', 'Maximum file size in MB');

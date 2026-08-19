@@ -17,6 +17,7 @@ services:
     depends_on:
       db:
         condition: service_started
+    restart: unless-stopped
     networks:
       - fitpower
 
@@ -24,14 +25,22 @@ services:
     image: mariadb:11
     platform: linux/arm64
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASS}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS:-${DB_PASS}}
       MYSQL_DATABASE: fitpower
       MYSQL_USER: fitpower
       MYSQL_PASSWORD: ${DB_PASS}
     volumes:
       - db_data:/var/lib/mysql
-    ports:
-      - "3307:3306"
+    # The database is NOT exposed to the host: it is reachable only from the
+    # internal Docker network. Uncomment for local debugging only.
+    # ports:
+    #   - "127.0.0.1:3307:3306"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - fitpower
 
@@ -51,18 +60,21 @@ services:
       - php
       - chat
       - node
+    restart: unless-stopped
     networks:
       - fitpower
 
   chat:
     image: node:20-alpine
     platform: linux/arm64
+    user: node
     working_dir: /app
     volumes:
       - ./FitPower:/app
-    command: sh -c "npm install --omit=dev 2>/dev/null; node chat-server.js"
+    command: sh -c "npm install --omit=dev && node chat-server.js"
     environment:
       API_BASE_URL: http://nginx:8080
+    restart: unless-stopped
     networks:
       - fitpower
 
@@ -72,13 +84,15 @@ services:
       dockerfile: Dockerfile.node
       platforms:
         - linux/arm64
+    user: node
     working_dir: /app
     volumes:
       - ./FitPower:/app
-    command: sh -c "npm install 2>/dev/null && node mediasoup-server.js"
+    command: sh -c "npm install && node mediasoup-server.js"
     environment:
       MEDIASOUP_ANNOUNCED_IP: ${MEDIASOUP_IP}
       API_BASE_URL: http://nginx:8080
+    restart: unless-stopped
     networks:
       - fitpower
 

@@ -11,7 +11,7 @@ function changePassword(): void {
 
     $errors = validate($input, $rules);
     if ($errors) {
-        error('Error de validación', 422, $errors);
+        error('Validation error', 422, $errors);
     }
 
     $db = getDB();
@@ -20,12 +20,12 @@ function changePassword(): void {
     $user = $stmt->fetch();
 
     if (!$user || !password_verify($input['currentPassword'], $user['password'])) {
-        error('Contraseña actual incorrecta', 401);
+        error('Incorrect current password', 401);
     }
 
     $hashedPassword = password_hash($input['newPassword'], PASSWORD_BCRYPT);
     $db->prepare("UPDATE users SET password = ? WHERE id = ?")
         ->execute([$hashedPassword, $auth['sub']]);
 
-    success(null, 'Contraseña actualizada exitosamente');
+    success(null, 'Password updated successfully');
 }

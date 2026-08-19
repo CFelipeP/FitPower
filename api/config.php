@@ -15,13 +15,15 @@ define('DB_NAME', getenv('DB_NAME') ?: 'fitpower');
 define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASS', getenv('DB_PASS') ?: '');
 
-// JWT_SECRET must be set via .env / environment. A known fallback value is a
-// critical security risk (token forgery), so the API fails closed without it.
+// JWT_SECRET must be set via .env / environment. A known fallback or
+// placeholder value is a critical security risk (token forgery), so the API
+// fails closed without a real secret.
 $_jwtSecret = getenv('JWT_SECRET') ?: '';
-if ($_jwtSecret === '' || $_jwtSecret === 'JWT_SECRET_REDACTED') {
+$_jwtPlaceholders = ['JWT_SECRET_REDACTED', 'change_me', 'change_me_to_random_64_chars', 'fitpower_secret_key_change_in_production_2026', 'your_secret_key_here', 'generate_a_random_64_char_string_here'];
+if ($_jwtSecret === '' || in_array(strtolower(trim($_jwtSecret)), array_map('strtolower', $_jwtPlaceholders), true) || strlen($_jwtSecret) < 32) {
     http_response_code(500);
     header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'JWT_SECRET no configurado']);
+    echo json_encode(['success' => false, 'message' => 'JWT_SECRET not configured or insecure']);
     exit;
 }
 define('JWT_SECRET', $_jwtSecret);
@@ -82,7 +84,7 @@ function rateLimit(int $customMax = 0): void {
 
         if ($existing) {
             if ((int)$existing['hits'] >= $max) {
-                error('Demasiadas solicitudes. Intenta de nuevo en un minuto.', 429);
+                error('Too many requests. Try again in a minute.', 429);
             }
             $db->prepare("UPDATE rate_limits SET hits = hits + 1 WHERE ip_address = ? AND endpoint = ? AND window_start = ?")
                 ->execute([$ip, $endpoint, $existing['window_start']]);
@@ -98,8 +100,21 @@ function rateLimit(int $customMax = 0): void {
     }
 }
 
+function ensureSessionHardened(): void {
+    if (session_status() === PHP_SESSION_ACTIVE) return;
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    if ($isHttps) {
+        ini_set('session.cookie_secure', '1');
+    }
+    ini_set('session.cookie_httponly', '1');
+    ini_set('session.cookie_samesite', 'Lax');
+    ini_set('session.use_strict_mode', '1');
+}
+
 function generateCsrfToken(): string {
     if (session_status() === PHP_SESSION_NONE) {
+        ensureSessionHardened();
         session_start();
     }
     $token = bin2hex(random_bytes(32));
@@ -110,6 +125,7 @@ function generateCsrfToken(): string {
 
 function validateCsrfToken(string $token): bool {
     if (session_status() === PHP_SESSION_NONE) {
+        ensureSessionHardened();
         session_start();
     }
     $stored = $_SESSION['csrf_token'] ?? '';
@@ -145,7 +161,7 @@ function requireCsrf(): void {
     }
     $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['_csrf'] ?? '');
     if (!$token || !validateCsrfToken($token)) {
-        error('CSRF token inválido o expirado', 403);
+        error('Invalid or expired CSRF token', 403);
     }
 }
 
@@ -165,7 +181,7 @@ function checkLoginThrottle(string $identifier, string $ip): void {
         $ipRow = $stmt->fetch();
         if ($ipRow && $ipRow['locked_until'] && strtotime($ipRow['locked_until']) > time()) {
             $remaining = ceil((strtotime($ipRow['locked_until']) - time()) / 60);
-            error("Demasiados intentos desde esta IP. Espera {$remaining} minutos.", 429);
+            error("Too many attempts from this IP. Wait {$remaining} minutes.", 429);
         }
 
         // Check email+IP based throttle
@@ -174,7 +190,7 @@ function checkLoginThrottle(string $identifier, string $ip): void {
         $row = $stmt->fetch();
         if ($row && $row['locked_until'] && strtotime($row['locked_until']) > time()) {
             $remaining = ceil((strtotime($row['locked_until']) - time()) / 60);
-            error("Demasiados intentos. Espera {$remaining} minutos.", 429);
+            error("Too many attempts. Wait {$remaining} minutes.", 429);
         }
     } catch (\PDOException $e) {
     }
@@ -216,19 +232,27 @@ function getDB(): PDO {
 }
 
 function getAllowedOrigins(): array {
-    return [
+    $origins = [
         'http://localhost:5177',
         'http://localhost:8080',
         APP_URL,
-        'https://192.168.0.44',
     ];
+    $extra = getenv('EXTRA_ALLOWED_ORIGINS') ?: '';
+    foreach (explode(',', $extra) as $origin) {
+        $origin = trim($origin);
+        if ($origin !== '' && filter_var($origin, FILTER_VALIDATE_URL)) {
+            $origins[] = $origin;
+        }
+    }
+    return array_values(array_unique($origins));
 }
 
 function sendSecurityHeaders(): void {
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: DENY');
     header('Referrer-Policy: strict-origin-when-cross-origin');
-    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https:; frame-ancestors 'none';");
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https:; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'");
 }
 
 function logAdminAction(int $adminId, string $action, string $targetType, int $targetId, ?array $details = null): void {

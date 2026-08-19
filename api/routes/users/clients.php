@@ -11,23 +11,32 @@ function listCoachClients(): void {
     $trainerId = $trainerId ? (int)$trainerId : null;
 
     if ($trainerId) {
+        // Only clients with a real relationship: enrolled in one of this
+        // coach's programs (active) or having a session with this coach.
         $stmt = $db->prepare("
             SELECT DISTINCT u.id, u.first_name, u.last_name, u.email
             FROM users u
-            LEFT JOIN user_programs up ON up.user_id = u.id
-            LEFT JOIN programs p ON p.id = up.program_id AND p.trainer_id = ?
             WHERE u.role = 'client'
+              AND (
+                EXISTS (
+                    SELECT 1 FROM user_programs up
+                    JOIN programs p ON p.id = up.program_id
+                    WHERE up.user_id = u.id AND p.trainer_id = ? AND up.status = 'active'
+                )
+                OR EXISTS (
+                    SELECT 1 FROM sessions s WHERE s.user_id = u.id AND s.trainer_id = ?
+                )
+              )
             ORDER BY u.first_name, u.last_name
         ");
-        $stmt->execute([$trainerId]);
+        $stmt->execute([$trainerId, $trainerId]);
     } else {
-        $stmt = $db->prepare("
+        $stmt = $db->query("
             SELECT DISTINCT u.id, u.first_name, u.last_name, u.email
             FROM users u
             WHERE u.role = 'client'
             ORDER BY u.first_name, u.last_name
         ");
-        $stmt->execute();
     }
     $rows = $stmt->fetchAll();
 
@@ -64,7 +73,7 @@ function getClientDetail(string $id): void {
     $row = $stmt->fetch();
 
     if (!$row) {
-        error('Cliente no encontrado', 404);
+        error('Client not found', 404);
     }
 
     $daysSince = (int)((time() - strtotime($row['updated_at'])) / 86400);

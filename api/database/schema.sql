@@ -112,7 +112,7 @@ CREATE TABLE languages (
 ) ENGINE=InnoDB;
 
 INSERT INTO languages (name) VALUES
-('English'), ('Español'), ('Português'), ('Français'), ('Deutsch'),
+('English'), ('Português'), ('Français'), ('Deutsch'),
 ('Italiano'), ('日本語'), ('中文'), ('العربية'), ('हिन्दी');
 
 CREATE TABLE trainer_language (
@@ -312,11 +312,18 @@ CREATE TABLE payments (
     amount DECIMAL(10,2) NOT NULL,
     currency VARCHAR(3) NOT NULL DEFAULT 'USD',
     method VARCHAR(50) NULL,
+    checkout_session_id VARCHAR(255) NULL,
+    paypal_capture_id VARCHAR(64) NULL,
+    stripe_invoice_id VARCHAR(255) NULL,
     type ENUM('subscription','coaching','product') NOT NULL DEFAULT 'subscription',
     status ENUM('pending','completed','failed','refunded') NOT NULL DEFAULT 'pending',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (subscription_id) REFERENCES user_subscriptions(id) ON DELETE SET NULL
+    FOREIGN KEY (subscription_id) REFERENCES user_subscriptions(id) ON DELETE SET NULL,
+    KEY idx_payments_user (user_id),
+    KEY idx_payments_status_type_created (status, type, created_at),
+    KEY idx_payments_checkout_session (checkout_session_id),
+    KEY idx_payments_paypal_capture (paypal_capture_id)
 ) ENGINE=InnoDB;
 
 -- ============================================================

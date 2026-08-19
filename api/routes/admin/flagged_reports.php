@@ -56,19 +56,19 @@ function adminUpdateFlaggedReport(string $id): void {
     $status = $input['status'] ?? '';
 
     if (!in_array($status, ['reviewed', 'dismissed', 'action_taken'], true)) {
-        error('Estado inválido', 422);
+        error('Invalid status', 422);
     }
 
     $db = getDB();
     $stmt = $db->prepare("SELECT id FROM content_reports WHERE id = ?");
     $stmt->execute([(int)$id]);
     if (!$stmt->fetch()) {
-        error('Reporte no encontrado', 404);
+        error('Report not found', 404);
     }
 
     $db->prepare("UPDATE content_reports SET status = ? WHERE id = ?")
         ->execute([$status, (int)$id]);
 
     logAdminAction($auth['sub'], 'review_report', 'content_report', (int)$id, ['status' => $status]);
-    success(null, 'Reporte actualizado');
+    success(null, 'Report updated');
 }
