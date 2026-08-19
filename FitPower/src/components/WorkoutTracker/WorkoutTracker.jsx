@@ -3,7 +3,7 @@ import { apiFetch } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
 import { confirmSwal, swalError } from '../../lib/alerts'
 import {
-    CheckCircle, Dumbbell, Clock, Flame, Plus, X, Trash2, ChevronDown, ClipboardList, Activity, Timer, Play
+    CheckCircle, Dumbbell, Clock, Flame, Plus, X, Trash2, ChevronDown, ChevronUp, ClipboardList, Activity, Timer, Play
 } from 'lucide-react'
 import RestTimer from '../RestTimer/RestTimer'
 import GuidedWorkout from '../GuidedWorkout/GuidedWorkout'
@@ -122,6 +122,24 @@ export default function WorkoutTracker() {
             loadSessions()
         } catch {
             swalError('Error deleting exercise')
+        }
+    }
+
+    async function moveExercise(sessionId, index, dir) {
+        const session = sessions.find(s => s.id === sessionId)
+        const list = [...(session?.exercises || [])]
+        const to = index + dir
+        if (to < 0 || to >= list.length) return
+        ;[list[index], list[to]] = [list[to], list[index]]
+        try {
+            await apiFetch(`/sessions/${sessionId}/exercises/order`, {
+                method: 'PUT',
+                body: JSON.stringify({ order: list.map(e => e.id) })
+            })
+            showToast('Order saved')
+            loadSessions()
+        } catch {
+            swalError('Could not save order')
         }
     }
 
@@ -310,22 +328,64 @@ export default function WorkoutTracker() {
                                         )}
 
                                         <div className="wt-exercise-list">
-                                            {exercises.map(ex => (
+                                            {exercises.map((ex, exIndex) => (
                                                 <Fragment key={ex.id}>
                                                 <div className="wt-exercise-item">
-                                                    <div>
-                                                        <div className="wt-exercise-name">
-                                                            <Dumbbell />
-                                                            {ex.name}
-                                                        </div>
-                                                        <div className="wt-exercise-detail">
-                                                            <span>{ex.sets} × {ex.reps} @ {ex.weight}</span>
-                                                        </div>
-                                                        {ex.notes && (
-                                                            <div className="wt-exercise-notes">{ex.notes}</div>
+                                                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                                                        {(ex.videoUrl || ex.imageUrl) ? (
+                                                            <img
+                                                                src={ex.videoUrl || ex.imageUrl}
+                                                                alt={ex.name}
+                                                                loading="lazy"
+                                                                className="wt-exercise-thumb"
+                                                            />
+                                                        ) : (
+                                                            <div className="wt-exercise-thumb wt-exercise-thumb-empty">
+                                                                <Dumbbell size={14} />
+                                                            </div>
                                                         )}
+                                                        <div>
+                                                            <div className="wt-exercise-name">
+                                                                <Dumbbell />
+                                                                {ex.name}
+                                                            </div>
+                                                            <div className="wt-exercise-detail">
+                                                                <span>{ex.sets} × {ex.reps} @ {ex.weight}</span>
+                                                                {ex.muscleGroup && <span className="wt-exercise-meta-pill">{ex.muscleGroup}</span>}
+                                                                {ex.equipment && <span className="wt-exercise-meta-pill">{ex.equipment}</span>}
+                                                            </div>
+                                                            {ex.notes && (
+                                                                <div className="wt-exercise-notes">{ex.notes}</div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <div style={{display:'flex',gap:4,alignItems:'flex-start'}}>
+                                                        {!isClient && (
+                                                            <>
+                                                                <button
+                                                                    className="wt-btn wt-btn-sm wt-btn-outline"
+                                                                    title="Move up"
+                                                                    disabled={exIndex === 0}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        moveExercise(session.id, exIndex, -1)
+                                                                    }}
+                                                                >
+                                                                    <ChevronUp style={{ width: 12, height: 12 }} />
+                                                                </button>
+                                                                <button
+                                                                    className="wt-btn wt-btn-sm wt-btn-outline"
+                                                                    title="Move down"
+                                                                    disabled={exIndex === exercises.length - 1}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        moveExercise(session.id, exIndex, 1)
+                                                                    }}
+                                                                >
+                                                                    <ChevronDown style={{ width: 12, height: 12 }} />
+                                                                </button>
+                                                            </>
+                                                        )}
                                                         <button
                                                             className="wt-btn wt-btn-sm"
                                                             style={{background:'rgba(255,214,0,.1)',color:'var(--power-500)',border:'1px solid rgba(255,214,0,.2)'}}
@@ -337,6 +397,7 @@ export default function WorkoutTracker() {
                                                         >
                                                             <Timer style={{ width: 12, height: 12 }} />
                                                         </button>
+                                                        {!isClient && (
                                                         <button
                                                             className="wt-btn wt-btn-danger wt-btn-sm"
                                                             onClick={(e) => {
@@ -346,6 +407,7 @@ export default function WorkoutTracker() {
                                                         >
                                                             <Trash2 style={{ width: 12, height: 12 }} />
                                                         </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 {restTimerExercise === ex.id && (

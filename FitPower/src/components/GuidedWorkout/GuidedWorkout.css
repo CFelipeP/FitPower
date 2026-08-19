@@ -82,3 +82,45 @@
     .gw-rest-label { justify-content: space-between; }
     .gw-set { flex-wrap: wrap; }
 }
+
+.gw-exercise-video {
+    width: 100%;
+    max-width: 360px;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border-radius: 12px;
+    background: #14141b;
+    align-self: center;
+}
+
+.gw-exercise-video-unavailable {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #777;
+    font-size: 13px;
+}
+
+.gw-exercise-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.gw-meta-pill {
+    padding: 3px 10px;
+    font-size: 12px;
+    color: #ddd;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 999px;
+    text-transform: capitalize;
+}
+
+.gw-exercise-instructions {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
+    color: #bbb;
+}

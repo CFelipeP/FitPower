@@ -23,6 +23,11 @@ function buildInitialState(session) {
         targetReps: ex.reps || '',
         targetWeight: ex.weight || '',
         notes: ex.notes || '',
+        videoUrl: ex.videoUrl || '',
+        imageUrl: ex.imageUrl || '',
+        muscleGroup: ex.muscleGroup || '',
+        equipment: ex.equipment || '',
+        instructions: ex.instructions || '',
         doneSets: [],
         skipped: false,
         difficulty: null,
@@ -345,15 +350,40 @@ export default function GuidedWorkout({ session, onClose, onFinished }) {
                     </div>
                 ) : (
                     <div className="gw-body">
-                        <div className="gw-exercise-card">
-                            <div className="gw-exercise-head">
-                                <div>
-                                    <h3 className="gw-exercise-name"><Dumbbell size={18} /> {current.name}</h3>
-                                    <p className="gw-exercise-target">Target: {current.targetSets} × {current.targetReps}{current.targetWeight ? ` @ ${current.targetWeight}` : ''}</p>
+                            <div className="gw-exercise-card">
+                                <div className="gw-exercise-head">
+                                    <div>
+                                        <h3 className="gw-exercise-name"><Dumbbell size={18} /> {current.name}</h3>
+                                        <p className="gw-exercise-target">Target: {current.targetSets} × {current.targetReps}{current.targetWeight ? ` @ ${current.targetWeight}` : ''}</p>
+                                    </div>
+                                    <span className="gw-exercise-count">{current.doneSets.length}/{current.targetSets} sets</span>
                                 </div>
-                                <span className="gw-exercise-count">{current.doneSets.length}/{current.targetSets} sets</span>
-                            </div>
-                            {current.notes && <p className="gw-exercise-notes">{current.notes}</p>}
+                                {current.videoUrl ? (
+                                    <img
+                                        className="gw-exercise-video"
+                                        src={current.videoUrl}
+                                        alt={current.name}
+                                        loading="lazy"
+                                    />
+                                ) : current.imageUrl ? (
+                                    <img
+                                        className="gw-exercise-video"
+                                        src={current.imageUrl}
+                                        alt={current.name}
+                                        loading="lazy"
+                                    />
+                                ) : (
+                                    <div className="gw-exercise-video gw-exercise-video-unavailable">
+                                        <Dumbbell size={22} />
+                                        <span>Video unavailable</span>
+                                    </div>
+                                )}
+                                <div className="gw-exercise-meta">
+                                    {current.muscleGroup && <span className="gw-meta-pill">Muscle: {current.muscleGroup}</span>}
+                                    {current.equipment && <span className="gw-meta-pill">Equipment: {current.equipment}</span>}
+                                </div>
+                                {current.instructions && <p className="gw-exercise-instructions">{current.instructions}</p>}
+                                {current.notes && <p className="gw-exercise-notes">{current.notes}</p>}
 
                             <div className="gw-sets">
                                 {current.doneSets.map((s, i) => (
