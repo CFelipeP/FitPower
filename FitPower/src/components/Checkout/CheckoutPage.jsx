@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
-import { Check, Crown, Loader2, ArrowLeft, Shield, Lock, Tag } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams, Link, useNavigate } from 'react-router-dom'
+import { Check, Crown, Loader2, ArrowLeft, Shield, Lock, Tag, Wallet, X, RefreshCw } from 'lucide-react'
 import { apiFetch } from '../../lib/api'
 import { swalError } from '../../lib/alerts'
 import '../DashboardShared.css'
@@ -16,6 +16,12 @@ export default function CheckoutPage() {
     const [processing, setProcessing] = useState(false)
     const [coupon, setCoupon] = useState('')
     const [couponApplied, setCouponApplied] = useState(null)
+    const [vw, setVw] = useState(null)
+    const [vwCard, setVwCard] = useState({ name: '', cardNum: '', expiration: '', cvv: '' })
+    const [vwMsg, setVwMsg] = useState('')
+    const [vwPolling, setVwPolling] = useState(false)
+    const pollRef = useRef(null)
+    const navigate = useNavigate()
 
     useEffect(() => {
         if (!planId) {
@@ -67,26 +73,6 @@ export default function CheckoutPage() {
         }
     }
 
-    const handlePayment = async () => {
-        if (!plan || processing) return
-        setProcessing(true)
-        try {
-            const res = await apiFetch('/stripe/create-checkout', {
-                method: 'POST',
-                body: JSON.stringify({ plan_id: plan.id, billing, coupon_code: couponApplied?.code || undefined }),
-            })
-            if (res?.url) {
-                window.location.href = res.url
-                return
-            }
-            swalError('We could not start the payment. No charge was made. Please try again.')
-        } catch (e) {
-            swalError(e.message || 'We could not start the payment. No charge was made. Please try again.')
-        } finally {
-            setProcessing(false)
-        }
-    }
-
     const handlePayPal = async () => {
         if (!plan || processing) return
         setProcessing(true)
@@ -106,6 +92,85 @@ export default function CheckoutPage() {
             setProcessing(false)
         }
     }
+
+    const stopPolling = () => {
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+        setVwPolling(false)
+    }
+
+    const handleVW = async () => {
+        if (!plan || processing || vw) return
+        setProcessing(true)
+        setVwMsg('')
+        try {
+            const res = await apiFetch('/vw/checkout', {
+                method: 'POST',
+                body: JSON.stringify({ plan_id: plan.id, billing, coupon_code: couponApplied?.code || undefined }),
+            })
+            setVw({ intent_id: res.intent_id, amount: res.amount, qr: res.qr_code_base64 || null })
+            setVwMsg('Payment pending — scan the QR with Virtual Wallet or pay by card.')
+            startPolling(res.intent_id)
+        } catch (e) {
+            setVwMsg('')
+            swalError(e.message || 'Virtual Wallet could not start the payment. No charge was made.')
+        } finally {
+            setProcessing(false)
+        }
+    }
+
+    const startPolling = (intentId) => {
+        stopPolling()
+        setVwPolling(true)
+        pollRef.current = setInterval(async () => {
+            try {
+                const st = await apiFetch(`/vw/status?intent_id=${encodeURIComponent(intentId)}`)
+                if (st?.status === 'completed') {
+                    stopPolling()
+                    const confirm = await apiFetch('/vw/confirm', {
+                        method: 'POST',
+                        body: JSON.stringify({ intent_id: intentId }),
+                    })
+                    navigate(`/payment/success?intent_id=${encodeURIComponent(intentId)}&plan_name=${encodeURIComponent(confirm?.plan_name || plan.name)}`)
+                } else if (st?.status === 'failed') {
+                    stopPolling()
+                    setVwMsg('The payment failed. No charge was made. Please try again.')
+                }
+            } catch {
+                // keep polling while the provider settles the payment
+            }
+        }, 3000)
+    }
+
+    const handleVWCard = async () => {
+        if (!vw || processing) return
+        if (!vwCard.name.trim() || !vwCard.cardNum.trim() || !vwCard.expiration.trim() || !vwCard.cvv.trim()) {
+            swalError('Complete all card fields.')
+            return
+        }
+        setProcessing(true)
+        setVwMsg('')
+        try {
+            await apiFetch('/vw/process-card', {
+                method: 'POST',
+                body: JSON.stringify({
+                    intent_id: vw.intent_id,
+                    name: vwCard.name,
+                    cardNum: vwCard.cardNum.replace(/\s/g, ''),
+                    expiration: vwCard.expiration,
+                    CVV: vwCard.cvv,
+                }),
+            })
+            setVwMsg('Payment processed — confirming with Virtual Wallet…')
+            // The provider polls internally; our /vw/status will flip to completed.
+        } catch (e) {
+            setVwMsg('')
+            swalError(e.message || 'The payment was declined. No charge was made.')
+        } finally {
+            setProcessing(false)
+        }
+    }
+
+    useEffect(() => () => stopPolling(), [])
 
     if (loading) {
         return (
@@ -208,12 +273,54 @@ export default function CheckoutPage() {
 
                             <button
                                 className="co-btn co-btn-primary co-pay-btn"
-                                onClick={handlePayment}
-                                disabled={processing}
+                                onClick={handleVW}
+                                disabled={processing || !!vw}
                             >
-                                {processing ? <Loader2 size={16} className="spin" /> : <Lock size={16} />}
-                                {processing ? 'Redirecting to secure checkout…' : 'Pay with Stripe'}
+                                {processing ? <Loader2 size={16} className="spin" /> : <Wallet size={16} />}
+                                {processing ? 'Starting secure checkout…' : 'Pay with Virtual Wallet'}
                             </button>
+
+                            {vw && (
+                                <div className="co-vw">
+                                    <div className="co-vw-head">
+                                        <span>Virtual Wallet checkout</span>
+                                        <button className="co-vw-close" onClick={() => { stopPolling(); setVw(null); setVwMsg('') }} title="Cancel">
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                    <div className="co-vw-amount">
+                                        ${Number(vw.amount).toFixed(2)}
+                                        <span className="co-vw-amount-lbl">Total due today</span>
+                                    </div>
+
+                                    {vw.qr ? (
+                                        <div className="co-vw-qr">
+                                            <img src={`data:image/png;base64,${vw.qr}`} alt="Virtual Wallet QR" />
+                                            <p>Scan with the Virtual Wallet app</p>
+                                        </div>
+                                    ) : (
+                                        <div className="co-vw-wait"><RefreshCw size={16} className="spin" /> Waiting for QR…</div>
+                                    )}
+
+                                    <div className="co-vw-or"><span>or pay by card</span></div>
+                                    <input className="co-vw-input" placeholder="Name on card"
+                                        value={vwCard.name} onChange={e => setVwCard({ ...vwCard, name: e.target.value })} />
+                                    <input className="co-vw-input" placeholder="Card number" inputMode="numeric" maxLength={19}
+                                        value={vwCard.cardNum} onChange={e => setVwCard({ ...vwCard, cardNum: e.target.value })} />
+                                    <div className="co-vw-row">
+                                        <input className="co-vw-input" placeholder="MM/AA" maxLength={5} inputMode="numeric"
+                                            value={vwCard.expiration} onChange={e => setVwCard({ ...vwCard, expiration: e.target.value })} />
+                                        <input className="co-vw-input" placeholder="CVV" maxLength={4} type="password" inputMode="numeric"
+                                            value={vwCard.cvv} onChange={e => setVwCard({ ...vwCard, cvv: e.target.value })} />
+                                    </div>
+                                    <button className="co-btn co-btn-secondary co-pay-btn" onClick={handleVWCard} disabled={processing}>
+                                        {processing ? <Loader2 size={16} className="spin" /> : <Lock size={16} />}
+                                        Pay ${Number(vw.amount).toFixed(2)}
+                                    </button>
+                                    {vwPolling && <div className="co-vw-poll"><RefreshCw size={13} className="spin" /> Confirming payment…</div>}
+                                    {vwMsg && <p className="co-vw-msg">{vwMsg}</p>}
+                                </div>
+                            )}
 
                             <button
                                 className="co-btn co-btn-secondary co-pay-btn"
@@ -226,7 +333,7 @@ export default function CheckoutPage() {
 
                             <div className="co-secure">
                                 <Shield size={14} />
-                                <span>Payments processed securely by Stripe or PayPal</span>
+                                <span>Payments processed securely by Virtual Wallet or PayPal</span>
                             </div>
                         </div>
                     </div>

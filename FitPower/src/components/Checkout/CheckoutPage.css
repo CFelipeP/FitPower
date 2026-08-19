@@ -276,3 +276,34 @@
     .co-btn { width: 100%; justify-content: center; }
     .co-plan-price { flex-wrap: wrap; }
 }
+
+.co-vw {
+  margin-top: 14px;
+  border: 1px solid rgba(255, 214, 0, .25);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(255, 214, 0, .04);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.co-vw-head { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; }
+.co-vw-close { background: none; border: none; color: #999; cursor: pointer; display: flex; }
+.co-vw-amount { text-align: center; font-size: 28px; font-weight: 800; display: flex; flex-direction: column; line-height: 1.1; }
+.co-vw-amount-lbl { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; }
+.co-vw-qr { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.co-vw-qr img { width: 170px; height: 170px; border-radius: 10px; background: #fff; padding: 6px; }
+.co-vw-qr p { font-size: 12px; color: #aaa; margin: 0; }
+.co-vw-wait { display: flex; align-items: center; justify-content: center; gap: 8px; color: #999; font-size: 13px; padding: 18px 0; }
+.co-vw-or { display: flex; align-items: center; gap: 10px; color: #777; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+.co-vw-or::before, .co-vw-or::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.08); }
+.co-vw-input {
+  width: 100%; box-sizing: border-box;
+  padding: 11px 12px; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.03);
+  color: #fff; font-size: 14px;
+}
+.co-vw-row { display: flex; gap: 8px; }
+.co-vw-row .co-vw-input { flex: 1; }
+.co-vw-poll { display: flex; align-items: center; gap: 7px; color: var(--power-500, #FFD600); font-size: 12px; }
+.co-vw-msg { margin: 0; font-size: 12px; color: #aaa; line-height: 1.5; }

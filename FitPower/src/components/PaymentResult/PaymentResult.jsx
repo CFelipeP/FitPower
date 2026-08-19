@@ -14,13 +14,15 @@ export default function PaymentResult() {
     const amountParam = searchParams.get('amount')
     // PayPal appends ?token=<orderID> to the return URL after approval
     const paypalOrder = searchParams.get('paypal_order') || searchParams.get('token')
+    // Virtual Wallet returns via ?intent_id=<idempotency key>
+    const intentId = searchParams.get('intent_id')
     const { refresh: refreshEntitlements } = useEntitlements()
 
     const [planName, setPlanName] = useState(planNameParam || null)
     const [billing, setBilling] = useState(billingParam || null)
     const [amount, setAmount] = useState(amountParam || null)
     const [endsAt, setEndsAt] = useState(null)
-    const [loading, setLoading] = useState(!!sessionId && !planNameParam)
+    const [loading, setLoading] = useState((!!sessionId && !planNameParam) || !!intentId)
     const [failed, setFailed] = useState(false)
     const inFlightRef = useRef(null)
 
@@ -65,6 +67,19 @@ export default function PaymentResult() {
                         setFailed(true)
                     }
                     await refreshEntitlements()
+                } else if (intentId) {
+                    const confirm = await apiFetch('/vw/confirm', {
+                        method: 'POST',
+                        body: JSON.stringify({ intent_id: intentId }),
+                    })
+                    const sub = await apiFetch('/subscriptions')
+                    if (sub) {
+                        setPlanName(confirm?.plan_name || sub.planName || planNameParam || null)
+                        setBilling(sub.billing || billingParam || null)
+                        setAmount(sub.price || amountParam || null)
+                        if (sub.endsAt) setEndsAt(new Date(sub.endsAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }))
+                    }
+                    await refreshEntitlements()
                 } else if (planNameParam) {
                     await refreshEntitlements()
                 } else {
@@ -80,7 +95,7 @@ export default function PaymentResult() {
         run()
 
         return () => { cancelled = true }
-    }, [isSuccess, sessionId, planNameParam, paypalOrder, refreshEntitlements])
+    }, [isSuccess, sessionId, planNameParam, paypalOrder, intentId, refreshEntitlements])
 
     return (
         <div className="payment-result">

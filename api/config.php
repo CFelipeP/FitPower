@@ -47,6 +47,11 @@ define('PAYPAL_CLIENT_SECRET', getenv('PAYPAL_CLIENT_SECRET') ?: '');
 define('PAYPAL_WEBHOOK_ID', getenv('PAYPAL_WEBHOOK_ID') ?: '');
 define('PAYPAL_API_BASE', getenv('PAYPAL_API_BASE') ?: 'https://api-m.sandbox.paypal.com');
 
+define('VIRTUAL_WALLET_PUBLIC_KEY', getenv('VIRTUAL_WALLET_PUBLIC_KEY') ?: '');
+define('VIRTUAL_WALLET_SECRET_KEY', getenv('VIRTUAL_WALLET_SECRET_KEY') ?: '');
+define('VIRTUAL_WALLET_BASE_URL', getenv('VIRTUAL_WALLET_BASE_URL') ?: 'http://192.168.3.27:8000');
+define('VIRTUAL_WALLET_WEBHOOK_URL', getenv('VIRTUAL_WALLET_WEBHOOK_URL') ?: '');
+
 define('UPLOAD_DIR', __DIR__ . '/uploads');
 define('API_BASE', '/api');
 

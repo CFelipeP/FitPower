@@ -571,6 +571,42 @@ route('/paypal/webhook', ['method' => 'POST', 'handler' => function() {
     handlePayPalWebhook();
 }]);
 
+// --- Virtual Wallet Routes ---
+route('/vw/config', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/finance/virtual_wallet.php';
+    vwConfig();
+}]);
+
+route('/vw/checkout', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/finance/virtual_wallet.php';
+    vwCreateCheckout();
+}]);
+
+route('/vw/process-card', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/finance/virtual_wallet.php';
+    vwProcessCard();
+}]);
+
+route('/vw/status', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/finance/virtual_wallet.php';
+    vwStatus();
+}]);
+
+route('/vw/confirm', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/finance/virtual_wallet.php';
+    vwConfirm();
+}]);
+
+route('/vw/webhook', ['method' => 'POST', 'handler' => function() {
+    require __DIR__ . '/routes/finance/virtual_wallet.php';
+    vwWebhook();
+}]);
+
+route('/vw/payments', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/finance/virtual_wallet.php';
+    vwPayments();
+}]);
+
 // --- Chat Routes ---
 route('/conversations', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/chat/chat.php';
