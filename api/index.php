@@ -394,6 +394,11 @@ route('/sessions/{id}/exercises/{exerciseId}', ['method' => 'DELETE', 'handler' 
     deleteSessionExercise($p['id'], $p['exerciseId']);
 }]);
 
+route('/sessions/{id}/exercises/order', ['method' => 'PUT', 'handler' => function($p) {
+    require __DIR__ . '/routes/support/sessions.php';
+    reorderSessionExercises($p['id']);
+}]);
+
 route('/sessions/{id}/progress', ['method' => 'PUT', 'handler' => function($p) {
     require __DIR__ . '/routes/support/sessions.php';
     saveSessionProgress($p['id']);

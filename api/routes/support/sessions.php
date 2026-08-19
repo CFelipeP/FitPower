@@ -81,9 +81,12 @@ function loadExercises(PDO $db, array $sessionIds): array {
     if (empty($sessionIds)) return [];
     $placeholders = implode(',', array_fill(0, count($sessionIds), '?'));
     $stmt = $db->prepare("
-        SELECT * FROM exercises
-        WHERE session_id IN ($placeholders)
-        ORDER BY sort_order, id
+        SELECT e.*, el.video_url, el.image_url, el.muscle_group, el.equipment,
+               el.instructions, el.external_id, el.source AS exercise_source
+        FROM exercises e
+        LEFT JOIN exercise_library el ON el.id = e.exercise_id
+        WHERE e.session_id IN ($placeholders)
+        ORDER BY e.sort_order, e.id
     ");
     $stmt->execute($sessionIds);
     $bySession = [];
@@ -98,6 +101,13 @@ function loadExercises(PDO $db, array $sessionIds): array {
             'notes' => $ex['notes'],
             'sortOrder' => (int)$ex['sort_order'],
             'exerciseId' => $ex['exercise_id'] !== null ? (int)$ex['exercise_id'] : null,
+            'videoUrl' => $ex['video_url'],
+            'imageUrl' => $ex['image_url'],
+            'muscleGroup' => $ex['muscle_group'],
+            'equipment' => $ex['equipment'],
+            'instructions' => $ex['instructions'],
+            'externalId' => $ex['external_id'],
+            'source' => $ex['exercise_source'],
         ];
     }
     return $bySession;
@@ -582,4 +592,42 @@ function deleteSessionExercise(string $sessionId, string $exerciseId): void {
 
     $db->prepare("DELETE FROM exercises WHERE id = ? AND session_id = ?")->execute([$exerciseId, $sessionId]);
     success(null, 'Exercise deleted');
+}
+
+/**
+ * Reorders the exercises of a workout. Coach/admin only; the order array must
+ * contain the exact ids of the session's exercise rows (validated) so the
+ * user sees exactly the order the coach defined.
+ */
+function reorderSessionExercises(string $sessionId): void {
+    $auth = requireRole('admin', 'coach');
+    $input = getJsonInput();
+    $db = getDB();
+
+    $session = fetchSessionOr404($db, $sessionId);
+    assertSessionAccess($auth, $db, $session);
+
+    $order = $input['order'] ?? null;
+    if (!is_array($order) || empty($order)) {
+        error('order must be a non-empty array', 422);
+    }
+
+    $placeholders = implode(',', array_fill(0, count($order), '?'));
+    $params = array_merge($order, [$sessionId]);
+    $stmt = $db->prepare("SELECT id FROM exercises WHERE id IN ($placeholders) AND session_id = ?");
+    $stmt->execute($params);
+    $found = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+    $unique = array_values(array_unique(array_map('intval', $order)));
+    if (count($found) !== count($unique)) {
+        error('Order must contain exactly the session exercises', 422);
+    }
+
+    $update = $db->prepare("UPDATE exercises SET sort_order = ? WHERE id = ? AND session_id = ?");
+    foreach ($unique as $i => $exId) {
+        $update->execute([$i + 1, $exId, $sessionId]);
+    }
+
+    $bySession = loadExercises($db, [(int)$sessionId]);
+    success(['exercises' => $bySession[(int)$sessionId] ?? []], 'Exercise order saved');
 }
