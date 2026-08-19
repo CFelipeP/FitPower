@@ -46,6 +46,7 @@ define('PAYPAL_CLIENT_ID', getenv('PAYPAL_CLIENT_ID') ?: '');
 define('PAYPAL_CLIENT_SECRET', getenv('PAYPAL_CLIENT_SECRET') ?: '');
 define('PAYPAL_WEBHOOK_ID', getenv('PAYPAL_WEBHOOK_ID') ?: '');
 define('PAYPAL_API_BASE', getenv('PAYPAL_API_BASE') ?: 'https://api-m.sandbox.paypal.com');
+define('PAYPAL_SANDBOX_AUTOCAPTURE', filter_var(getenv('PAYPAL_SANDBOX_AUTOCAPTURE') ?: 'false', FILTER_VALIDATE_BOOLEAN));
 
 define('VIRTUAL_WALLET_PUBLIC_KEY', getenv('VIRTUAL_WALLET_PUBLIC_KEY') ?: '');
 define('VIRTUAL_WALLET_SECRET_KEY', getenv('VIRTUAL_WALLET_SECRET_KEY') ?: '');

@@ -1,5 +1,18 @@
 <?php
 
+/**
+ * Sandbox auto-capture mode. When enabled (PAYPAL_SANDBOX_AUTOCAPTURE=1) a
+ * PayPal order that cannot be approved/captured in this demo environment is
+ * activated server-side from the tracked order (plan/billing/amount resolved
+ * in the backend). Idempotent; never activated without a valid tracked order
+ * owned by the authenticated user.
+ *
+ * SECURITY/INTEGRITY: MUST stay OFF in production (real money).
+ */
+function paypalAutocapture(): bool {
+    return defined('PAYPAL_SANDBOX_AUTOCAPTURE') && PAYPAL_SANDBOX_AUTOCAPTURE === true;
+}
+
 function getPayPalAccessToken(): string
 {
     $clientId = defined('PAYPAL_CLIENT_ID') ? PAYPAL_CLIENT_ID : '';
@@ -239,18 +252,25 @@ function capturePayPalOrder(): void
     if (!$plan) error('Plan not found');
 
     $res = paypalApi('POST', "/v2/checkout/orders/$orderID/capture");
+    $capturedOk = (($res['_http_code'] ?? 0) === 201 && ($res['status'] ?? '') === 'COMPLETED');
 
-    if (($res['_http_code'] ?? 0) !== 201 || ($res['status'] ?? '') !== 'COMPLETED') {
+    $captureId = '';
+    $paypalAmount = (float)$tracked['amount'];
+
+    if ($capturedOk) {
+        $capture = $res['purchase_units'][0]['payments']['captures'][0] ?? [];
+        $captureId = (string)($capture['id'] ?? '');
+        $paypalAmount = (float)($capture['amount']['value'] ?? 0);
+        // Amount mismatch guard: never activate a plan for a different amount.
+        if (abs($paypalAmount - (float)$tracked['amount']) > 0.02) {
+            error('Payment amount mismatch detected. Contact support before using your plan.', 409);
+        }
+    } elseif (paypalAutocapture()) {
+        // Sandbox: simulate the capture when the provider cannot complete it in
+        // this demo environment. Amount comes from the tracked order (backend).
+        $captureId = 'sandbox_' . $orderID;
+    } else {
         error('We could not complete the payment. No charge was made. Please try again.', 502);
-    }
-
-    $capture = $res['purchase_units'][0]['payments']['captures'][0] ?? [];
-    $captureId = (string)($capture['id'] ?? '');
-    $paypalAmount = (float)($capture['amount']['value'] ?? 0);
-
-    // Amount mismatch guard: never activate a plan for a different amount.
-    if (abs($paypalAmount - (float)$tracked['amount']) > 0.02) {
-        error('Payment amount mismatch detected. Contact support before using your plan.', 409);
     }
 
     // Dedupe by capture id (protects against double-capture retries).
