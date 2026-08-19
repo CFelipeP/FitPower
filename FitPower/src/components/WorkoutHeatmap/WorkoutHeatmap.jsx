@@ -37,12 +37,17 @@ export default function WorkoutHeatmap() {
   const [loading, setLoading] = useState(true)
   const [year, setYear] = useState(new Date().getFullYear())
   const [hoveredCell, setHoveredCell] = useState(null)
+  const [pinnedCell, setPinnedCell] = useState(null)
 
   const loadHeatmap = useCallback(async () => {
     setLoading(true)
     try {
       const data = await apiFetch(`/workout-logs/heatmap?year=${year}`)
-      setHeatmap(data || {})
+      // API returns an array of { date, count } rows; normalize to a map.
+      const rows = Array.isArray(data) ? data : []
+      const map = {}
+      rows.forEach(r => { if (r && r.date) map[r.date] = Number(r.count) || 0 })
+      setHeatmap(map)
     } catch {
       showToast('Error loading heatmap')
     } finally {
@@ -160,8 +165,24 @@ export default function WorkoutHeatmap() {
                           key={ci}
                           className={`wh-cell ${cell ? 'wh-has-data' : ''}`}
                           style={{ backgroundColor: cell ? getColor(cell.count) : 'transparent' }}
+                          role={cell ? 'button' : undefined}
+                          tabIndex={cell ? 0 : -1}
+                          aria-label={cell ? `${cell.date}: ${cell.count} workouts` : undefined}
                           onMouseEnter={() => setHoveredCell(cell ? { ...cell, label: getLabel(cell.count) } : null)}
-                          onMouseLeave={() => setHoveredCell(null)}
+                          onMouseLeave={() => { if (!pinnedCell) setHoveredCell(null) }}
+                          onClick={() => {
+                            const info = cell ? { ...cell, label: getLabel(cell.count) } : null
+                            setHoveredCell(info)
+                            setPinnedCell(info)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              const info = cell ? { ...cell, label: getLabel(cell.count) } : null
+                              setHoveredCell(info)
+                              setPinnedCell(info)
+                            }
+                          }}
                         />
                       ))}
                     </div>
@@ -175,7 +196,7 @@ export default function WorkoutHeatmap() {
             {hoveredCell ? (
               <><strong>{hoveredCell.date}</strong>: {hoveredCell.count} workouts ({hoveredCell.label})</>
             ) : (
-              <span className="wh-tooltip-idle">Hover over a day to see details</span>
+              <span className="wh-tooltip-idle">Tap or hover over a day to see details</span>
             )}
           </div>
 

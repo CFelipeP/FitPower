@@ -1,79 +1,36 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import translations from '../lib/translations'
-import { apiFetch } from '../lib/api'
 
 const I18nContext = createContext()
 
-const SUPPORTED_LANGS = ['en', 'es']
-const FALLBACK_LANG = 'en'
-const LANG_KEY = 'fitpower_lang'
-
-function detectBrowserLang() {
-    try {
-        const lang = navigator.language?.split('-')[0] || FALLBACK_LANG
-        return SUPPORTED_LANGS.includes(lang) ? lang : FALLBACK_LANG
-    } catch {
-        return FALLBACK_LANG
-    }
-}
+const ENGLISH_LANG = 'en'
 
 export function I18nProvider({ children }) {
-    const [lang, setLangState] = useState(() => {
-        return localStorage.getItem(LANG_KEY) || detectBrowserLang()
-    })
-
-    const setLang = useCallback((newLang) => {
-        if (!SUPPORTED_LANGS.includes(newLang)) return
-        setLangState(newLang)
-        localStorage.setItem(LANG_KEY, newLang)
-        document.documentElement.lang = newLang
-
-        const token = localStorage.getItem('token')
-        if (token) {
-            apiFetch('/settings', {
-                method: 'PUT',
-                body: JSON.stringify({ language: newLang }),
-            }).catch(() => {})
-        }
-    }, [])
+    const [lang] = useState(ENGLISH_LANG)
 
     useEffect(() => {
-        document.documentElement.lang = lang
-    }, [lang])
-
-    useEffect(() => {
-        const token = localStorage.getItem('token')
-        if (token) {
-            apiFetch('/settings').then(settings => {
-                if (settings?.language && SUPPORTED_LANGS.includes(settings.language) && settings.language !== lang) {
-                    setLangState(settings.language)
-                    localStorage.setItem(LANG_KEY, settings.language)
-                    document.documentElement.lang = settings.language
-                }
-            }).catch(() => {})
-        }
+        document.documentElement.lang = ENGLISH_LANG
+        try { localStorage.setItem('fitpower_lang', ENGLISH_LANG) } catch { /* storage unavailable */ }
     }, [])
+
+    const setLang = useCallback(() => {}, [])
 
     const t = useCallback((key, params = {}) => {
         const keys = key.split('.')
-        let val = translations[lang] || translations[FALLBACK_LANG]
+        let val = translations[ENGLISH_LANG]
         for (const k of keys) {
             val = val?.[k]
         }
-        if (val === undefined) {
-            val = translations[FALLBACK_LANG]
-            for (const k of keys) {
-                val = val?.[k]
-            }
-        }
         if (typeof val === 'string' && Object.keys(params).length > 0) {
-            return val.replace(/\{(\w+)\}/g, (_, key) => params[key] ?? `{${key}}`)
+            return val.replace(/\{(\w+)\}/g, (_, paramName) => params[paramName] ?? `{${paramName}}`)
         }
         return val ?? key
-    }, [lang])
+    }, [])
+
+    const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t])
 
     return (
-        <I18nContext.Provider value={{ lang, setLang, t }}>
+        <I18nContext.Provider value={value}>
             {children}
         </I18nContext.Provider>
     )

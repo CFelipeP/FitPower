@@ -18,8 +18,17 @@ export default function ClientNutrition({ clientId }) {
     if (!clientId) return
     setLoading(true)
     try {
-      const data = await apiFetch(`/coach/clients/${clientId}/nutrition`)
-      setLogs(Array.isArray(data) ? data : [])
+      const data = await apiFetch(`/coach/clients/${clientId}/nutrition/history?days=90`)
+      const list = Array.isArray(data) ? data : (data?.data || [])
+      // Map the history shape to the flat shape the table/calendar expects.
+      setLogs(list.map(l => ({
+        id: l.date,
+        date: l.date,
+        calories: l.caloriesConsumed ?? l.calories ?? null,
+        protein: l.protein?.current ?? l.protein ?? null,
+        carbs: l.carbs?.current ?? l.carbs ?? null,
+        fat: l.fat?.current ?? l.fat ?? null,
+      })))
     } catch {
       showToast('Error loading nutrition data')
     } finally {

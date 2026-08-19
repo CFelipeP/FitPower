@@ -116,7 +116,11 @@ export async function apiFetch(endpoint, options = {}) {
     }
 
     if (!data.success) {
-        throw new Error(data.message || 'API Error')
+        const err = new Error(data.message || 'API Error')
+        err.status = res.status
+        err.code = data.code || null
+        err.data = data
+        throw err
     }
     return data.data
 }

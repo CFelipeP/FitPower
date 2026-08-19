@@ -53,10 +53,15 @@
 .wl-btn-icon {
     background: none;
     border: none;
-    color: #737373;
+    color: var(--text-muted);
     cursor: pointer;
-    padding: 4px;
+    padding: 8px;
     border-radius: 4px;
+    min-width: 36px;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 .wl-btn-icon:hover { color: #fff; background: rgba(255,255,255,.1); }
 
@@ -66,6 +71,10 @@
     padding: 12px;
     font-size: 14px;
     margin-top: 8px;
+}
+
+@media (pointer: coarse) {
+    .wl-btn-icon { min-width: 44px; min-height: 44px; }
 }
 
 /* ── Form ── */
@@ -203,7 +212,7 @@
     align-items: center;
     gap: 10px;
     font-size: 12px;
-    color: #737373;
+    color: var(--text-muted);
 }
 
 .wl-log-date { color: #a3a3a3; }
@@ -220,7 +229,7 @@
 
 .wl-log-notes {
     font-size: 12px;
-    color: #737373;
+    color: var(--text-muted);
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid rgba(255,255,255,.05);
@@ -229,7 +238,7 @@
 
 .wl-loading, .wl-empty {
     text-align: center;
-    color: #737373;
+    color: var(--text-muted);
     padding: 48px 16px;
     font-size: 14px;
 }
@@ -237,6 +246,7 @@
 .wl-pagination {
     display: flex;
     justify-content: center;
+    flex-wrap: wrap;
     gap: 6px;
     margin-top: 20px;
 }
@@ -246,7 +256,7 @@
     .wl-workout-logs { padding: 16px 12px; }
     .wl-title { font-size: 18px; }
     .wl-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-    .wl-exercise-inputs { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    .wl-exercise-inputs { grid-template-columns: 1fr; gap: 8px; }
     .wl-log-main { flex-direction: column; align-items: flex-start; }
     .wl-log-right { margin-top: 4px; }
     .wl-log-badge { font-size: 10px; padding: 1px 6px; }

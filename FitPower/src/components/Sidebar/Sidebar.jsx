@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Zap, ChevronRight, Menu, X, PanelLeft } from 'lucide-react'
 import './Sidebar.css'
 
-export default function Sidebar({ items, activeNav, onNavClick, userName, userSubtitle, avatarUrl, role, collapsed, onToggle, mobileOpen, onMobileClose }) {
+export default function Sidebar({ items, activeNav, onNavClick, userName, userSubtitle, avatarUrl, collapsed, onToggle, mobileOpen, onMobileClose, mobileRight }) {
     function isSection(obj) {
         return obj.section || obj.type === 'heading'
     }
@@ -22,12 +22,14 @@ export default function Sidebar({ items, activeNav, onNavClick, userName, userSu
                     <Menu size={22} />
                 </button>
                 <span className="sb-mobile-title">{pageTitle}</span>
-                <div style={{ width: 38 }} />
+                <div className="sb-mobile-right">
+                    {mobileRight || <span className="sb-mobile-right-spacer" />}
+                </div>
             </header>
 
             {mobileOpen && <div className="sb-overlay" onClick={handleMobileClose} />}
 
-            <aside className={`sb-sidebar ${collapsed ? 'sb-collapsed' : ''} ${mobileOpen ? 'sb-mobile-open' : ''}`}>
+            <nav className={`sb-sidebar ${collapsed ? 'sb-collapsed' : ''} ${mobileOpen ? 'sb-mobile-open' : ''}`} aria-label="Main navigation">
                 <div className="sb-header">
                     <button className="sb-expand-btn" onClick={onToggle} aria-label="Expand sidebar">
                         <PanelLeft size={20} />
@@ -41,7 +43,7 @@ export default function Sidebar({ items, activeNav, onNavClick, userName, userSu
                     </button>
                 </div>
 
-                <nav className="sb-nav">
+                <div className="sb-nav">
                     {items.map((item, i) => {
                         if (isSection(item)) {
                             return (
@@ -55,11 +57,13 @@ export default function Sidebar({ items, activeNav, onNavClick, userName, userSu
                         return (
                             <button
                                 key={item.label + '-' + i}
+                                type="button"
                                 className={`sb-nav-item ${isActive ? 'sb-active' : ''} ${collapsed ? 'sb-item-collapsed' : ''}`}
                                 onClick={() => { onNavClick(item.label); if (mobileOpen) handleMobileClose() }}
                                 title={collapsed ? item.label : undefined}
+                                aria-current={isActive ? 'page' : undefined}
                             >
-                                {Icon && <Icon className="sb-nav-icon" />}
+                                {Icon && <Icon className="sb-nav-icon" aria-hidden="true" />}
                                 <span className="sb-nav-label">{item.label}</span>
                                 {!collapsed && item.badge != null && (
                                     <span className="sb-nav-badge">{item.badge}</span>
@@ -67,10 +71,11 @@ export default function Sidebar({ items, activeNav, onNavClick, userName, userSu
                             </button>
                         )
                     })}
-                </nav>
+                </div>
 
                 <div className="sb-footer">
                     <button
+                        type="button"
                         className="sb-profile"
                         onClick={(e) => {
                             e.preventDefault()
@@ -78,21 +83,27 @@ export default function Sidebar({ items, activeNav, onNavClick, userName, userSu
                             if (mobileOpen) handleMobileClose()
                         }}
                     >
-                        <img loading="lazy"
-                            src={avatarUrl || `https://picsum.photos/seed/${role || 'user'}/80/80.jpg`}
-                            alt="Profile"
-                            className="sb-avatar"
-                        />
+                        {avatarUrl ? (
+                            <img
+                                src={avatarUrl}
+                                alt=""
+                                className="sb-avatar"
+                            />
+                        ) : (
+                            <div className="sb-avatar sb-avatar-initials" aria-hidden="true">
+                                {(userName || 'U').trim().charAt(0).toUpperCase()}
+                            </div>
+                        )}
                         {!collapsed && (
                             <div className="sb-user-info">
                                 <div className="sb-user-name">{userName || 'User'}</div>
                                 <div className="sb-user-role">{userSubtitle || ''}</div>
                             </div>
                         )}
-                        {!collapsed && <ChevronRight className="sb-chevron" />}
+                        {!collapsed && <ChevronRight className="sb-chevron" aria-hidden="true" />}
                     </button>
                 </div>
-            </aside>
+            </nav>
         </>
     )
 }

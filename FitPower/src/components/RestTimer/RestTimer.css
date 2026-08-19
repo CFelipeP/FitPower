@@ -33,13 +33,14 @@
   background: rgba(255,255,255,.04);
   border: 1px solid #2a2a35;
   color: #bbb;
-  padding: 8px;
+  padding: 10px 8px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
   transition: all .2s;
+  min-height: 44px;
 }
 
 .rt-preset-btn:hover {
@@ -62,8 +63,8 @@
 }
 
 .rt-ring {
-  width: 120px;
-  height: 120px;
+  width: min(45vw, 140px);
+  height: min(45vw, 140px);
 }
 
 .rt-ring-bg {
@@ -82,7 +83,7 @@
 
 .rt-time {
   position: absolute;
-  font-size: 24px;
+  font-size: clamp(28px, 6vw, 40px);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #fff;

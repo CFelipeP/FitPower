@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { Bell, Send } from 'lucide-react'
 
 export default function AdminNotifications() {
@@ -9,13 +10,13 @@ export default function AdminNotifications() {
     const [sending, setSending] = useState(false)
 
     const handleSend = async () => {
-        if (!form.title || !form.message) { showToast('Title and message required'); return }
+        if (!form.title || !form.message) { swalError('Title and message required'); return }
         setSending(true)
         try {
-            await apiFetch('/admin/notifications/broadcast', { method: 'POST', body: JSON.stringify(form) })
+            await apiFetch('/admin/notifications/broadcast', { method: 'POST', body: JSON.stringify({ title: form.title, body: form.message, type: form.type, role: form.target_role }) })
             showToast('Notification sent')
             setForm({ title: '', message: '', type: 'info', link_url: '', target_role: '' })
-        } catch (e) { showToast(e.message || 'Error sending notification') }
+        } catch (e) { swalError(e.message || 'Error sending notification') }
         finally { setSending(false) }
     }
 

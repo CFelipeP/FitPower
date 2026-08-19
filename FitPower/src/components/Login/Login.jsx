@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useSearchParams } from 'react-router-dom'
 import {
     Zap, Mail, Lock, Eye, EyeOff, ArrowLeft,
@@ -42,44 +43,36 @@ export default function Login() {
     // Public stats
     const [publicStats, setPublicStats] = useState({ workouts: 0, trainers: 0, clients: 0 })
 
-    // Handle token from OAuth redirect
+    // Handle token from OAuth redirect (fragment form: #token=...&refresh_token=...).
+    // Tokens are validated against the API before being stored.
     useEffect(() => {
-        const token = searchParams.get('token')
-        const refreshToken = searchParams.get('refresh_token')
-        const error = searchParams.get('error')
-        if (error) {
-            showToast('Google login: ' + decodeURIComponent(error))
-            return
-        }
-        if (token) {
-            localStorage.setItem('token', token)
-            if (refreshToken) localStorage.setItem('refresh_token', refreshToken)
-            // Navigate cleanly - AuthContext will pick up token from localStorage on mount
-            window.location.href = searchParams.get('setup_password') === '1' ? '/login?setup_password=1' : '/client/dashboard'
-        }
-    }, [searchParams, showToast])
+        const hash = window.location.hash || ''
+        if (!hash.includes('token=')) return
 
-    // Handle reset_token / verify_token links from emails
-    useEffect(() => {
-        const resetToken = searchParams.get('reset_token')
-        if (resetToken) {
-            setResetToken(resetToken)
-            showView(VIEWS.NEW_PASS)
-            return
-        }
-        const verifyToken = searchParams.get('verify_token')
-        if (verifyToken) {
-            fetch('/api/auth/verify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: verifyToken }),
+        const params = new URLSearchParams(hash.replace(/^#/, ''))
+        const token = params.get('token')
+        const refreshToken = params.get('refresh_token')
+        const setupPassword = params.get('setup_password') === '1'
+
+        if (!token) return
+
+        fetch('/api/auth/me', {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then((r) => r.json())
+            .then((d) => {
+                if (!d.success || !d.data) {
+                    swalError('Google login: token validation failed')
+                    return
+                }
+                localStorage.setItem('token', token)
+                if (refreshToken) localStorage.setItem('refresh_token', refreshToken)
+                localStorage.setItem('role', d.data.role || 'client')
+                // Navigate cleanly - AuthContext will pick up the token on mount.
+                window.location.href = setupPassword ? '/login?setup_password=1' : '/client/dashboard'
             })
-                .then(r => r.json())
-                .then(d => showToast(d.message || 'Email verification result'))
-                .catch(() => showToast('Server connection error'))
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchParams])
+            .catch(() => swalError('Google login: server connection error'))
+    }, [searchParams, showToast])
 
     // Redirect to dashboard if already authenticated (e.g., after Google OAuth reload)
     useEffect(() => {
@@ -125,7 +118,6 @@ export default function Login() {
     const [newPassTouched, setNewPassTouched] = useState(false)
     const [confirmTouched, setConfirmTouched] = useState(false)
     const [savingPass, setSavingPass] = useState(false)
-    const [resetToken, setResetToken] = useState(null)
     const [setupPassword, setSetupPassword] = useState('')
     const [setupConfirm, setSetupConfirm] = useState('')
     const [setupVisible, setSetupVisible] = useState(false)
@@ -167,6 +159,29 @@ export default function Login() {
         setCodeError(false)
     }
 
+    // Handle reset_token / verify_token links from emails
+    const [resetToken, setResetToken] = useState(null)
+    useEffect(() => {
+        const resetToken = searchParams.get('reset_token')
+        if (resetToken) {
+            setResetToken(resetToken)
+            showView(VIEWS.NEW_PASS)
+            return
+        }
+        const verifyToken = searchParams.get('verify_token')
+        if (verifyToken) {
+            fetch('/api/auth/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: verifyToken }),
+            })
+                .then(r => r.json())
+                .then(d => showToast(d.message || 'Email verification result'))
+                .catch(() => swalError('Server connection error'))
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams])
+
     // Login handler
     const handleLogin = async () => {
         setLoginTouched({ email: true, password: true })
@@ -199,12 +214,13 @@ export default function Login() {
             })
             const data = await res.json()
             setForgotLoading(false)
-            showToast(data.message || 'Check your email for the reset code')
-            setResetCode('')
-            setResendTimer(60)
-            showView(VIEWS.CODE)
+            // The reset token is delivered exclusively by email (never in the
+            // API response). Send the user back to login to check their inbox.
+            showToast(data.message || 'Check your email for the reset link')
+            setForgotEmail('')
+            showView(VIEWS.LOGIN_EMAIL)
         } catch {
-            showToast('Server connection error')
+            swalError('Server connection error')
             setForgotLoading(false)
         }
     }
@@ -230,7 +246,7 @@ export default function Login() {
         setSavingPass(true)
         try {
             if (!resetToken) {
-                showToast('Recovery token not found')
+                swalError('Recovery token not found')
                 setSavingPass(false)
                 return
             }
@@ -241,22 +257,22 @@ export default function Login() {
             })
             const data = await res.json()
             if (!data.success) {
-                showToast(data.message || 'Error resetting password')
+                swalError(data.message || 'Error resetting password')
                 setSavingPass(false)
                 return
             }
             setResetToken(null)
             showView(VIEWS.SUCCESS)
         } catch {
-            showToast('Server connection error')
+            swalError('Server connection error')
         } finally {
             setSavingPass(false)
         }
     }
 
     const handleSetupPassword = async () => {
-        if (!setupPassword || setupPassword.length < 8) { showToast('Password must be at least 8 characters'); return }
-        if (setupPassword !== setupConfirm) { showToast('Passwords do not match'); return }
+        if (!setupPassword || setupPassword.length < 8) { swalError('Password must be at least 8 characters'); return }
+        if (setupPassword !== setupConfirm) { swalError('Passwords do not match'); return }
         setSetupSaving(true)
         try {
             await apiFetch('/auth/set-password', {
@@ -266,7 +282,7 @@ export default function Login() {
             showToast('Password set successfully!')
             navigate('/client/dashboard')
         } catch (e) {
-            showToast(e.message || 'Error setting password')
+            swalError(e.message || 'Error setting password')
         } finally {
             setSetupSaving(false)
         }
@@ -319,10 +335,7 @@ export default function Login() {
 
                 {/* LEFT PANEL */}
                 <div className="login-left">
-                    <img loading="lazy"                         src="https://media.revistagq.com/photos/65b12cfd195fefc5e6d8fe02/3:2/w_2559,h_1706,c_limit/fitness%20portada.jpg"
-                        alt="HIIT Training"
-                        className="login-left-bg"
-                    />
+                    <div className="login-left-bg" role="img" aria-label="Fitness training atmosphere" />
 
                     <div className="login-left-content">
                         <a href="/" className="login-logo">

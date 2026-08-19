@@ -418,3 +418,21 @@
     .ls-overlay { align-items: flex-end; }
     .ls-new-btn { width: 40px; height: 40px; }
 }
+
+@media (max-width: 640px) {
+    .ls-container { padding: 16px 12px; }
+    .ls-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .ls-body { padding: 8px; }
+    .ls-modal { width: calc(100vw - 32px); max-height: 92vh; }
+}
+
+/* ── Mobile hardening ── */
+@media (max-width: 768px) {
+    .ls-new-btn { width: 44px; height: 44px; }
+    .ls-call-btn { width: 48px; height: 48px; }
+    .ls-btn { min-height: 44px; }
+    .ls-modal-close { width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; }
+    .ls-input, .ls-search-input { font-size: 16px; }
+    .ls-overlay { align-items: flex-end; }
+    .ls-modal { width: 100%; max-width: 100%; max-height: 92vh; border-radius: 20px 20px 0 0; }
+}

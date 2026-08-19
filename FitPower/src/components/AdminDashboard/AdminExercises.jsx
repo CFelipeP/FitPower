@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
+import { confirmSwal, swalError } from '../../lib/alerts'
 import { Dumbbell, Plus, X, Edit2, Trash2 } from 'lucide-react'
 
 const emptyForm = { name: '', description: '', category: '', muscle_group: '', equipment: '', video_url: '', difficulty: 'beginner' }
@@ -13,7 +14,7 @@ export default function AdminExercises() {
     const [form, setForm] = useState({ ...emptyForm })
 
     useEffect(() => {
-        apiFetch('/exercises').then(d => setExercises(d.exercises || d.data || [])).catch(() => {})
+        apiFetch('/exercises').then(d => setExercises(Array.isArray(d) ? d : (d.exercises || d.data || []))).catch(() => {})
     }, [])
 
     const openCreate = () => { setEditId(null); setForm({ ...emptyForm }); setModalOpen(true) }
@@ -25,18 +26,18 @@ export default function AdminExercises() {
     }
 
     const handleSave = async () => {
-        if (!form.name) { showToast('Name is required'); return }
+        if (!form.name) { swalError('Name is required'); return }
         try {
             if (editId) { await apiFetch(`/exercises/${editId}`, { method: 'PUT', body: JSON.stringify(form) }); showToast('Exercise updated') }
             else { await apiFetch('/exercises', { method: 'POST', body: JSON.stringify(form) }); showToast('Exercise created') }
-            setModalOpen(false); apiFetch('/exercises').then(d => setExercises(d.exercises || d.data || [])).catch(() => {})
-        } catch (e) { showToast(e.message || 'Error') }
+            setModalOpen(false); apiFetch('/exercises').then(d => setExercises(Array.isArray(d) ? d : (d.exercises || d.data || []))).catch(() => {})
+        } catch (e) { swalError(e.message || 'Error') }
     }
 
     const deleteExercise = async (id) => {
-        if (!confirm('Delete this exercise?')) return
-        try { await apiFetch(`/exercises/${id}`, { method: 'DELETE' }); showToast('Exercise deleted'); apiFetch('/exercises').then(d => setExercises(d.exercises || d.data || [])).catch(() => {}) }
-        catch (e) { showToast(e.message || 'Error') }
+        if (!(await confirmSwal('Delete this exercise?'))) return
+        try { await apiFetch(`/exercises/${id}`, { method: 'DELETE' }); showToast('Exercise deleted'); apiFetch('/exercises').then(d => setExercises(Array.isArray(d) ? d : (d.exercises || d.data || []))).catch(() => {}) }
+        catch (e) { swalError(e.message || 'Error') }
     }
 
     return (
@@ -47,22 +48,29 @@ export default function AdminExercises() {
             </div>
             <div className="ad-dash-card" style={{ margin: '24px' }}>
                 <table className="ad-table">
-                    <thead><tr><th>Name</th><th>Category</th><th>Muscle Group</th><th>Equipment</th><th>Difficulty</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Name</th><th>Category</th><th>Muscle Group</th><th>Equipment</th><th>Difficulty</th><th>Source</th><th>Actions</th></tr></thead>
                     <tbody>
                         {exercises.map(ex => (
                             <tr key={ex.id} className="ad-user-row">
                                 <td><span style={{ fontWeight: 500 }}>{ex.name}</span></td>
                                 <td><span className="ad-time">{ex.category || '-'}</span></td>
-                                <td><span className="ad-time">{ex.muscle_group || '-'}</span></td>
+                                <td><span className="ad-time">{ex.muscle_group || ex.muscleGroup || '-'}</span></td>
                                 <td><span className="ad-time">{ex.equipment || '-'}</span></td>
-                                <td><span className={'ad-status-badge ad-status-' + (ex.difficulty === 'advanced' ? 'cancelled' : ex.difficulty === 'intermediate' ? 'pending' : 'active')}>{ex.difficulty}</span></td>
+                                <td><span className={'ad-status-badge ad-status-' + (ex.difficulty === 'advanced' ? 'cancelled' : ex.difficulty === 'intermediate' ? 'pending' : 'active')}>{ex.difficulty || '—'}</span></td>
+                                <td>
+                                    {ex.source === 'github_exercises_dataset' ? (
+                                        <span className="ad-status-badge ad-status-pending" title={`Source: ${ex.source} · External ID: ${ex.externalId}`}>Dataset</span>
+                                    ) : (
+                                        <span className="ad-status-badge ad-status-active">Original</span>
+                                    )}
+                                </td>
                                 <td>
                                     <button className="ad-btn ad-btn-secondary ad-btn-xs" style={{ marginRight: 4 }} onClick={() => openEdit(ex)}><Edit2 size={14} /></button>
                                     <button className="ad-btn ad-btn-danger ad-btn-xs" onClick={() => deleteExercise(ex.id)}><Trash2 size={14} /></button>
                                 </td>
                             </tr>
                         ))}
-                        {exercises.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: '#737373', padding: 32 }}>No exercises found</td></tr>}
+                        {exercises.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>No exercises found</td></tr>}
                     </tbody>
                 </table>
             </div>

@@ -144,3 +144,18 @@
     color: #ccc;
     font-size: 14px;
 }
+
+.edm-section-text { overflow-wrap: anywhere; }
+
+/* ── Mobile hardening ── */
+@media (max-width: 640px) {
+    .edm-overlay { padding: 0; align-items: flex-end; }
+    .edm-modal {
+        width: 100%;
+        max-width: 100%;
+        max-height: 92vh;
+        border-radius: 20px 20px 0 0;
+    }
+    .edm-close { width: 44px; height: 44px; top: 12px; right: 12px; }
+    .edm-body { padding: 16px; }
+}

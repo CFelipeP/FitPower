@@ -385,3 +385,25 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Booking */
+.coach-book-section h2 { display: flex; align-items: center; gap: 8px; }
+.coach-book-empty { color: var(--text-muted); font-size: 13px; }
+.coach-book-slots { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.coach-book-slot { display: flex; align-items: center; gap: 10px; width: 100%; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px; padding: 10px 14px; color: #e5e5e5; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.coach-book-slot:hover { border-color: var(--power-500, #ffd600); }
+.coach-book-slot:disabled { opacity: .6; cursor: wait; }
+.coach-book-time { margin-left: auto; color: #a3a3a3; }
+.coach-book-error { color: #fca5a5; font-size: 12px; margin: 10px 0 0; }
+.coach-book-hint { color: var(--text-dim); font-size: 11px; margin: 12px 0 0; line-height: 1.5; }
+
+@media (max-width: 767px) {
+    .coach-profile-header { flex-direction: column; text-align: center; gap: 16px; }
+    .coach-profile-details { justify-content: center; flex-wrap: wrap; }
+    .coach-profile-specs, .coach-profile-langs { justify-content: center; }
+    .coach-profile-content { padding: 0 16px 32px; }
+    .coach-book-slot { flex-wrap: wrap; }
+    .coach-book-time { margin-left: 0; width: 100%; }
+    .coach-programs-grid { grid-template-columns: 1fr; }
+    .coach-review-header { flex-wrap: wrap; }
+}

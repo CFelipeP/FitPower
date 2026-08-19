@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { apiFetch } from '../../lib/api'
+import { mediaUrl } from '../../lib/media'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import { X, Save, Loader2, CheckCircle2, Upload } from 'lucide-react'
 
@@ -59,6 +61,18 @@ export default function ProfileEditModal({ profileForm, setProfileForm, profileF
     const [savingToast, setSavingToast] = useState(null)
     const [uploadingPhoto, setUploadingPhoto] = useState(false)
     const fileInputRef = useRef(null)
+    const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 480)
+
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 480px)')
+        const handler = (e) => setIsMobile(e.matches)
+        mq.addEventListener('change', handler)
+        return () => mq.removeEventListener('change', handler)
+    }, [])
+
+    const rowStyle = isMobile
+        ? { display: 'grid', gridTemplateColumns: '1fr', gap: 12 }
+        : o.row
 
     useEffect(() => {
         if (!profileFormLoading && !profileForm.firstName) {
@@ -75,7 +89,7 @@ export default function ProfileEditModal({ profileForm, setProfileForm, profileF
                         trainingDays: data.trainingDays?.toString() || '',
                     })
                 })
-                .catch(() => showToast('Error loading profile'))
+                .catch(() => swalError('Error loading profile'))
                 .finally(() => setProfileFormLoading(false))
         }
     }, [profileForm.firstName, profileFormLoading, setProfileFormLoading, showToast])
@@ -89,11 +103,11 @@ export default function ProfileEditModal({ profileForm, setProfileForm, profileF
         if (!file) return
         const allowed = ['image/jpeg', 'image/png', 'image/jpg']
         if (!allowed.includes(file.type)) {
-            showToast('Solo se permiten archivos JPG, JPEG o PNG')
+            swalError('Only JPG, JPEG or PNG files are allowed')
             return
         }
         if (file.size > 5 * 1024 * 1024) {
-            showToast('La imagen no debe superar los 5MB')
+            swalError('The image must be 5MB or smaller')
             return
         }
         setUploadingPhoto(true)
@@ -107,9 +121,9 @@ export default function ProfileEditModal({ profileForm, setProfileForm, profileF
             if (res?.photo) {
                 setProfileForm(f => ({ ...f, photo: res.photo }))
             }
-            showToast('Foto subida correctamente')
+            showToast('Photo uploaded')
         } catch {
-            showToast('Error al subir la foto')
+            swalError('Could not upload the photo. Please try again.')
         } finally {
             setUploadingPhoto(false)
             if (fileInputRef.current) fileInputRef.current.value = ''
@@ -120,19 +134,23 @@ export default function ProfileEditModal({ profileForm, setProfileForm, profileF
         e.preventDefault()
         const userId = getUserIdFromToken()
         if (!userId) {
-            showToast('Session expired')
+            swalError('Session expired')
             return
         }
         if (!profileForm.firstName?.trim()) {
-            showToast('First name is required')
+            swalError('First name is required')
             return
         }
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileForm.email)) {
-            showToast('Invalid email address')
+            swalError('Invalid email address')
             return
         }
         if (profileForm.trainingDays && (Number(profileForm.trainingDays) < 1 || Number(profileForm.trainingDays) > 7)) {
-            showToast('Training days must be between 1 and 7')
+            swalError('Training days must be between 1 and 7')
+            return
+        }
+        if (profileForm.photo?.trim() && !/^(https?:\/\/|\/|uploads\/)/i.test(profileForm.photo.trim())) {
+            swalError('Photo URL must start with http(s):// or /uploads/')
             return
         }
         setProfileFormSaving(true)
@@ -150,7 +168,7 @@ export default function ProfileEditModal({ profileForm, setProfileForm, profileF
             }, 1200)
         } catch {
             setSavingToast(null)
-            showToast('Error saving profile')
+            swalError('Error saving profile')
         } finally {
             setProfileFormSaving(false)
         }
@@ -193,15 +211,17 @@ export default function ProfileEditModal({ profileForm, setProfileForm, profileF
 
                         <div style={o.avatarSection}>
                             <div style={o.avatarWrap}>
-                                <img loading="lazy"
-                                    src={profileForm.photo && (profileForm.photo.startsWith('http://') || profileForm.photo.startsWith('https://'))
-                                        ? profileForm.photo : 'https://picsum.photos/seed/default/120/120.jpg'}
-                                    alt="" style={o.avatar}
-                                />
+                                {profileForm.photo && mediaUrl(profileForm.photo) ? (
+                                    <img loading="lazy" src={mediaUrl(profileForm.photo)} alt="" style={o.avatar} />
+                                ) : (
+                                    <div style={{ ...o.avatar, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 28, color: '#eee', background: 'rgba(255,214,0,.15)' }}>
+                                        {(profileForm.firstName || 'U')[0].toUpperCase()}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        <div style={o.row}>
+                        <div style={rowStyle}>
                             <div style={o.field}>
                                 <label style={o.label}>First Name</label>
                                 <input style={o.input} value={profileForm.firstName} onChange={handleChange('firstName')} placeholder="First name" />
@@ -243,7 +263,7 @@ export default function ProfileEditModal({ profileForm, setProfileForm, profileF
 
                         <div style={o.divider} />
 
-                        <div style={o.row}>
+                        <div style={rowStyle}>
                             <div style={o.field}>
                                 <label style={o.label}>Fitness Level</label>
                                 <select style={o.select} value={profileForm.fitnessLevel} onChange={handleChange('fitnessLevel')}>

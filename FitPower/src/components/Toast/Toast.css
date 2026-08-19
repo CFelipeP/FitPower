@@ -13,6 +13,7 @@
     transform: translateX(120%);
     transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
     box-shadow: 0 0 30px rgba(255, 214, 0, 0.15), 0 0 60px rgba(255, 214, 0, 0.05);
+    max-width: calc(100vw - 48px);
 }
 
 .toast.show {
@@ -23,10 +24,21 @@
     color: var(--power-500);
     width: 20px;
     height: 20px;
+    flex-shrink: 0;
 }
 
 .toast-msg {
     font-size: 14px;
     font-weight: 500;
     color: white;
+    word-break: break-word;
+}
+
+@media (max-width: 480px) {
+    .toast {
+        top: calc(12px + env(safe-area-inset-top, 0px));
+        right: 12px;
+        left: 12px;
+        max-width: none;
+    }
 }

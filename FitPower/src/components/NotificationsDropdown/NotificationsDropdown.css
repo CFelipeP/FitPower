@@ -7,10 +7,9 @@
 }
 
 .nd-dropdown {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
+    position: fixed;
     width: 380px;
+    max-width: calc(100vw - 24px);
     max-height: 480px;
     background: #1a1a2e;
     border: 1px solid #2a2a4a;
@@ -20,6 +19,7 @@
     flex-direction: column;
     overflow: hidden;
     animation: nd-fadeIn 0.15s ease-out;
+    z-index: 1000;
 }
 
 @keyframes nd-fadeIn {
@@ -186,4 +186,20 @@
 .nd-empty p {
     font-size: 14px;
     margin: 0;
+}
+
+.nd-header-actions { display: flex; align-items: center; gap: 6px; }
+.nd-delete { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 8px; border-radius: 6px; opacity: 0; transition: opacity .15s; display: flex; align-items: center; justify-content: center; min-width: 36px; min-height: 36px; flex-shrink: 0; }
+.nd-item:hover .nd-delete { opacity: 1; }
+.nd-delete:hover { color: #fca5a5; }
+.nd-load-more { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; background: none; border: none; border-top: 1px solid rgba(255, 255, 255, .06); color: #a3a3a3; padding: 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.nd-load-more:disabled { opacity: .5; }
+
+@media (hover: none) {
+    .nd-delete { opacity: 1; }
+    .nd-delete, .nd-mark-all { min-width: 44px; min-height: 44px; }
+}
+
+@media (max-width: 640px) {
+    .nd-dropdown { width: auto; right: 12px !important; left: 12px !important; max-width: none; max-height: min(480px, calc(100vh - 80px)); }
 }

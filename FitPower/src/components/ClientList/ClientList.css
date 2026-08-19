@@ -22,7 +22,7 @@
 }
 
 .clist-subtitle {
-    color: #737373;
+    color: var(--text-muted);
     font-size: 14px;
 }
 
@@ -38,7 +38,7 @@
     transform: translateY(-50%);
     width: 16px;
     height: 16px;
-    color: #525252;
+    color: var(--text-dim);
 }
 
 .clist-search-input {
@@ -61,7 +61,7 @@
 .clist-loading {
     text-align: center;
     padding: 80px 24px;
-    color: #737373;
+    color: var(--text-muted);
     font-size: 15px;
 }
 
@@ -72,7 +72,7 @@
     justify-content: center;
     padding: 80px 24px;
     text-align: center;
-    color: #737373;
+    color: var(--text-muted);
 }
 
 .clist-empty h3 {
@@ -142,7 +142,7 @@
     align-items: center;
     gap: 4px;
     font-size: 12px;
-    color: #737373;
+    color: var(--text-muted);
     margin-bottom: 8px;
 }
 
@@ -166,7 +166,7 @@
 
 .clist-tier-pro { color: var(--power-500); background: rgba(255,214,0,.1); }
 .clist-tier-premium { color: #a78bfa; background: rgba(167,139,250,.1); }
-.clist-tier-starter { color: #737373; background: rgba(115,115,115,.1); }
+.clist-tier-starter { color: var(--text-muted); background: rgba(115,115,115,.1); }
 
 .clist-status-active { color: #4ade80; background: rgba(74,222,128,.1); }
 .clist-status-pending { color: #fbbf24; background: rgba(251,191,36,.1); }
@@ -184,7 +184,7 @@
     align-items: center;
     gap: 4px;
     font-size: 11px;
-    color: #525252;
+    color: var(--text-dim);
 }
 
 .clist-modal-overlay {
@@ -233,7 +233,7 @@
 .clist-modal-close {
     background: none;
     border: none;
-    color: #737373;
+    color: var(--text-muted);
     cursor: pointer;
     padding: 4px;
     border-radius: 8px;
@@ -276,7 +276,7 @@
 
 .clist-modal-email {
     font-size: 13px;
-    color: #737373;
+    color: var(--text-muted);
 }
 
 .clist-modal-info {
@@ -293,7 +293,7 @@
 
 .clist-modal-label {
     font-size: 13px;
-    color: #737373;
+    color: var(--text-muted);
 }
 
 .clist-modal-value {
@@ -310,7 +310,7 @@
 
 .clist-modal-bio p {
     font-size: 13px;
-    color: #737373;
+    color: var(--text-muted);
     line-height: 1.6;
     margin-top: 8px;
 }
@@ -326,4 +326,9 @@
     .clist-card { padding: 14px; }
     .clist-card-header { flex-direction: column; gap: 8px; }
     .clist-modal { width: 95vw; padding: 24px 16px; }
+}
+
+@media (max-width: 640px) {
+    .client-list-container { padding: 16px 12px; }
+    .client-card { flex-wrap: wrap; }
 }

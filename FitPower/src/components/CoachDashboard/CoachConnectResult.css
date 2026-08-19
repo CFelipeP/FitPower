@@ -1,0 +1,10 @@
+.ccr-wrap { min-height: 70vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.ccr-card { background: #12121a; border: 1px solid rgba(255, 255, 255, .1); border-radius: 20px; padding: 40px; max-width: 440px; width: 100%; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.ccr-title { color: #fff; font-size: 20px; font-weight: 700; margin: 0; }
+.ccr-sub { color: #a3a3a3; font-size: 14px; line-height: 1.6; margin: 0; }
+.ccr-icon-ok { color: #4ade80; }
+.ccr-icon-warn { color: #fde047; }
+.ccr-icon-loading { color: var(--power-500, #ffd600); }
+.ccr-actions { margin-top: 10px; }
+.ccr-btn { display: inline-flex; align-items: center; gap: 6px; border-radius: 10px; padding: 10px 20px; font-size: 13px; font-weight: 700; text-decoration: none; font-family: inherit; }
+.ccr-btn-primary { background: var(--power-500, #ffd600); color: #111; }

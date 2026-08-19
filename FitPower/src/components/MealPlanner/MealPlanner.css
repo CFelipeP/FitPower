@@ -423,3 +423,10 @@
     .mp-search { width: 100%; }
     .mp-filters { flex-wrap: wrap; }
 }
+
+@media (max-width: 640px) {
+    .mp-container { padding: 16px 12px; }
+    .mp-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .mp-modal { width: calc(100vw - 32px); max-height: 92vh; overflow-y: auto; }
+    .mp-modal-body { padding: 14px; }
+}

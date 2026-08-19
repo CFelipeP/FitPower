@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import { Search, Plus, X, Pencil, Trash2, Dumbbell, AlertCircle, ChevronDown, Play } from 'lucide-react'
 import ExerciseDemoModal from '../ExerciseLibrary/ExerciseDemoModal'
@@ -17,6 +18,7 @@ export default function WorkoutBuilder() {
     const [search, setSearch] = useState('')
     const [filterCat, setFilterCat] = useState('')
     const [filterDiff, setFilterDiff] = useState('')
+    const [filterSource, setFilterSource] = useState('')
     const [showForm, setShowForm] = useState(false)
     const [editing, setEditing] = useState(null)
     const [saving, setSaving] = useState(false)
@@ -31,9 +33,9 @@ export default function WorkoutBuilder() {
         try {
             const data = await apiFetch('/exercises')
             setExercises(data)
-        } catch { showToast('Error loading exercises') }
+        } catch { swalError('Error loading exercises') }
         finally { setLoading(false) }
-    }, [showToast])
+    }, [])
 
     useEffect(() => { loadExercises() }, [loadExercises])
 
@@ -55,7 +57,7 @@ export default function WorkoutBuilder() {
 
     async function handleSave() {
         if (!form.name.trim() || !form.category) {
-            showToast('Name and category are required')
+            swalError('Name and category are required')
             return
         }
         setSaving(true)
@@ -74,9 +76,10 @@ export default function WorkoutBuilder() {
                 showToast('Exercise created')
             }
             setShowForm(false); setEditing(null)
-            await loadExercises()
-        } catch (e) { showToast(e.message || 'Error saving') }
+        } catch (e) { swalError(e.message || 'Error saving'); return }
         finally { setSaving(false) }
+        // Reloading the list is best-effort: the save already succeeded.
+        try { await loadExercises() } catch { /* list refresh failed */ }
     }
 
     async function handleDelete(id) {
@@ -85,7 +88,7 @@ export default function WorkoutBuilder() {
             showToast('Exercise deleted')
             setConfirmDelete(null)
             await loadExercises()
-        } catch { showToast('Error deleting') }
+        } catch { swalError('Error deleting') }
     }
 
     const filtered = useMemo(() => {
@@ -93,9 +96,13 @@ export default function WorkoutBuilder() {
             if (search && !ex.name.toLowerCase().includes(search.toLowerCase())) return false
             if (filterCat && ex.category !== filterCat) return false
             if (filterDiff && ex.difficulty !== filterDiff) return false
+            if (filterSource === 'repo' && ex.source !== 'github_exercises_dataset') return false
+            if (filterSource === 'custom' && ex.source === 'github_exercises_dataset') return false
             return true
         })
-    }, [exercises, search, filterCat, filterDiff])
+    }, [exercises, search, filterCat, filterDiff, filterSource])
+
+    const repoCount = useMemo(() => exercises.filter(e => e.source === 'github_exercises_dataset').length, [exercises])
 
     const grouped = useMemo(() => {
         const map = {}
@@ -116,11 +123,11 @@ export default function WorkoutBuilder() {
             <div className="wb-header">
                 <div className="wb-header-left">
                     <Dumbbell size={20} />
-                    <h2 className="wb-title">Workout Builder</h2>
-                    <span className="wb-count">{exercises.length} exercises</span>
+                    <h2 className="wb-title">Exercise Library</h2>
+                    <span className="wb-count">{exercises.length} exercises · {repoCount} del repositorio</span>
                 </div>
                 <button className="wb-btn wb-btn-primary" onClick={openCreate}>
-                    <Plus size={16} /> <span>New</span>
+                    <Plus size={16} /> <span>New Exercise</span>
                 </button>
             </div>
 
@@ -137,6 +144,11 @@ export default function WorkoutBuilder() {
 
             {showFilters && (
                 <div className="wb-filters">
+                    <select value={filterSource} onChange={e => setFilterSource(e.target.value)}>
+                        <option value="">All sources</option>
+                        <option value="repo">Repository (1,319)</option>
+                        <option value="custom">Custom</option>
+                    </select>
                     <select value={filterCat} onChange={e => setFilterCat(e.target.value)}>
                         <option value="">All categories</option>
                         {CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
@@ -164,32 +176,44 @@ export default function WorkoutBuilder() {
                         <div key={cat} className="wb-group">
                             <h3 className="wb-group-title">{cat.charAt(0).toUpperCase() + cat.slice(1)}</h3>
                             <div className="wb-grid">
-                                {exs.map(ex => (
+                                {exs.map(ex => {
+                                    const isRepo = ex.source === 'github_exercises_dataset'
+                                    return (
                                     <div key={ex.id} className="wb-card">
                                         <div className="wb-card-body">
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
+                                                {isRepo ? (
+                                                    <span className="wb-tag wb-tag-repo" title="Del repositorio exercises-dataset">REPOSITORIO</span>
+                                                ) : (
+                                                    <span className="wb-tag wb-tag-custom">CUSTOM</span>
+                                                )}
+                                                {ex.difficulty && <span className={'wb-tag wb-tag-diff wb-diff-' + ex.difficulty}>{ex.difficulty}</span>}
+                                            </div>
                                             <h4 className="wb-card-name" style={{cursor:'pointer'}} onClick={() => setDemoExercise(ex)}>{ex.name}</h4>
                                             {ex.description && <p className="wb-card-desc">{ex.description}</p>}
                                             <div className="wb-card-tags">
                                                 {ex.muscleGroup && <span className="wb-tag wb-tag-muscle">{ex.muscleGroup}</span>}
                                                 {ex.equipment && <span className="wb-tag wb-tag-equip">{ex.equipment}</span>}
-                                                <span className={'wb-tag wb-tag-diff wb-diff-' + ex.difficulty}>
-                                                    {ex.difficulty}
-                                                </span>
                                             </div>
                                         </div>
                                         <div className="wb-card-actions">
                                             <button className="wb-action-btn" onClick={() => setDemoExercise(ex)} title="View Demo">
                                                 <Play size={14} />
                                             </button>
-                                            <button className="wb-action-btn" onClick={() => openEdit(ex)} title="Edit">
-                                                <Pencil size={14} />
-                                            </button>
-                                            <button className="wb-action-btn wb-action-del" onClick={() => setConfirmDelete(ex)} title="Delete">
-                                                <Trash2 size={14} />
-                                            </button>
+                                            {!isRepo && (
+                                                <>
+                                                    <button className="wb-action-btn" onClick={() => openEdit(ex)} title="Edit">
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button className="wb-action-btn wb-action-del" onClick={() => setConfirmDelete(ex)} title="Delete">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         </div>
                     ))

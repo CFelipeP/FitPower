@@ -89,6 +89,8 @@
   font-family: inherit;
   outline: none;
   transition: border-color .2s;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .td-input:focus {
@@ -300,4 +302,10 @@
   font-size: 15px;
   margin: 0;
   color: #888;
+}
+
+@media (max-width: 480px) {
+  .td-container { padding: 16px 12px; }
+  .td-actions { flex-direction: column; }
+  .td-actions .td-save-btn { width: 100%; justify-content: center; }
 }

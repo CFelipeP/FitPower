@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import * as mediasoupClient from 'mediasoup-client'
-import { Video, VideoOff, Mic, MicOff, PhoneOff, Monitor, Loader } from 'lucide-react'
+import { Video, VideoOff, Mic, MicOff, PhoneOff, Monitor, Loader, RotateCcw } from 'lucide-react'
 import './VideoCall.css'
 
 const WS_URL = import.meta.env.VITE_MEDIASOUP_WS_URL || (() => {
@@ -8,8 +8,8 @@ const WS_URL = import.meta.env.VITE_MEDIASOUP_WS_URL || (() => {
   return `${protocol}//${location.host}/ws/mediasoup`
 })()
 
+// Global counters are only used for uniqueness; all per-call state lives in refs.
 let wsIdCounter = 0
-let currentMount = null
 const pendingReplies = []
 
 function closeWs(ws) {
@@ -110,10 +110,14 @@ export default function VideoCall({ roomId, onClose, onError }) {
     const localStreamRef = useRef(null)
     const producersRef = useRef({})
     const consumersRef = useRef({})
+    const consumerPeerRef = useRef({})
     const timeoutRef = useRef(null)
     const myPeerIdRef = useRef(null)
     const retryCountRef = useRef(0)
     const connErrorRef = useRef(null)
+    const mountRef = useRef(null)
+    const fakeRafRef = useRef(null)
+    const isScreenSharingRef = useRef(false)
     const maxRetries = 3
 
     useEffect(() => {
@@ -122,17 +126,47 @@ export default function VideoCall({ roomId, onClose, onError }) {
         }
     }, [localStream])
 
+    // Release every acquired resource (media, transports, producers, consumers,
+    // fake-video rAF) before a retry or unmount so nothing leaks.
+    const releaseResources = useCallback(() => {
+        if (fakeRafRef.current) {
+            cancelAnimationFrame(fakeRafRef.current)
+            fakeRafRef.current = null
+        }
+        Object.values(producersRef.current).forEach(p => { try { p?.close() } catch { /* noop */ } })
+        producersRef.current = {}
+        Object.values(consumersRef.current).forEach(c => { try { c?.close() } catch { /* noop */ } })
+        consumersRef.current = {}
+        consumerPeerRef.current = {}
+        try { sendTransportRef.current?.close() } catch { /* noop */ }
+        try { recvTransportRef.current?.close() } catch { /* noop */ }
+        sendTransportRef.current = null
+        recvTransportRef.current = null
+        localStreamRef.current?.getTracks().forEach(t => { try { t.stop() } catch { /* noop */ } })
+        localStreamRef.current = null
+        closeWs(wsRef.current)
+        wsRef.current = null
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }, [])
+
     const initCall = useCallback(async () => {
         const mount = {}
-        currentMount = mount
+        mountRef.current = mount
+
+        // A retry is a fresh attempt: clear any previous error state.
+        connErrorRef.current = null
+        setConnError(null)
+        setConnecting(true)
+        setConnected(false)
+        releaseResources()
 
         const token = localStorage.getItem('token')
 
         let stream
         if (!navigator.mediaDevices) {
             const msg = window.location.protocol === 'https:'
-                ? 'Los dispositivos de media no están disponibles en este navegador'
-                : 'Las videollamadas requieren HTTPS. Accede via https://'
+                        ? 'Media devices are not available in this browser'
+                : 'Video calls require HTTPS. Access via https://'
             setConnError(msg)
             setConnecting(false)
             onError?.(msg)
@@ -152,30 +186,30 @@ export default function VideoCall({ roomId, onClose, onError }) {
                 const ctx = canvas.getContext('2d')
                 let frame = 0
                 function drawFake() {
-                    if (currentMount !== mount) return
+                    if (mountRef.current !== mount) return
                     frame++
                     ctx.fillStyle = '#1a1a2e'
                     ctx.fillRect(0, 0, 640, 480)
                     ctx.fillStyle = '#fff'
                     ctx.font = 'bold 22px Arial'
                     ctx.textAlign = 'center'
-                    ctx.fillText('Cámara no disponible', 320, 180)
+                    ctx.fillText('Camera unavailable', 320, 180)
                     ctx.font = '16px Arial'
                     ctx.fillText(`Frame: ${frame}`, 320, 260)
-                    requestAnimationFrame(drawFake)
+                    fakeRafRef.current = requestAnimationFrame(drawFake)
                 }
                 drawFake()
                 const track = canvas.captureStream(30).getVideoTracks()[0]
                 if (track) stream.addTrack(track)
             } catch {
-                if (currentMount !== mount) return
+                if (mountRef.current !== mount) return
                 setConnError('Could not access camera or microphone')
                 setConnecting(false)
                 return
             }
         }
 
-        if (currentMount !== mount) return
+        if (mountRef.current !== mount) return
 
         if (!token) {
             setConnError('No authentication token')
@@ -196,19 +230,19 @@ export default function VideoCall({ roomId, onClose, onError }) {
         wsRef.current = ws
 
         function fail(msg) {
-            if (currentMount !== mount) return
+            if (mountRef.current !== mount) return
             setConnError(msg)
             setConnecting(false)
             closeWs(ws)
         }
 
         timeoutRef.current = setTimeout(() => {
-            if (currentMount !== mount) return
+            if (mountRef.current !== mount) return
             fail('Video call server is not responding (timeout)')
         }, 8000)
 
       async function handleMsg(msg) {
-        if (currentMount !== mount) return
+        if (mountRef.current !== mount) return
 
         if (routeMessage(msg, wsId)) return
 
@@ -224,13 +258,13 @@ export default function VideoCall({ roomId, onClose, onError }) {
               const device = new mediasoupClient.Device()
               deviceRef.current = device
               await device.load({ routerRtpCapabilities: msg.rtpCapabilities })
-              if (currentMount !== mount) break
+              if (mountRef.current !== mount) break
 
               const sendResp = await requestResponse(ws, wsId,
                 { type: 'create_transport', direction: 'send' },
                 d => d.type === 'transport_created' && d.direction === 'send'
               )
-              if (currentMount !== mount || !sendResp) break
+              if (mountRef.current !== mount || !sendResp) break
 
               const sendTransport = device.createSendTransport({
                 id: sendResp.id,
@@ -246,7 +280,7 @@ export default function VideoCall({ roomId, onClose, onError }) {
                 { type: 'create_transport', direction: 'recv' },
                 d => d.type === 'transport_created' && d.direction === 'recv'
               )
-              if (currentMount !== mount || !recvResp) break
+              if (mountRef.current !== mount || !recvResp) break
 
               const recvTransport = device.createRecvTransport({
                 id: recvResp.id,
@@ -314,7 +348,7 @@ export default function VideoCall({ roomId, onClose, onError }) {
                   }
                 }
               }
-              if (currentMount !== mount) break
+              if (mountRef.current !== mount) break
 
               for (const p of (msg.producers || [])) {
                 if (p.peerId === myPeerIdRef.current) continue
@@ -331,12 +365,13 @@ export default function VideoCall({ roomId, onClose, onError }) {
                     rtpParameters: resp.rtpParameters,
                   })
                   consumersRef.current[consumer.id] = consumer
+                  consumerPeerRef.current[consumer.id] = p.peerId
                   const s = new MediaStream([consumer.track])
                   setRemoteStreams(prev => {
                     const idx = prev.findIndex(x => x.peerId === p.peerId && x.kind === p.kind)
                     const upd = [...prev]
-                    if (idx >= 0) { upd[idx] = { peerId: p.peerId, kind: p.kind, stream: s } }
-                    else { upd.push({ peerId: p.peerId, kind: p.kind, stream: s }) }
+                    if (idx >= 0) { upd[idx] = { peerId: p.peerId, kind: p.kind, stream: s, producerId: p.producerId } }
+                    else { upd.push({ peerId: p.peerId, kind: p.kind, stream: s, producerId: p.producerId }) }
                     return upd
                   })
                   ws.send(JSON.stringify({ type: 'resume_consumer', consumerId: consumer.id }))
@@ -345,17 +380,25 @@ export default function VideoCall({ roomId, onClose, onError }) {
                 }
               }
 
-              if (currentMount !== mount) break
+              if (mountRef.current !== mount) break
               retryCountRef.current = 0
+              connErrorRef.current = null
               setConnecting(false)
               setConnected(true)
             } catch (e) {
-              onError?.(`Room setup failed: ${e.message}`)
+              // Setup failure must terminate the spinner and surface the error.
+              if (mountRef.current !== mount) return
+              setConnecting(false)
+              const msg = `Room setup failed: ${e.message}`
+              setConnError(msg)
+              connErrorRef.current = msg
+              onError?.(msg)
             }
             break
           }
 
           case 'new_peer': {
+            // Peer presence is driven by its producers (new_producer events).
             break
           }
 
@@ -366,7 +409,7 @@ export default function VideoCall({ roomId, onClose, onError }) {
                 { type: 'consume', producerId: msg.producerId, rtpCapabilities: deviceRef.current.rtpCapabilities },
                 d => d.type === 'consumed' && d.producerId === msg.producerId
               )
-              if (currentMount !== mount || !resp) break
+              if (mountRef.current !== mount || !resp) break
 
               const consumer = await recvTransportRef.current.consume({
                 id: resp.id,
@@ -375,12 +418,13 @@ export default function VideoCall({ roomId, onClose, onError }) {
                 rtpParameters: resp.rtpParameters,
               })
               consumersRef.current[consumer.id] = consumer
+              consumerPeerRef.current[consumer.id] = msg.peerId
               const stream = new MediaStream([consumer.track])
               setRemoteStreams(prev => {
                 const idx = prev.findIndex(s => s.peerId === msg.peerId && s.kind === msg.kind)
                 const upd = [...prev]
-                if (idx >= 0) { upd[idx] = { peerId: msg.peerId, kind: msg.kind, stream } }
-                else { upd.push({ peerId: msg.peerId, kind: msg.kind, stream }) }
+                if (idx >= 0) { upd[idx] = { peerId: msg.peerId, kind: msg.kind, stream, producerId: msg.producerId } }
+                else { upd.push({ peerId: msg.peerId, kind: msg.kind, stream, producerId: msg.producerId }) }
                 return upd
               })
               ws.send(JSON.stringify({ type: 'resume_consumer', consumerId: consumer.id }))
@@ -391,18 +435,27 @@ export default function VideoCall({ roomId, onClose, onError }) {
           }
 
           case 'peer_left': {
-            setRemoteStreams(prev => prev.filter(s => s.peerId !== msg.peerId))
+            // Close that peer's consumers so media actually stops flowing.
+            for (const [id, peerId] of Object.entries(consumerPeerRef.current)) {
+              if (Number(peerId) === Number(msg.peerId)) {
+                try { consumersRef.current[id]?.close() } catch { /* noop */ }
+                delete consumersRef.current[id]
+                delete consumerPeerRef.current[id]
+              }
+            }
+            setRemoteStreams(prev => prev.filter(s => Number(s.peerId) !== Number(msg.peerId)))
             break
           }
 
           case 'producer_closed': {
             for (const [id, c] of Object.entries(consumersRef.current)) {
-              if (c.producerId === msg.producerId) {
-                c.close()
+              if (String(c.producerId) === String(msg.producerId)) {
+                try { c.close() } catch { /* noop */ }
                 delete consumersRef.current[id]
+                delete consumerPeerRef.current[id]
               }
             }
-            setRemoteStreams(prev => prev.filter(s => s.producerId !== msg.producerId))
+            setRemoteStreams(prev => prev.filter(s => String(s.producerId) !== String(msg.producerId)))
             break
           }
 
@@ -414,13 +467,13 @@ export default function VideoCall({ roomId, onClose, onError }) {
       }
 
       ws.onopen = () => {
-        if (currentMount !== mount) return
+        if (mountRef.current !== mount) return
         clearTimeout(timeoutRef.current)
         ws.send(JSON.stringify({ type: 'auth', token }))
       }
 
       ws.onmessage = async (event) => {
-        if (currentMount !== mount) return
+        if (mountRef.current !== mount) return
         try {
           const msg = JSON.parse(event.data)
           if (msg.type === 'connected') return
@@ -429,14 +482,14 @@ export default function VideoCall({ roomId, onClose, onError }) {
       }
 
       ws.onclose = () => {
-        if (currentMount !== mount) return
+        if (mountRef.current !== mount) return
         clearTimeout(timeoutRef.current)
         setConnected(false)
         if (!connErrorRef.current && retryCountRef.current < maxRetries) {
           retryCountRef.current++
           const delay = 2000 * retryCountRef.current
           setConnecting(true)
-          setTimeout(() => { if (currentMount === mount) initCall() }, delay)
+          setTimeout(() => { if (mountRef.current === mount) initCall() }, delay)
         } else if (!connErrorRef.current) {
           setConnecting(false)
           setConnError('Connection lost. Please try again.')
@@ -448,27 +501,24 @@ export default function VideoCall({ roomId, onClose, onError }) {
       }
 
       ws.onerror = () => {
-        if (currentMount !== mount) return
+        if (mountRef.current !== mount) return
         clearTimeout(timeoutRef.current)
         fail('Cannot connect to video call server.')
       }
-    }, [callRoomId, onError])
+    }, [callRoomId, onError, releaseResources])
 
     useEffect(() => {
         initCall()
         return () => {
-            currentMount = null
+            mountRef.current = null
             cleanPending(wsIdCounter + 1)
-            clearTimeout(timeoutRef.current)
-            wsIdCounter++
-            Object.values(producersRef.current).forEach(p => p?.close())
-            Object.values(consumersRef.current).forEach(c => c?.close())
-            sendTransportRef.current?.close()
-            recvTransportRef.current?.close()
-            localStreamRef.current?.getTracks().forEach(t => t.stop())
-            closeWs(wsRef.current)
-            wsRef.current = null
+            releaseResources()
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initCall])
+    const retry = useCallback(() => {
+        retryCountRef.current = 0
+        initCall()
     }, [initCall])
 
     function toggleMic() {
@@ -486,15 +536,12 @@ export default function VideoCall({ roomId, onClose, onError }) {
     }
 
     async function toggleScreenShare() {
+        const localStream = localStreamRef.current
+        if (!localStream) return
         const currentVideoTrack = videoTrackRef.current
         if (!currentVideoTrack) return
 
-        const localStream = localStreamRef.current
-        if (!localStream) return
-
-        const captureStream = currentVideoTrack.label?.includes('screen')
-
-        if (captureStream) {
+        if (isScreenSharingRef.current) {
             try {
                 const newStream = await navigator.mediaDevices.getUserMedia({
                     video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
@@ -509,6 +556,7 @@ export default function VideoCall({ roomId, onClose, onError }) {
                 for (const p of Object.values(producersRef.current)) {
                     try { await p.replaceTrack({ track: newTrack }) } catch { /* ignore */ }
                 }
+                isScreenSharingRef.current = false
                 setScreenSharing(false)
             } catch { /* ignore */ }
         } else {
@@ -526,23 +574,16 @@ export default function VideoCall({ roomId, onClose, onError }) {
                 }
 
                 screenTrack.onended = () => toggleScreenShare()
+                isScreenSharingRef.current = true
                 setScreenSharing(true)
             } catch { /* user cancelled */ }
         }
     }
 
     function hangUp() {
-        clearTimeout(timeoutRef.current)
-        currentMount = null
-        wsIdCounter++
-        cleanPending(wsIdCounter)
-        Object.values(producersRef.current).forEach(p => p?.close())
-        Object.values(consumersRef.current).forEach(c => c?.close())
-        sendTransportRef.current?.close()
-        recvTransportRef.current?.close()
-        localStreamRef.current?.getTracks().forEach(t => t.stop())
-        closeWs(wsRef.current)
-        wsRef.current = null
+        mountRef.current = null
+        cleanPending(wsIdCounter + 1)
+        releaseResources()
         onClose?.()
     }
 
@@ -558,22 +599,27 @@ export default function VideoCall({ roomId, onClose, onError }) {
         }
     }, [remoteStreams])
 
+    const remoteVideos = remoteStreams.filter(rs => rs.kind === 'video')
+
     return (
         <div className="vc-container">
             {connecting && !connError && (
-                <div className="vc-loading">
+                <div className="vc-loading" role="status" aria-live="polite">
                     <Loader size={32} className="vc-spin" />
                     <span>Connecting to video call server...</span>
                 </div>
             )}
 
             {connError ? (
-                <div className="vc-error-state">
-                    <VideoOff size={48} />
+                <div className="vc-error-state" role="alert" aria-live="assertive">
+                    <VideoOff size={48} aria-hidden="true" />
                     <h3>Connection Failed</h3>
                     <p>{connError}</p>
                     <div className="vc-error-actions">
-                        <button className="vc-retry-btn" onClick={hangUp}>
+                        <button className="vc-retry-btn" onClick={retry} aria-label="Try connecting again">
+                            <RotateCcw size={18} /> Try Again
+                        </button>
+                        <button className="vc-retry-btn vc-retry-secondary" onClick={hangUp} aria-label="Go back">
                             <PhoneOff size={18} /> Back
                         </button>
                     </div>
@@ -581,35 +627,36 @@ export default function VideoCall({ roomId, onClose, onError }) {
             ) : (
                 <div className="vc-grid">
                     <div className="vc-remote-area">
-                        {connected && remoteStreams.filter(rs => rs.kind === 'video').length === 0 && (
+                        {connected && remoteVideos.length === 0 && (
                             <div className="vc-waiting">
-                                <Video size={48} />
+                                <Video size={48} aria-hidden="true" />
                                 <p>Waiting for others to join...</p>
                             </div>
                         )}
                         {!connected && !connecting && !connError && (
                             <div className="vc-waiting">
-                                <Video size={48} />
+                                <Video size={48} aria-hidden="true" />
                                 <p>Disconnected</p>
                             </div>
                         )}
 
-                        {remoteStreams.filter(rs => rs.kind === 'video').map(rs => (
+                        {remoteVideos.map(rs => (
                             <div key={`${rs.peerId}-video`} className="vc-remote-video">
                                 <video
                                     ref={el => { remoteVideoRefs.current[`${rs.peerId}-video`] = el }}
                                     autoPlay playsInline
                                     className="vc-video-el"
+                                    aria-label="Remote participant video"
                                 />
                             </div>
                         ))}
                     </div>
 
                     <div className="vc-local-video">
-                        <video ref={localVideoRef} autoPlay playsInline muted className="vc-video-el" />
+                        <video ref={localVideoRef} autoPlay playsInline muted className="vc-video-el" aria-label="Your video" />
                         {!camEnabled && (
                             <div className="vc-cam-off">
-                                <VideoOff size={24} />
+                                <VideoOff size={24} aria-hidden="true" />
                             </div>
                         )}
                         <div className="vc-local-label">You</div>
@@ -623,6 +670,8 @@ export default function VideoCall({ roomId, onClose, onError }) {
                         className={`vc-ctrl-btn ${!micEnabled ? 'vc-ctrl-off' : ''}`}
                         onClick={toggleMic}
                         title={micEnabled ? 'Mute microphone' : 'Unmute microphone'}
+                        aria-label={micEnabled ? 'Mute microphone' : 'Unmute microphone'}
+                        aria-pressed={!micEnabled}
                     >
                         {micEnabled ? <Mic size={20} /> : <MicOff size={20} />}
                     </button>
@@ -630,6 +679,8 @@ export default function VideoCall({ roomId, onClose, onError }) {
                         className={`vc-ctrl-btn ${!camEnabled ? 'vc-ctrl-off' : ''}`}
                         onClick={toggleCam}
                         title={camEnabled ? 'Turn off camera' : 'Turn on camera'}
+                        aria-label={camEnabled ? 'Turn off camera' : 'Turn on camera'}
+                        aria-pressed={!camEnabled}
                     >
                         {camEnabled ? <Video size={20} /> : <VideoOff size={20} />}
                     </button>
@@ -637,10 +688,12 @@ export default function VideoCall({ roomId, onClose, onError }) {
                         className={`vc-ctrl-btn ${screenSharing ? 'vc-ctrl-active' : ''}`}
                         onClick={toggleScreenShare}
                         title={screenSharing ? 'Stop sharing' : 'Share screen'}
+                        aria-label={screenSharing ? 'Stop sharing screen' : 'Share screen'}
+                        aria-pressed={screenSharing}
                     >
                         <Monitor size={20} />
                     </button>
-                    <button className="vc-ctrl-btn vc-ctrl-hangup" onClick={hangUp} title="End call">
+                    <button className="vc-ctrl-btn vc-ctrl-hangup" onClick={hangUp} title="End call" aria-label="End call">
                         <PhoneOff size={20} />
                     </button>
                 </div>

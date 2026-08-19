@@ -3,7 +3,7 @@
 .cnp-header-left { display: flex; align-items: center; gap: 16px; }
 .cnp-title { font-family: var(--font-display); font-weight: 700; font-size: 24px; display: flex; align-items: center; gap: 12px; }
 .cnp-title svg { color: var(--power-500); }
-.cnp-sub { color: #737373; font-size: 14px; }
+.cnp-sub { color: var(--text-muted); font-size: 14px; }
 
 .cnp-back-btn {
     background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
@@ -36,7 +36,7 @@
 }
 .cnp-client-info { flex: 1; min-width: 0; }
 .cnp-client-name { font-size: 14px; font-weight: 600; color: #fff; }
-.cnp-client-prog { font-size: 12px; color: #737373; margin-top: 2px; }
+.cnp-client-prog { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .cnp-client-status {
     font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; flex-shrink: 0;
 }
@@ -60,7 +60,7 @@
 .cnp-input:focus { border-color: rgba(255,214,0,.4); }
 .cnp-form-close {
     width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.05);
-    border: none; color: #737373; cursor: pointer; display: flex; align-items: center;
+    border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center;
     justify-content: center; flex-shrink: 0; transition: color .25s;
 }
 .cnp-form-close:hover { color: #fff; }
@@ -76,7 +76,7 @@
 .cnp-cat-btn {
     font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px;
     background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
-    color: #737373; cursor: pointer; font-family: var(--font-sans); text-transform: capitalize;
+    color: var(--text-muted); cursor: pointer; font-family: var(--font-sans); text-transform: capitalize;
     transition: all .25s;
 }
 .cnp-cat-btn:hover { border-color: rgba(255,255,255,.2); color: #d4d4d4; }
@@ -103,20 +103,20 @@
     padding: 2px 8px; border-radius: 4px; text-transform: capitalize; flex-shrink: 0;
 }
 .cnp-delete-btn {
-    background: none; border: none; color: #525252; cursor: pointer;
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
     padding: 4px; border-radius: 6px; transition: color .25s, background .25s;
     flex-shrink: 0;
 }
 .cnp-delete-btn:hover { color: #f87171; background: rgba(239,68,68,.1); }
 .cnp-note-content { color: #a3a3a3; font-size: 14px; line-height: 1.6; margin: 0 0 10px; }
-.cnp-note-meta { display: flex; align-items: center; gap: 8px; color: #525252; font-size: 12px; }
+.cnp-note-meta { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 12px; }
 
 /* Empty / Loading */
-.cnp-loading { color: #737373; text-align: center; padding: 40px 20px; font-size: 14px; }
-.cnp-empty { color: #525252; text-align: center; padding: 24px; font-size: 14px; }
+.cnp-loading { color: var(--text-muted); text-align: center; padding: 40px 20px; font-size: 14px; }
+.cnp-empty { color: var(--text-dim); text-align: center; padding: 24px; font-size: 14px; }
 .cnp-empty-state {
     display: flex; flex-direction: column; align-items: center; gap: 12px;
-    color: #525252; padding: 60px 20px;
+    color: var(--text-dim); padding: 60px 20px;
 }
 .cnp-empty-state svg { opacity: .3; }
 .cnp-empty-state p { font-size: 14px; }
@@ -126,4 +126,9 @@
     .cnp-header { flex-direction: column; align-items: stretch; }
     .cnp-form-footer { flex-direction: column; align-items: stretch; }
     .cnp-category-selector { justify-content: center; }
+}
+
+@media (max-width: 640px) {
+    .cnp-grid { grid-template-columns: 1fr !important; }
+    .cnp-note-card { padding: 12px; }
 }

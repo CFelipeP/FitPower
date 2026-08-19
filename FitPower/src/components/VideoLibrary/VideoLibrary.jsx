@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Video, Upload, Search, X, Film, Trash2, Play, Edit, Save } from 'lucide-react'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
 import './VideoLibrary.css'
@@ -35,11 +36,11 @@ export default function VideoLibrary() {
             const data = await apiFetch('/videos')
             setVideos(Array.isArray(data) ? data : (data.videos || []))
         } catch {
-            showToast('Error loading videos')
+            swalError('Error loading videos')
         } finally {
             setLoading(false)
         }
-    }, [showToast])
+    }, [])
 
     useEffect(() => {
         loadVideos()
@@ -89,7 +90,7 @@ export default function VideoLibrary() {
     function handleFile(file) {
         const validTypes = ['video/mp4', 'video/webm', 'video/quicktime']
         if (!validTypes.includes(file.type)) {
-            showToast('Please upload MP4, WebM or MOV video files')
+            swalError('Please upload MP4, WebM or MOV video files')
             return
         }
         setUploading(true)
@@ -118,16 +119,16 @@ export default function VideoLibrary() {
             } else {
                 try {
                     const err = JSON.parse(xhr.responseText)
-                    showToast(err.message || 'Upload failed')
+                    swalError(err.message || 'Upload failed')
                 } catch {
-                    showToast('Upload failed')
+                    swalError('Upload failed')
                 }
             }
         }
 
         xhr.onerror = () => {
             setUploading(false)
-            showToast('Upload failed')
+            swalError('Upload failed')
         }
 
         xhr.send(formData)
@@ -141,7 +142,7 @@ export default function VideoLibrary() {
             setSelected(null)
             loadVideos()
         } catch {
-            showToast('Error deleting video')
+            swalError('Error deleting video')
         }
     }
 
@@ -161,7 +162,7 @@ export default function VideoLibrary() {
             setEditing(null)
             loadVideos()
         } catch {
-            showToast('Error updating video')
+            swalError('Error updating video')
         }
     }
 
@@ -181,7 +182,7 @@ export default function VideoLibrary() {
             setFeedbackText('')
             setSelectedClient('')
         } catch {
-            showToast('Error sending feedback')
+            swalError('Error sending feedback')
         } finally {
             setFeedbackSending(false)
         }

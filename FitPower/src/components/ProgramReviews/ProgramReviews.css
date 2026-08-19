@@ -95,4 +95,8 @@
 .pr-review-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 .pr-review-stars { display: flex; gap: 1px; margin-top: 2px; }
 .pr-review-date { margin-left: auto; font-size: 11px; color: var(--text-dim); }
-.pr-review-comment { color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
+.pr-review-comment { color: var(--text-secondary); font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+
+@media (max-width: 480px) {
+    .pr-form textarea { font-size: 16px; }
+}

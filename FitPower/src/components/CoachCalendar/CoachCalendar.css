@@ -48,8 +48,11 @@
     font-size: 13px;
     color: #a3a3a3;
     font-weight: 500;
-    min-width: 160px;
+    min-width: 0;
     text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .cc-btn {
@@ -149,7 +152,7 @@
 .cc-loading {
     text-align: center;
     padding: 48px 0;
-    color: #737373;
+    color: var(--text-muted);
     font-size: 14px;
 }
 
@@ -205,7 +208,7 @@
 
 .cc-cell-day {
     font-size: 10px;
-    color: #737373;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: .06em;
     font-weight: 600;
@@ -256,7 +259,7 @@
 
 .cc-more {
     font-size: 10px;
-    color: #737373;
+    color: var(--text-muted);
     font-weight: 600;
     padding: 2px 0;
 }
@@ -285,7 +288,7 @@
 }
 
 .cc-empty {
-    color: #737373;
+    color: var(--text-muted);
     font-size: 14px;
     padding: 24px 0;
     text-align: center;
@@ -364,17 +367,17 @@
     width: 14px;
     height: 14px;
     flex-shrink: 0;
-    color: #737373;
+    color: var(--text-muted);
 }
 
 .cc-sep {
-    color: #525252;
+    color: var(--text-dim);
     margin: 0 2px;
 }
 
 .cc-card-desc {
     font-size: 12px;
-    color: #737373;
+    color: var(--text-muted);
     line-height: 1.5;
     margin-top: 6px;
 }
@@ -490,7 +493,7 @@
 
 .cc-fg input::placeholder,
 .cc-fg textarea::placeholder {
-    color: #525252;
+    color: var(--text-dim);
 }
 
 .cc-fg select {
@@ -704,4 +707,23 @@
     .cc-topbar-title {
         font-size: 17px;
     }
+}
+
+/* ── Tablet 481-767px: week grid scrolls horizontally with snap ── */
+@media (min-width: 481px) and (max-width: 767px) {
+    .cc-week-grid {
+        gap: 6px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+        scroll-snap-type: x mandatory;
+        grid-template-columns: repeat(7, minmax(110px, 1fr));
+    }
+    .cc-cell {
+        min-width: 110px;
+        min-height: 100px;
+        scroll-snap-align: start;
+    }
+    .cc-btn-icon, .cc-btn-sm { width: 44px; height: 44px; }
+    .cc-btn { min-height: 44px; }
 }

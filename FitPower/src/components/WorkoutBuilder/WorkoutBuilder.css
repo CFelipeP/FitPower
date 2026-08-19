@@ -117,6 +117,7 @@
 .wb-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     padding: 9px 18px;
     border-radius: 10px;
@@ -127,6 +128,7 @@
     transition: all .2s;
     font-family: inherit;
     white-space: nowrap;
+    min-height: 44px;
 }
 
 .wb-btn-primary {
@@ -193,15 +195,19 @@
     border: none;
     color: #555;
     cursor: pointer;
-    padding: 2px;
+    padding: 8px;
     display: flex;
+    min-width: 40px;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
 }
 
 .wb-clear:hover { color: #f97316; }
 
 .wb-filter-toggle {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border-radius: 10px;
     border: 1px solid #2a2a35;
     background: rgba(255,255,255,.04);
@@ -370,8 +376,8 @@
 }
 
 .wb-action-btn {
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
     border-radius: 8px;
     border: 1px solid #2a2a35;
     background: rgba(255,255,255,.03);
@@ -564,4 +570,13 @@
     .wb-confirm { padding: 20px 16px; }
     .wb-confirm-actions { flex-direction: column; }
     .wb-confirm-actions .wb-btn { width: 100%; justify-content: center; }
+    .wb-form-close { width: 44px; height: 44px; }
 }
+
+@media (max-width: 520px) {
+    .wb-field-row { grid-template-columns: 1fr; }
+}
+
+/* Source badges */
+.wb-tag-repo { background: rgba(255,214,0,.15); color: var(--power-500); font-weight: 700; letter-spacing: .04em; }
+.wb-tag-custom { background: rgba(168,85,247,.15); color: #c4b5fd; font-weight: 600; }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import { Video, Phone, Plus, X, Search, User } from 'lucide-react'
 import VideoCall from '../VideoCall/VideoCall'
@@ -14,16 +15,16 @@ export default function LiveSessions({ role }) {
     const [clients, setClients] = useState([])
     const [clientSearch, setClientSearch] = useState('')
     const [newTitle, setNewTitle] = useState('')
-    const [zoomFallback, setZoomFallback] = useState(null)
     const [callError, setCallError] = useState(false)
+    const [callKey, setCallKey] = useState(0)
 
     const loadSessions = useCallback(async () => {
         try {
             const data = await apiFetch('/video-sessions')
             setSessions(data)
-        } catch { showToast('Error loading sessions') }
+        } catch { swalError('Error loading sessions') }
         finally { setLoading(false) }
-    }, [showToast])
+    }, [])
 
     useEffect(() => { loadSessions() }, [loadSessions])
 
@@ -35,7 +36,7 @@ export default function LiveSessions({ role }) {
             })
             setActiveCall(sessionId)
             loadSessions()
-        } catch { showToast('Error starting call') }
+        } catch { swalError('Error starting call') }
     }
 
     function handleJoinCall(sessionId) {
@@ -52,12 +53,28 @@ export default function LiveSessions({ role }) {
             } catch { /* ignore */ }
         }
         setActiveCall(null)
+        setCallError(false)
+        loadSessions()
+    }
+
+    // Leaving the call screen early must not leave the session stuck 'active'.
+    async function handleGoBack() {
+        if (activeCall) {
+            try {
+                await apiFetch(`/video-sessions/${activeCall}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ status: 'pending' }),
+                })
+            } catch { /* ignore */ }
+        }
+        setActiveCall(null)
+        setCallError(false)
         loadSessions()
     }
 
     async function handleCreateSession(calleeId) {
         if (!newTitle.trim()) {
-            showToast('Enter a session title')
+            swalError('Enter a session title')
             return
         }
         try {
@@ -70,7 +87,7 @@ export default function LiveSessions({ role }) {
             setClientSearch('')
             showToast('Session created')
             loadSessions()
-        } catch { showToast('Error creating session') }
+        } catch { swalError('Error creating session') }
     }
 
     function openNewModal() {
@@ -80,7 +97,7 @@ export default function LiveSessions({ role }) {
         if (role === 'coach') {
             apiFetch('/clients')
                 .then(d => setClients(d?.clients || []))
-                .catch(() => showToast('Error loading clients'))
+                .catch(() => swalError('Error loading clients'))
         }
     }
 
@@ -121,13 +138,16 @@ export default function LiveSessions({ role }) {
     }
 
     if (activeCall) {
-        if (callError && zoomFallback) {
+        if (callError) {
             return (
                 <div className="ls-container">
                     <div className="ls-call-error">
                         <p>Video call failed</p>
-                        <a href={zoomFallback} target="_blank" rel="noopener noreferrer" className="ls-zoom-btn">Unirse vía Zoom</a>
-                        <button className="ls-btn" onClick={() => { setActiveCall(null); setCallError(false); setZoomFallback(null) }}>Go back</button>
+                        <p className="ls-call-error-sub">The in-app call could not be established. You can retry the connection or go back to the session list.</p>
+                        <div className="ls-call-error-actions">
+                            <button className="ls-btn" onClick={() => { setCallError(false); setCallKey(k => k + 1) }}>Retry</button>
+                            <button className="ls-btn" onClick={handleGoBack}>Go back</button>
+                        </div>
                     </div>
                 </div>
             )
@@ -135,9 +155,10 @@ export default function LiveSessions({ role }) {
         return (
             <div className="ls-container">
                 <VideoCall
+                    key={callKey}
                     roomId={`vs-${activeCall}`}
                     onClose={handleEndCall}
-                    onError={(msg) => { setCallError(true); setZoomFallback(`https://zoom.us/j/COACH_MEETING_ID`); showToast(msg) }}
+                    onError={(msg) => { setCallError(true); swalError(msg) }}
                 />
             </div>
         )

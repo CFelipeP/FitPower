@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { Plus, X, Edit2, Star } from 'lucide-react'
 
 const emptyForm = { name: '', priceMonthly: '', priceYearly: '', features: '', is_popular: false }
@@ -13,7 +14,7 @@ export default function AdminPlans() {
     const [form, setForm] = useState({ ...emptyForm })
 
     useEffect(() => {
-        apiFetch('/admin/plans').then(d => setPlans(d.data || d.plans || [])).catch(() => {})
+        apiFetch('/admin/plans').then(d => setPlans(Array.isArray(d) ? d : (d.data || d.plans || []))).catch(() => {})
     }, [])
 
     const openCreate = () => { setEditId(null); setForm({ ...emptyForm }); setModalOpen(true) }
@@ -31,11 +32,16 @@ export default function AdminPlans() {
     }
 
     const handleSave = async () => {
-        if (!form.name || form.priceMonthly === '' || form.priceYearly === '') { showToast('Name and prices required'); return }
+        if (!form.name || form.priceMonthly === '' || form.priceYearly === '') { swalError('Name and prices required'); return }
+        const monthly = parseFloat(form.priceMonthly)
+        const yearly = parseFloat(form.priceYearly)
+        if (!Number.isFinite(monthly) || monthly < 0 || monthly > 100000) { swalError('Monthly price must be between 0 and 100000'); return }
+        if (!Number.isFinite(yearly) || yearly < 0 || yearly > 1000000) { swalError('Yearly price must be between 0 and 1000000'); return }
+        if (yearly > 0 && monthly > 0 && yearly < monthly) { swalError('Yearly price should not be lower than the monthly price'); return }
         const body = {
             name: form.name,
-            priceMonthly: parseFloat(form.priceMonthly),
-            priceYearly: parseFloat(form.priceYearly),
+            priceMonthly: monthly,
+            priceYearly: yearly,
             popular: form.is_popular,
             features: form.features.split('\n').filter(Boolean),
         }
@@ -43,8 +49,8 @@ export default function AdminPlans() {
             if (editId) { await apiFetch(`/admin/plans/${editId}`, { method: 'PUT', body: JSON.stringify(body) }); showToast('Plan updated') }
             else { await apiFetch('/admin/plans', { method: 'POST', body: JSON.stringify(body) }); showToast('Plan created') }
             setModalOpen(false)
-            apiFetch('/admin/plans').then(d => setPlans(d.data || d.plans || [])).catch(() => {})
-        } catch (e) { showToast(e.message || 'Error saving plan') }
+            apiFetch('/admin/plans').then(d => setPlans(Array.isArray(d) ? d : (d.data || d.plans || []))).catch(() => {})
+        } catch (e) { swalError(e.message || 'Error saving plan') }
     }
 
     return (
@@ -60,7 +66,7 @@ export default function AdminPlans() {
                             <div>
                                 <div style={{ fontSize: 18, fontWeight: 700 }}>{plan.name}</div>
                                 <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--power-500)', marginTop: 8 }}>
-                                    ${plan.priceMonthly}<span style={{ fontSize: 14, color: '#737373', fontWeight: 400 }}>/month</span>
+                                    ${plan.priceMonthly}<span style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 400 }}>/month</span>
                                 </div>
                                 <div style={{ fontSize: 13, color: '#a3a3a3' }}>${plan.priceYearly}/year</div>
                             </div>
@@ -72,7 +78,7 @@ export default function AdminPlans() {
                         <button className="ad-btn ad-btn-secondary ad-btn-xs" style={{ width: '100%', justifyContent: 'center' }} onClick={() => openEdit(plan)}><Edit2 size={14} /> Edit</button>
                     </div>
                 ))}
-                {plans.length === 0 && <div style={{ color: '#737373', textAlign: 'center', padding: 32 }}>No plans yet</div>}
+                {plans.length === 0 && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No plans yet</div>}
             </div>
 
             <div className={'ad-modal-overlay' + (modalOpen ? ' ad-modal-open' : '')} onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>

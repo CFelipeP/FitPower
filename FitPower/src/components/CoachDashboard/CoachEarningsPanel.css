@@ -1,0 +1,25 @@
+.cep-wrap { padding: 24px; }
+.cep-note { color: #a3a3a3; font-size: 13px; line-height: 1.5; margin: 0 0 12px; display: flex; align-items: center; gap: 6px; }
+.cep-ok { color: #86efac; }
+.cep-warn { color: #fde047; }
+.cep-bank-card, .cep-payout-card, .cep-breakdown-card { margin-bottom: 16px; }
+.cep-payout-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cep-input { background: rgba(0, 0, 0, .3); border: 1px solid rgba(255, 255, 255, .12); border-radius: 10px; padding: 9px 12px; color: #fff; font-size: 13px; width: 160px; max-width: 100%; font-family: inherit; }
+.cep-payout-row .cd-btn { width: auto; }
+.cep-input:focus { outline: none; border-color: var(--power-500, #ffd600); }
+.cep-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.cep-table-wrap table { min-width: 480px; }
+
+@media (max-width: 640px) {
+  .cep-wrap { padding: 16px 12px; }
+  .cep-payout-row { flex-direction: column; align-items: stretch; }
+  .cep-payout-row .cep-input { width: 100%; }
+  .cep-payout-row .cd-btn { width: 100%; justify-content: center; }
+}
+.cep-list { display: flex; flex-direction: column; }
+.cep-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255, 255, 255, .05); }
+.cep-row-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cep-row-desc { color: #e5e5e5; font-size: 13px; }
+.cep-row-date { color: var(--text-muted); font-size: 11px; }
+.cep-row-amount { color: #4ade80; font-weight: 700; font-size: 13px; }
+.cd-badge-pending { background: rgba(255, 214, 0, .15); color: #fde047; }

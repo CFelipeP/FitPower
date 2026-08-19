@@ -9,6 +9,7 @@ export default function ClientMetrics({ clientId }) {
   const [metrics, setMetrics] = useState([])
   const [loading, setLoading] = useState(true)
   const chartRef = useRef(null)
+  const [chartWidthState, setChartWidthState] = useState(600)
 
   const loadMetrics = useCallback(async () => {
     if (!clientId) return
@@ -27,8 +28,19 @@ export default function ClientMetrics({ clientId }) {
 
   const weightData = metrics.filter(m => m.weight != null).slice(-20)
 
-  const chartWidth = 600
-  const chartHeight = 240
+  useEffect(() => {
+    const el = chartRef.current
+    if (!el) return
+    const observer = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect?.width
+      if (w) setChartWidthState(Math.max(300, Math.min(w, 900)))
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [weightData.length])
+
+  const chartWidth = chartWidthState
+  const chartHeight = Math.max(200, Math.round(chartWidthState * 0.4))
   const padding = { top: 30, right: 30, bottom: 40, left: 60 }
   const plotW = chartWidth - padding.left - padding.right
   const plotH = chartHeight - padding.top - padding.bottom
@@ -120,7 +132,7 @@ export default function ClientMetrics({ clientId }) {
                     stroke="rgba(255,255,255,.06)"
                     strokeWidth="1"
                   />
-                  <text x={padding.left - 8} y={tick.y + 4} textAnchor="end" fill="#737373" fontSize="11">
+                  <text x={padding.left - 8} y={tick.y + 4} textAnchor="end" fill="var(--text-muted)" fontSize="11">
                     {tick.label}
                   </text>
                 </g>
@@ -129,7 +141,7 @@ export default function ClientMetrics({ clientId }) {
                 const idx = weightData.indexOf(d)
                 const x = padding.left + (idx / Math.max(weightData.length - 1, 1)) * plotW
                 return (
-                  <text key={i} x={x} y={chartHeight - 12} textAnchor="middle" fill="#737373" fontSize="11">
+                  <text key={i} x={x} y={chartHeight - 12} textAnchor="middle" fill="var(--text-muted)" fontSize="11">
                     {formatDate(d.date || d.createdAt)}
                   </text>
                 )

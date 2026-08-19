@@ -40,16 +40,18 @@
 .sp-cancel-btn {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     background: transparent;
     border: 1px solid rgba(239, 68, 68, 0.4);
     color: #ef4444;
     font-size: 13px;
     font-weight: 600;
-    padding: 8px 16px;
+    padding: 10px 16px;
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
+    min-height: 44px;
 }
 
 .sp-cancel-btn:hover {
@@ -69,7 +71,7 @@
 .sp-toggle-label {
     font-size: 14px;
     font-weight: 500;
-    color: #737373;
+    color: var(--text-muted);
     transition: color 0.3s ease;
 }
 
@@ -186,7 +188,7 @@
 }
 
 .sp-plan-desc {
-    color: #737373;
+    color: var(--text-muted);
     font-size: 14px;
     line-height: 1.4;
 }
@@ -205,7 +207,7 @@
 }
 
 .sp-price-period {
-    color: #737373;
+    color: var(--text-muted);
     font-size: 14px;
     font-weight: 400;
     margin-left: 2px;
@@ -229,7 +231,7 @@
 }
 
 .sp-feature-disabled {
-    color: #737373 !important;
+    color: var(--text-muted) !important;
 }
 
 /* Buttons */
@@ -283,7 +285,7 @@
     justify-content: center;
     gap: 16px;
     padding: 80px 20px;
-    color: #737373;
+    color: var(--text-muted);
 }
 
 .sp-error p {
@@ -320,3 +322,45 @@
 }
 
 
+
+/* Fase 4: subscription lifecycle */
+.sp-status-banner { display: flex; align-items: center; gap: 12px; border-radius: 14px; padding: 14px 18px; margin-bottom: 20px; border: 1px solid; font-size: 13px; }
+.sp-banner-warn { background: rgba(255, 214, 0, .07); border-color: rgba(255, 214, 0, .3); color: #fde047; }
+.sp-banner-danger { background: rgba(248, 113, 113, .07); border-color: rgba(248, 113, 113, .3); color: #fca5a5; }
+.sp-banner-ok { background: rgba(74, 222, 128, .07); border-color: rgba(74, 222, 128, .3); color: #86efac; }
+.sp-status-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.sp-status-info strong { color: #fff; }
+.sp-status-info span { color: #a3a3a3; }
+.sp-renews { color: #a3a3a3; font-weight: 400; }
+
+.sp-billing-history { margin-top: 32px; }
+.sp-billing-title { display: flex; align-items: center; gap: 8px; color: #e5e5e5; font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+.sp-billing-empty { color: var(--text-muted); font-size: 13px; }
+.sp-invoice-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sp-invoice-table th { text-align: left; color: var(--text-muted); font-weight: 600; padding: 8px 12px; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+.sp-invoice-table td { color: #d4d4d4; padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, .05); }
+.sp-invoice-status { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 2px 10px; border-radius: 9999px; }
+.sp-invoice-completed { background: rgba(74, 222, 128, .15); color: #86efac; }
+.sp-invoice-failed { background: rgba(248, 113, 113, .15); color: #fca5a5; }
+.sp-invoice-pending { background: rgba(255, 214, 0, .15); color: #fde047; }
+.sp-invoice-refunded { background: rgba(163, 163, 163, .15); color: #d4d4d4; }
+
+.sp-modal-overlay { position: fixed; inset: 0; z-index: 1200; background: rgba(0, 0, 0, .7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.sp-modal { width: 100%; max-width: 460px; background: #12121a; border: 1px solid rgba(255, 255, 255, .1); border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+.sp-modal-title { color: #fff; font-size: 17px; font-weight: 700; margin: 0; }
+.sp-modal-sub { color: #a3a3a3; font-size: 13px; line-height: 1.5; margin: 0; }
+.sp-modal-label { color: #a3a3a3; font-size: 12px; font-weight: 600; display: block; margin-bottom: 6px; }
+.sp-modal-select { width: 100%; background: rgba(0, 0, 0, .3); border: 1px solid rgba(255, 255, 255, .12); border-radius: 10px; padding: 9px 12px; color: #fff; font-size: 13px; font-family: inherit; }
+.sp-modal-actions { display: flex; gap: 10px; }
+.sp-modal-actions .sp-btn { flex: 1; justify-content: center; }
+.sp-modal-hint { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0; }
+.sp-cancel-confirm { display: flex; align-items: center; justify-content: center; gap: 6px; background: none; border: 1px solid rgba(248, 113, 113, .35); color: #fca5a5; border-radius: 10px; padding: 10px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.sp-cancel-confirm:hover { background: rgba(248, 113, 113, .08); }
+
+@media (max-width: 767px) {
+    .sp-grid { grid-template-columns: 1fr !important; gap: 16px; }
+    .sp-status-banner { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .sp-current-banner { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .sp-billing-toggle-wrapper { justify-content: center; }
+    .sp-modal { width: calc(100vw - 32px); }
+}

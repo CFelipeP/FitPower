@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { TrendingUp, Scale, Activity, Plus, X } from 'lucide-react'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import './ProgressCharts.css'
 
@@ -20,13 +21,26 @@ export default function ProgressCharts() {
   const [chartMetric, setChartMetric] = useState('weight')
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({ weight: '', bodyFat: '', muscle: '', bmi: '', date: '' })
+  const chartRef = useRef(null)
+  const [chartWidth, setChartWidth] = useState(600)
+
+  useEffect(() => {
+    const el = chartRef.current
+    if (!el) return
+    const observer = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect?.width
+      if (w) setChartWidth(Math.max(280, Math.min(w, 900)))
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   const loadData = useCallback(async () => {
     try {
       const result = await apiFetch('/metrics')
       setData(Array.isArray(result) ? result : [])
     } catch {
-      showToast('Error loading metrics')
+      swalError('Error loading metrics')
     } finally {
       setLoading(false)
     }
@@ -54,14 +68,26 @@ export default function ProgressCharts() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    const w = parseFloat(form.weight)
+    const bf = parseFloat(form.bodyFat)
+    const mu = parseFloat(form.muscle)
+    const bmi = parseFloat(form.bmi)
+    if ([w, bf, mu, bmi].some(v => Number.isNaN(v))) {
+      swalError('Enter valid numbers for all fields')
+      return
+    }
+    if (w < 20 || w > 500) { swalError('Weight must be between 20 and 500 kg'); return }
+    if (bf < 1 || bf > 70) { swalError('Body fat must be between 1% and 70%'); return }
+    if (mu < 10 || mu > 300) { swalError('Muscle mass must be between 10 and 300 kg'); return }
+    if (bmi < 10 || bmi > 60) { swalError('BMI must be between 10 and 60'); return }
     try {
       await apiFetch('/metrics', {
         method: 'POST',
         body: JSON.stringify({
-          weight: parseFloat(form.weight),
-          bodyFat: parseFloat(form.bodyFat),
-          muscle: parseFloat(form.muscle),
-          bmi: parseFloat(form.bmi),
+          weight: w,
+          bodyFat: bf,
+          muscle: mu,
+          bmi,
           date: form.date || new Date().toISOString().split('T')[0],
         }),
       })
@@ -69,8 +95,8 @@ export default function ProgressCharts() {
       setModalOpen(false)
       setForm({ weight: '', bodyFat: '', muscle: '', bmi: '', date: '' })
       loadData()
-    } catch {
-      showToast('Error saving measurement')
+    } catch (err) {
+      swalError(err.message || 'Error saving measurement')
     }
   }
 
@@ -80,8 +106,8 @@ export default function ProgressCharts() {
   const minVal = values.length ? Math.floor(Math.min(...values) * 0.95) : 0
   const maxVal = values.length ? Math.ceil(Math.max(...values) * 1.05) : 100
   const pad = { top: 30, right: 30, bottom: 40, left: 55 }
-  const svgW = 600
-  const svgH = 300
+  const svgW = chartWidth
+  const svgH = Math.max(180, Math.round(chartWidth * 0.5))
   const chartW = svgW - pad.left - pad.right
   const chartH = svgH - pad.top - pad.bottom
   const valRange = maxVal - minVal || 1
@@ -120,7 +146,7 @@ export default function ProgressCharts() {
             ))}
           </div>
         </div>
-        <div className="pc-chart-wrap">
+        <div className="pc-chart-wrap" ref={chartRef}>
           {chartData.length < 2 ? (
             <div className="pc-empty-chart">{loading ? 'Loading...' : 'Not enough data points to show chart'}</div>
           ) : (
@@ -197,19 +223,19 @@ export default function ProgressCharts() {
             <form className="pc-form" onSubmit={handleSubmit}>
               <label className="pc-field">
                 <span>Weight (kg)</span>
-                <input name="weight" type="number" step="0.1" value={form.weight} onChange={handleChange} required />
+                <input name="weight" type="number" step="0.1" min="20" max="500" value={form.weight} onChange={handleChange} required />
               </label>
               <label className="pc-field">
                 <span>Body Fat (%)</span>
-                <input name="bodyFat" type="number" step="0.1" value={form.bodyFat} onChange={handleChange} required />
+                <input name="bodyFat" type="number" step="0.1" min="1" max="70" value={form.bodyFat} onChange={handleChange} required />
               </label>
               <label className="pc-field">
                 <span>Muscle Mass (kg)</span>
-                <input name="muscle" type="number" step="0.1" value={form.muscle} onChange={handleChange} required />
+                <input name="muscle" type="number" step="0.1" min="10" max="300" value={form.muscle} onChange={handleChange} required />
               </label>
               <label className="pc-field">
                 <span>BMI</span>
-                <input name="bmi" type="number" step="0.1" value={form.bmi} onChange={handleChange} required />
+                <input name="bmi" type="number" step="0.1" min="10" max="60" value={form.bmi} onChange={handleChange} required />
               </label>
               <label className="pc-field">
                 <span>Date</span>

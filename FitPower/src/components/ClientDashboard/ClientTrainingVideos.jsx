@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
-import { Video, Search, Play, Clock, X, Tag, Star } from 'lucide-react'
+import { Video, Search, Play, Clock, X, Star } from 'lucide-react'
 
 const CATEGORIES = [
     { value: '', label: 'All' },
@@ -77,12 +77,12 @@ export default function ClientTrainingVideos() {
                 <h1 style={{ fontSize: 24, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 12 }}>
                     <Video size={24} style={{ color: 'var(--power-500)' }} /> Training Videos
                 </h1>
-                <span style={{ color: '#737373', fontSize: 14 }}>{videos.length} video{videos.length !== 1 ? 's' : ''}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 14 }}>{videos.length} video{videos.length !== 1 ? 's' : ''}</span>
             </div>
 
             <div className="cd-card" style={{ marginBottom: 24, padding: '12px 16px', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ position: 'relative', flex: '1 1 200px' }}>
-                    <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#737373' }} />
+                    <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                     <input
                         className="cd-input"
                         type="text"
@@ -106,15 +106,15 @@ export default function ClientTrainingVideos() {
             </div>
 
             {loading ? (
-                <div style={{ textAlign: 'center', padding: 60, color: '#737373' }}>
+                <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
                     <div className="cd-spinner" style={{ margin: '0 auto 12px' }} />
                     Loading videos...
                 </div>
             ) : videos.length === 0 ? (
                 <div className="cd-card" style={{ textAlign: 'center', padding: 60 }}>
-                    <Video size={48} style={{ color: '#525252', marginBottom: 16 }} />
+                    <Video size={48} style={{ color: 'var(--text-dim)', marginBottom: 16 }} />
                     <h3 style={{ color: '#e5e5e5', fontSize: 18, marginBottom: 8 }}>No videos available yet</h3>
-                    <p style={{ color: '#737373' }}>Your coach will upload training videos here soon</p>
+                    <p style={{ color: 'var(--text-muted)' }}>Your coach will upload training videos here soon</p>
                 </div>
             ) : (
                 <>
@@ -123,7 +123,7 @@ export default function ClientTrainingVideos() {
                             <h2 style={{ fontSize: 18, fontWeight: 600, color: '#e5e5e5', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <Star size={18} style={{ color: '#f59e0b' }} /> Featured
                             </h2>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(320px, 100%), 1fr))', gap: 16 }}>
                                 {featured.map(video => (
                                     <VideoCard key={video.id} video={video} onClick={() => setSelectedVideo(video)} />
                                 ))}
@@ -133,7 +133,7 @@ export default function ClientTrainingVideos() {
 
                     <div>
                         {featured.length > 0 && <h2 style={{ fontSize: 18, fontWeight: 600, color: '#e5e5e5', marginBottom: 16 }}>All Videos</h2>}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(320px, 100%), 1fr))', gap: 16 }}>
                             {regular.map(video => (
                                 <VideoCard key={video.id} video={video} onClick={() => setSelectedVideo(video)} />
                             ))}
@@ -197,17 +197,17 @@ function VideoCard({ video, onClick }) {
                     </p>
                 )}
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <span style={{ fontSize: 12, color: CATEGORY_COLORS[video.category] || '#737373', background: (CATEGORY_COLORS[video.category] || '#737373') + '18', padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
+                    <span style={{ fontSize: 12, color: CATEGORY_COLORS[video.category] || 'var(--text-muted)', background: (CATEGORY_COLORS[video.category] || 'var(--text-muted)') + '18', padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
                         {CATEGORIES.find(c => c.value === video.category)?.label || video.category}
                     </span>
-                    <span style={{ fontSize: 11, color: '#525252', marginLeft: 'auto' }}>{timeAgo(video.createdAt)}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>{timeAgo(video.createdAt)}</span>
                 </div>
                 {video.coachName && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,.05)' }}>
                         <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(168,85,247,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#a855f7', fontWeight: 700, flexShrink: 0 }}>
                             {video.coachName[0]}
                         </div>
-                        <span style={{ fontSize: 12, color: '#737373' }}>By <strong style={{ color: '#a3a3a3', fontWeight: 500 }}>{video.coachName}</strong></span>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>By <strong style={{ color: '#a3a3a3', fontWeight: 500 }}>{video.coachName}</strong></span>
                     </div>
                 )}
             </div>
@@ -230,18 +230,20 @@ function VideoModal({ video, onClose }) {
         <div style={{
             position: 'fixed', inset: 0, zIndex: 10000,
             background: 'rgba(0,0,0,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 24,
+            padding: 24, overflowY: 'auto',
         }} onClick={onClose}>
             <div
-                style={{ width: '100%', maxWidth: 900, position: 'relative' }}
+                style={{ width: '100%', maxWidth: 900, position: 'relative', maxHeight: '92vh', overflowY: 'auto', paddingBottom: 16 }}
                 onClick={e => e.stopPropagation()}
             >
                 <button
                     onClick={onClose}
+                    aria-label="Close video"
                     style={{
-                        position: 'absolute', top: -40, right: 0,
-                        background: 'none', border: 'none', color: '#fff', cursor: 'pointer',
-                        fontSize: 14, display: 'flex', alignItems: 'center', gap: 6
+                        position: 'sticky', top: 0, float: 'right', zIndex: 2,
+                        background: 'rgba(0,0,0,.6)', border: 'none', color: '#fff', cursor: 'pointer',
+                        fontSize: 14, display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '10px 14px', borderRadius: 8, marginBottom: 8
                     }}
                 >
                     <X size={20} /> Close
@@ -251,7 +253,7 @@ function VideoModal({ video, onClose }) {
                     src={`/api/${video.filePath}`}
                     controls
                     autoPlay
-                    style={{ width: '100%', borderRadius: 8, background: '#000', maxHeight: '70vh' }}
+                    style={{ width: '100%', borderRadius: 8, background: '#000', maxHeight: '70vh', display: 'block', clear: 'both' }}
                 />
 
                 <div style={{ marginTop: 16 }}>
@@ -260,11 +262,11 @@ function VideoModal({ video, onClose }) {
                         <p style={{ color: '#a3a3a3', fontSize: 14, lineHeight: 1.5, margin: '0 0 12px' }}>{video.description}</p>
                     )}
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={{ fontSize: 13, color: CATEGORY_COLORS[video.category] || '#737373', background: (CATEGORY_COLORS[video.category] || '#737373') + '18', padding: '3px 10px', borderRadius: 4, fontWeight: 500 }}>
+                        <span style={{ fontSize: 13, color: CATEGORY_COLORS[video.category] || 'var(--text-muted)', background: (CATEGORY_COLORS[video.category] || 'var(--text-muted)') + '18', padding: '3px 10px', borderRadius: 4, fontWeight: 500 }}>
                             {CATEGORIES.find(c => c.value === video.category)?.label || video.category}
                         </span>
                         {video.durationSeconds > 0 && (
-                            <span style={{ fontSize: 13, color: '#737373', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontSize: 13, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
                                 <Clock size={13} /> {formatDuration(video.durationSeconds)}
                             </span>
                         )}
@@ -274,7 +276,7 @@ function VideoModal({ video, onClose }) {
                             </span>
                         ))}
                         {video.coachName && (
-                            <span style={{ fontSize: 13, color: '#737373', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 13, color: 'var(--text-muted)', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(168,85,247,.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#a855f7', fontWeight: 700 }}>
                                     {video.coachName[0]}
                                 </span>

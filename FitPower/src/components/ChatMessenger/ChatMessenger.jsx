@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { apiFetch } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
-import { MessageCircle, Send, ChevronLeft, Plus, X, CheckCheck, Search } from 'lucide-react'
+import { MessageCircle, Send, ChevronLeft, Plus, X, CheckCheck, Check, Search, ChevronUp } from 'lucide-react'
 import './ChatMessenger.css'
 
 const WS_URL = import.meta.env.VITE_WS_URL || (() => {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${location.host}/ws/chat`
 })()
-const POLL_INTERVAL = 15000
 const EMOJIS = ['😀','😎','🔥','💪','❤️','👍','🎉','💯','😂','😍','🙌','👏','✨','🤝','💀','👀','😅','🥹','😤','🙏','💥','⚡','🔥','💪','🏆','🥇','🎯','💡','🎵','🎶','💜','🌟','⭐','🌈','🫶']
 const COLORS = ['#f97316','#8b5cf6','#06b6d4','#ec4899','#22c55e','#eab308','#3b82f6','#a855f7']
 
@@ -68,6 +67,8 @@ export default function ChatMessenger() {
     const [wsConnected, setWsConnected] = useState(false)
     const [typingUsers, setTypingUsers] = useState({})
     const [stickToBottom, setStickToBottom] = useState(true)
+    const [hasMore, setHasMore] = useState(false)
+    const [loadingOlder, setLoadingOlder] = useState(false)
     const stickToBottomRef = useRef(true)
     useEffect(() => { stickToBottomRef.current = stickToBottom }, [stickToBottom])
     const wsRef = useRef(null)
@@ -76,8 +77,12 @@ export default function ChatMessenger() {
     const msgContainerRef = useRef(null)
     const inputRef = useRef(null)
     const emojiRef = useRef(null)
-    const pollRef = useRef(null)
     const sendingRef = useRef(false)
+    const activeConvRef = useRef(null)
+    useEffect(() => { activeConvRef.current = activeConv }, [activeConv])
+    const handleWSMessageRef = useRef(() => {})
+    const tempIdCounterRef = useRef(0)
+    const scrollRafRef = useRef(null)
 
     const loadConversations = useCallback(async () => {
         try {
@@ -89,14 +94,15 @@ export default function ChatMessenger() {
 
     const loadMessages = useCallback(async (convId, silent = false) => {
         try {
-            const data = await apiFetch(`/messages/${convId}`)
+            const data = await apiFetch(`/messages/${convId}?limit=50`)
+            const list = data?.messages || []
             const prev = msgContainerRef.current
             if (silent && prev) {
                 const saved = stickToBottomRef.current ? null : prev.scrollTop
                 setMessages(prevMessages => {
-                    const dataIds = new Set(data.map(m => m.id))
+                    const dataIds = new Set(list.map(m => m.id))
                     const kept = prevMessages.filter(m => !dataIds.has(m.id) && m.id > 0)
-                    return [...data, ...kept]
+                    return [...list, ...kept]
                 })
                 if (saved !== null) {
                     requestAnimationFrame(() => {
@@ -106,27 +112,53 @@ export default function ChatMessenger() {
                     })
                 }
             } else {
-                setMessages(data)
+                setMessages(list)
             }
+            setHasMore(!!data?.hasMore)
             if (!silent) setLoading(false)
+            // Mark as read whenever we open/refresh the conversation.
+            apiFetch(`/conversations/${convId}/read`, { method: 'PUT' })
+                .then(() => loadConversations())
+                .catch(() => {})
         } catch { if (!silent) { showToast('Error loading messages'); setLoading(false) } }
-    }, [showToast])
+    }, [showToast, loadConversations])
 
-    function stopPolling() {
-        if (pollRef.current) {
-            clearInterval(pollRef.current)
-            pollRef.current = null
+    const loadOlder = useCallback(async () => {
+        if (!activeConv || loadingOlder) return
+        const oldest = messages[0]
+        if (!oldest) return
+        setLoadingOlder(true)
+        try {
+            const data = await apiFetch(`/messages/${activeConv.id}?before=${oldest.id}&limit=50`)
+            const list = data?.messages || []
+            setHasMore(!!data?.hasMore)
+            const container = msgContainerRef.current
+            const prevHeight = container ? container.scrollHeight : 0
+            setMessages(prev => {
+                const ids = new Set(prev.map(m => m.id))
+                const merged = [...list.filter(m => !ids.has(m.id)), ...prev]
+                return merged
+            })
+            requestAnimationFrame(() => {
+                if (container) container.scrollTop = container.scrollHeight - prevHeight
+            })
+        } catch {
+            showToast('Error loading older messages')
+        } finally {
+            setLoadingOlder(false)
         }
-    }
+    }, [activeConv, loadingOlder, messages, showToast])
 
-    const startPolling = useCallback((convId) => {
-        stopPolling()
-        pollRef.current = setInterval(() => {
-            loadMessages(convId, true)
-        }, POLL_INTERVAL)
-    }, [loadMessages])
+    // Conversation list refresh (unread counts, last message) — light, no message refetch.
+    useEffect(() => {
+        const timer = setInterval(() => {
+            if (document.visibilityState === 'visible') loadConversations()
+        }, 30000)
+        return () => clearInterval(timer)
+    }, [loadConversations])
 
     const handleWSMessage = useCallback((data) => {
+        const activeConv = activeConvRef.current
         switch (data.type) {
             case 'auth_ok':
                 setWsConnected(true)
@@ -151,6 +183,10 @@ export default function ChatMessenger() {
                         createdAt: data.createdAt,
                     }]
                 })
+                // Reading a message in the open conversation marks it read.
+                if (activeConv && Number(data.conversationId) === Number(activeConv.id)) {
+                    apiFetch(`/conversations/${activeConv.id}/read`, { method: 'PUT' }).catch(() => {})
+                }
                 if (data.senderId !== currentUserId && document.hidden) {
                     try {
                         const n = new Notification('FitPower', {
@@ -182,11 +218,19 @@ export default function ChatMessenger() {
             case 'subscribed':
                 break
         }
-    }, [activeConv, currentUserId, loadConversations, showToast])
+    }, [currentUserId, loadConversations, showToast])
+
+    useEffect(() => { handleWSMessageRef.current = handleWSMessage }, [handleWSMessage])
 
     const connectWS = useCallback(() => {
         const token = localStorage.getItem('token')
         if (!token) return
+        // Close any existing socket before creating a new one so reconnects
+        // never stack multiple live connections.
+        const prev = wsRef.current
+        if (prev && (prev.readyState === WebSocket.OPEN || prev.readyState === WebSocket.CONNECTING)) {
+            prev.close()
+        }
         const ws = new WebSocket(WS_URL)
         wsRef.current = ws
 
@@ -197,27 +241,25 @@ export default function ChatMessenger() {
         ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data)
-                handleWSMessage(data)
+                handleWSMessageRef.current(data)
             } catch { /* ignore invalid messages */ }
         }
 
         ws.onclose = () => {
             setWsConnected(false)
+            // Only clear the ref if it still points at this socket.
+            if (wsRef.current === ws) wsRef.current = null
         }
 
         ws.onerror = () => { ws.close() }
-    }, [handleWSMessage])
+    }, [])
 
     useEffect(() => { loadConversations() }, [loadConversations])
     useEffect(() => {
         if (activeConv) {
             loadMessages(activeConv.id)
-            startPolling(activeConv.id)
-        } else {
-            stopPolling()
         }
-        return () => stopPolling()
-    }, [activeConv, loadMessages, startPolling])
+    }, [activeConv, loadMessages])
     useEffect(() => {
         if (messages.length && stickToBottom) {
             msgEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -256,19 +298,26 @@ export default function ChatMessenger() {
     }, [activeConv, wsConnected])
 
     function handleScroll() {
-        if (!msgContainerRef.current) return
-        const { scrollTop, scrollHeight, clientHeight } = msgContainerRef.current
-        const atBottom = scrollHeight - scrollTop - clientHeight < 60
-        setStickToBottom(atBottom)
-        if (!atBottom) {
-            sessionStorage.setItem(SCROLL_KEY, String(scrollTop))
-        }
+        if (scrollRafRef.current) return
+        scrollRafRef.current = requestAnimationFrame(() => {
+            scrollRafRef.current = null
+            if (!msgContainerRef.current) return
+            const { scrollTop, scrollHeight, clientHeight } = msgContainerRef.current
+            const atBottom = scrollHeight - scrollTop - clientHeight < 60
+            setStickToBottom(atBottom)
+            if (!atBottom) {
+                try {
+                    sessionStorage.setItem(SCROLL_KEY, String(scrollTop))
+                } catch { /* private mode */ }
+            }
+        })
     }
 
     async function handleSend() {
         if (!newMsg.trim() || !activeConv || sendingRef.current) return
         const content = newMsg.trim()
-        const tempId = -Date.now()
+        tempIdCounterRef.current += 1
+        const tempId = -Date.now() - tempIdCounterRef.current
         sendingRef.current = true
         setNewMsg('')
         if (inputRef.current) {
@@ -346,8 +395,15 @@ export default function ChatMessenger() {
         }
     }
 
-    function selectConversation(conv) { setConvSearch(''); setStickToBottom(true); setActiveConv(conv) }
-    const handleBack = useCallback(() => { setActiveConv(null); setMessages([]); setTypingUsers({}); stopPolling() }, [])
+    function selectConversation(conv) {
+        setConvSearch('')
+        setStickToBottom(true)
+        setActiveConv(conv)
+        // Reset the unread badge locally; the server read position is updated on load.
+        setConversations(prev => prev.map(c => (c.id === conv.id ? { ...c, unreadCount: 0 } : c)))
+        apiFetch(`/conversations/${conv.id}/read`, { method: 'PUT' }).catch(() => {})
+    }
+    const handleBack = useCallback(() => { setActiveConv(null); setMessages([]); setTypingUsers({}); setHasMore(false) }, [])
 
     function handleNewChat() {
         setShowNewModal(true); setUserSearch('')
@@ -465,7 +521,15 @@ export default function ChatMessenger() {
                         </div>
                     ) : (
                         filteredConversations.map(conv => (
-                            <div key={conv.id} className={`cm-conv-item ${activeConv?.id === conv.id ? 'cm-conv-active' : ''}`} onClick={() => selectConversation(conv)}>
+                            <div
+                                key={conv.id}
+                                role="button"
+                                tabIndex={0}
+                                className={`cm-conv-item ${activeConv?.id === conv.id ? 'cm-conv-active' : ''}`}
+                                onClick={() => selectConversation(conv)}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectConversation(conv) } }}
+                                aria-current={activeConv?.id === conv.id ? 'true' : undefined}
+                            >
                                 <div className="cm-conv-avatar" style={{ background: hashColor(getOtherUserName(conv)) }}>
                                     {getInitials(getOtherUserName(conv))}
                                 </div>
@@ -474,7 +538,10 @@ export default function ChatMessenger() {
                                         <span className="cm-conv-name">{getOtherUserName(conv)}</span>
                                         <span className="cm-conv-time">{getLastMessageDate(conv)}</span>
                                     </div>
-                                    <div className="cm-conv-last">{conv.lastMessage || 'No messages'}</div>
+                                    <div className="cm-conv-last-row">
+                                        <div className="cm-conv-last">{conv.lastMessage || 'No messages'}</div>
+                                        {conv.unreadCount > 0 && <span className="cm-unread-badge">{conv.unreadCount}</span>}
+                                    </div>
                                 </div>
                             </div>
                         ))
@@ -501,6 +568,11 @@ export default function ChatMessenger() {
                         </div>
 
                         <div className="cm-messages" ref={msgContainerRef} onScroll={handleScroll}>
+                            {hasMore && (
+                                <button className="cm-load-older" onClick={loadOlder} disabled={loadingOlder}>
+                                    <ChevronUp size={14} /> {loadingOlder ? 'Loading...' : 'Load older messages'}
+                                </button>
+                            )}
                             {groupedMessages.length === 0 ? (
                                 <div className="cm-empty-msg">
                                     <MessageCircle size={44} />
@@ -545,7 +617,11 @@ export default function ChatMessenger() {
                                                                 {mi === group.msgs.length - 1 && (
                                                                     <div className="cm-bubble-meta">
                                                                         <span className="cm-bubble-time">{formatTime(msg.createdAt)}</span>
-                                                                        {isSent && <CheckCheck size={12} className="cm-read-tick" />}
+                                                                        {isSent && (
+                                                                            activeConv?.otherLastReadAt && new Date(activeConv.otherLastReadAt) >= new Date(msg.createdAt)
+                                                                                ? <CheckCheck size={12} className="cm-read-tick" />
+                                                                                : <Check size={12} className="cm-read-tick" />
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -558,7 +634,7 @@ export default function ChatMessenger() {
                                 })
                             )}
                             {isTyping && (
-                                <div className="cm-typing">
+                                <div className="cm-typing" role="status" aria-live="polite" aria-label={`${getOtherUserName(activeConv)} is typing`}>
                                     <span className="cm-typing-dots"><span>.</span><span>.</span><span>.</span></span>
                                 </div>
                             )}
@@ -567,7 +643,7 @@ export default function ChatMessenger() {
 
                         <div className="cm-input-area">
                             <div className="cm-input-wrap" ref={emojiRef}>
-                                <button className="cm-emoji-btn" onClick={() => setShowEmoji(!showEmoji)}>😀</button>
+                                <button className="cm-emoji-btn" onClick={() => setShowEmoji(!showEmoji)} aria-label="Open emoji picker" aria-expanded={showEmoji}>😀</button>
                                 {showEmoji && (
                                     <div className="cm-emoji-picker">
                                         {EMOJIS.map(e => (
@@ -580,13 +656,19 @@ export default function ChatMessenger() {
                                 ref={inputRef}
                                 className="cm-input"
                                 placeholder="Type a message..."
+                                aria-label="Message"
                                 value={newMsg}
                                 onChange={handleInputChange}
                                 onKeyDown={handleKeyDown}
+                                onFocus={() => {
+                                    requestAnimationFrame(() => {
+                                        inputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+                                    })
+                                }}
                                 rows={1}
                                 maxLength={2000}
                             />
-                            <button className="cm-send-btn" onClick={handleSend} disabled={!newMsg.trim() || sending}>
+                            <button className="cm-send-btn" onClick={handleSend} disabled={!newMsg.trim() || sending} aria-label="Send message">
                                 <Send size={18} />
                             </button>
                         </div>
@@ -607,11 +689,11 @@ export default function ChatMessenger() {
                     <div className="cm-modal">
                         <div className="cm-modal-header">
                             <h3>New Chat</h3>
-                            <button className="cm-modal-close" onClick={() => setShowNewModal(false)}><X size={18} /></button>
+                            <button className="cm-modal-close" onClick={() => setShowNewModal(false)} aria-label="Close new chat dialog"><X size={18} /></button>
                         </div>
                         <div className="cm-modal-search">
                             <Search size={16} />
-                            <input className="cm-modal-search-input" placeholder="Search by name or email..." value={userSearch} onChange={e => setUserSearch(e.target.value)} autoFocus />
+                            <input className="cm-modal-search-input" placeholder="Search by name or email..." aria-label="Search users" value={userSearch} onChange={e => setUserSearch(e.target.value)} autoFocus />
                         </div>
                         <div className="cm-modal-body">
                             {usersLoading ? (
@@ -620,7 +702,14 @@ export default function ChatMessenger() {
                                 <p className="cm-empty-text">{userSearch ? 'No results' : 'No users available'}</p>
                             ) : (
                                 filteredUsers.map(user => (
-                                    <div key={user.id} className="cm-user-item" onClick={() => startConversation(user.id)}>
+                                    <div
+                                        key={user.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        className="cm-user-item"
+                                        onClick={() => startConversation(user.id)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startConversation(user.id) } }}
+                                    >
                                         <div className="cm-user-avatar" style={{ background: hashColor((user.firstName || '') + ' ' + (user.lastName || '')) }}>
                                             {getInitials((user.firstName || '') + ' ' + (user.lastName || ''))}
                                         </div>

@@ -1,13 +1,23 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { Star, MapPin, Award, Globe, Camera, CirclePlay, ExternalLink, ArrowLeft, Quote } from 'lucide-react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { Star, MapPin, Award, Globe, Camera, CirclePlay, ExternalLink, ArrowLeft, Quote, CalendarDays, Loader2 } from 'lucide-react'
 import { apiFetch } from '../../lib/api'
+import { useAuth } from '../../context/AuthContext'
+import { confirmSwal, swalError, swalSuccess } from '../../lib/alerts'
 import './CoachProfile.css'
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 export default function CoachProfile() {
     const { id } = useParams()
     const [coach, setCoach] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [availability, setAvailability] = useState([])
+    const [booking, setBooking] = useState(false)
+    const [bookingSlot, setBookingSlot] = useState(null)
+    const [bookingError, setBookingError] = useState(null)
+    const navigate = useNavigate()
+    const { isAuthenticated } = useAuth()
 
     useEffect(() => {
         setLoading(true)
@@ -18,6 +28,65 @@ export default function CoachProfile() {
             .catch(() => {})
             .finally(() => setLoading(false))
     }, [id])
+
+    useEffect(() => {
+        apiFetch(`/coaches/${id}/availability`)
+            .then(d => setAvailability(Array.isArray(d) ? d : []))
+            .catch(() => setAvailability([]))
+    }, [id])
+
+    const handleBook = async (slot) => {
+        if (!isAuthenticated) {
+            navigate('/login')
+            return
+        }
+        setBookingSlot(slot)
+        setBookingError(null)
+        // Next occurrence of the coach's weekly slot.
+        const dayIdx = Number(slot.dayOfWeek)
+        const today = new Date()
+        let daysAhead = (dayIdx - today.getDay() + 7) % 7
+        if (daysAhead === 0) daysAhead = 7
+        const target = new Date(today)
+        target.setDate(today.getDate() + daysAhead)
+        const dateStr = target.toISOString().slice(0, 10)
+
+        const formattedDate = target.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+        const ok = await confirmSwal(
+            `Book a 1-on-1 session with ${coach.firstName} ${coach.lastName} on ${formattedDate} at ${slot.startTime}?`,
+            'Confirm booking',
+            { confirmText: 'Book Session', cancelText: 'Cancel' }
+        )
+        if (!ok) {
+            setBookingSlot(null)
+            return
+        }
+
+        setBooking(true)
+        try {
+            await apiFetch('/sessions', {
+                method: 'POST',
+                body: JSON.stringify({
+                    trainerId: coach.id,
+                    title: `Session with ${coach.firstName} ${coach.lastName}`,
+                    date: dateStr,
+                    startTime: slot.startTime,
+                    endTime: slot.endTime,
+                    type: '1on1',
+                }),
+            })
+            swalSuccess(
+                `${formattedDate} at ${slot.startTime} with ${coach.firstName}. They will see it in their schedule.`,
+                'Session booked!'
+            )
+        } catch (e) {
+            setBookingError(e.message || 'Could not book this session. Please try again.')
+            swalError(e.message || 'Could not book this session. Please try again.', 'Booking failed')
+        } finally {
+            setBooking(false)
+            setBookingSlot(null)
+        }
+    }
 
     if (loading) {
         return (
@@ -162,6 +231,34 @@ export default function CoachProfile() {
                     </div>
 
                     <div className="coach-profile-sidebar">
+                        <section className="coach-section coach-book-section">
+                            <h2><CalendarDays size={16} /> Book a session</h2>
+                            {availability.length === 0 ? (
+                                <p className="coach-book-empty">This coach has not published their availability yet.</p>
+                            ) : (
+                                <div className="coach-book-slots">
+                                    {availability.map((slot, i) => (
+                                        <button
+                                            key={slot.id || i}
+                                            className="coach-book-slot"
+                                            onClick={() => handleBook(slot)}
+                                            disabled={booking}
+                                        >
+                                            {booking && bookingSlot === slot ? (
+                                                <Loader2 size={14} className="spin" />
+                                            ) : (
+                                                <CalendarDays size={14} />
+                                            )}
+                                            <span>{DAY_NAMES[Number(slot.dayOfWeek)]}</span>
+                                            <span className="coach-book-time">{slot.startTime} – {slot.endTime}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            {bookingError && <p className="coach-book-error">{bookingError}</p>}
+                            <p className="coach-book-hint">Booking a session with a coach requires an active plan with live coaching.</p>
+                        </section>
+
                         {coach.reviews?.length > 0 && (
                             <section className="coach-section coach-reviews-section">
                                 <h2>Reviews ({coach.reviewCount})</h2>

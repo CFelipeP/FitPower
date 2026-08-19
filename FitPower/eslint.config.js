@@ -22,7 +22,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['ecosystem.config.cjs', 'chat-server.js', 'chat-auth.js', 'push-server.cjs', 'mediasoup-server.js', 'proxy-server.js', 'public/service-worker.js', 'public/firebase-messaging-sw.js'],
+    files: ['ecosystem.config.cjs', 'chat-server.js', 'chat-auth.js', 'push-server.cjs', 'mediasoup-server.js', 'proxy-server.js', 'run-reminders.cjs', 'public/service-worker.js', 'public/firebase-messaging-sw.js'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {

@@ -87,12 +87,17 @@ td { padding: 12px 8px; border-bottom: 1px solid #eee; font-size: 14px; }
 export function exportToCSV(data, filename = 'export.csv') {
     if (!data.length) return
     const headers = Object.keys(data[0])
+    const sanitizeCell = (val) => {
+        if (val === null || val === undefined) return ''
+        let str = String(val)
+        // CSV injection guard: neutralize formula characters in cells.
+        if (/^[=+\-@\t\r]/.test(str)) str = "'" + str
+        return str
+    }
     const csvContent = [
         headers.join(','),
         ...data.map(row => headers.map(h => {
-            const val = row[h]
-            if (val === null || val === undefined) return ''
-            const str = String(val)
+            const str = sanitizeCell(row[h])
             if (str.includes(',') || str.includes('"') || str.includes('\n')) {
                 return '"' + str.replace(/"/g, '""') + '"'
             }
@@ -104,8 +109,10 @@ export function exportToCSV(data, filename = 'export.csv') {
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     link.download = filename
+    document.body.appendChild(link)
     link.click()
-    URL.revokeObjectURL(link.href)
+    document.body.removeChild(link)
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000)
 }
 
 export function exportToPDF(title, data, columns) {

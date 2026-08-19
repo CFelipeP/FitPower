@@ -68,6 +68,11 @@
     transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.program-img-fallback {
+    background: linear-gradient(135deg, #1a1a24 0%, #23232e 50%, #1a1a24 100%);
+    display: block;
+}
+
 .program-card:hover .program-img {
     transform: scale(1.08);
 }
@@ -106,7 +111,7 @@
 }
 
 .program-time {
-    color: #737373;
+    color: var(--text-muted);
     font-size: 12px;
 }
 

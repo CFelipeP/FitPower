@@ -1,7 +1,8 @@
 import { useState, useRef, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
+import { swalError } from '../../lib/alerts'
+import Avatar from '../Avatar/Avatar'
 import {
     Zap, ArrowLeft, Check, ChevronRight,
     User, Mail, Lock, Eye, EyeOff,
@@ -13,7 +14,6 @@ import './Register.css'
 
 export default function Register() {
     const navigate = useNavigate()
-    const { showToast } = useToast()
     const { register: authRegister } = useAuth()
 
     // Steps
@@ -23,6 +23,7 @@ export default function Register() {
     const [lastName, setLastName] = useState('')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
     const [passVisible, setPassVisible] = useState(false)
     const [termsAccepted, setTermsAccepted] = useState(false)
 
@@ -32,7 +33,7 @@ export default function Register() {
     const [selectedDays, setSelectedDays] = useState('')
 
     // Validation
-    const [touched, setTouched] = useState({ firstName: false, lastName: false, email: false, password: false })
+    const [touched, setTouched] = useState({ firstName: false, lastName: false, email: false, password: false, confirmPassword: false })
 
     // Submit
     const [submitting, setSubmitting] = useState(false)
@@ -78,19 +79,21 @@ export default function Register() {
         const v2 = validateName(lastName)
         const v3 = validateEmail(email)
         const v4 = validatePass(password)
-        setTouched({ firstName: true, lastName: true, email: true, password: true })
+        const v5 = password === confirmPassword && confirmPassword !== ''
+        setTouched({ firstName: true, lastName: true, email: true, password: true, confirmPassword: true })
 
-        if (v1 && v2 && v3 && v4) {
-            goToStep(2)
-        } else {
-            showToast('Please fill in all fields correctly')
+        if (!v1 || !v2 || !v3 || !v4 || !v5) {
+            if (!v5) { swalError('Passwords do not match'); return }
+            swalError('Please fill in all fields correctly')
+            return
         }
+        goToStep(2)
     }
 
     const handleToStep3 = () => {
-        if (!selectedLevel) { showToast('Please select your fitness level'); return }
-        if (!selectedGoal) { showToast('Please select your primary goal'); return }
-        if (!selectedDays) { showToast('Please select training frequency'); return }
+        if (!selectedLevel) { swalError('Please select your fitness level'); return }
+        if (!selectedGoal) { swalError('Please select your primary goal'); return }
+        if (!selectedDays) { swalError('Please select training frequency'); return }
         goToStep(3)
     }
 
@@ -110,7 +113,7 @@ export default function Register() {
             })
             navigate('/onboarding')
         } catch (err) {
-            showToast(err.message || 'Error registering')
+            swalError(err.message || 'Error registering')
         } finally {
             setSubmitting(false)
         }
@@ -137,7 +140,7 @@ export default function Register() {
         }
     }
 
-    const formatGoal = (goal) => goal ? goal.replace('-', ' ') : ''
+    const formatGoal = (goal) => goal ? goal.replace(/-/g, ' ') : ''
 
     return (
         <div className="register-page noise grid-pattern">
@@ -149,11 +152,7 @@ export default function Register() {
 
                 {/* ═══ LEFT PANEL ═══ */}
                 <div className="register-left">
-                    <img loading="lazy" 
-                        src="https://blog.trainingym.com/hs-fs/hubfs/AdobeStock_174212531%20(1).jpeg?width=999&height=667"
-                        alt="Athletes Training"
-                        className="register-left-bg"
-                    />
+                    <div className="register-left-bg" role="img" aria-label="Athletes training" />
 
                     <div className="register-left-content">
                         <a href="/" className="register-logo">
@@ -216,13 +215,13 @@ export default function Register() {
                                 "Best investment I've made in my health. Dropped 12kg in 3 months — the AI programming is genuinely next-level."
                             </p>
                             <div className="register-testimonial-author">
-                                <img loading="lazy" 
-                                    src="https://picsum.photos/seed/user-maria/80/80.jpg"
-                                    alt="María"
+                                <Avatar
+                                    name="James Anderson"
+                                    size={80}
                                     className="register-testimonial-avatar"
                                 />
                                 <div>
-                                    <div className="register-testimonial-name">María González</div>
+                                    <div className="register-testimonial-name">James Anderson</div>
                                     <div className="register-testimonial-result">Lost 12kg · 3 months</div>
                                 </div>
                             </div>
@@ -256,14 +255,15 @@ export default function Register() {
                             </a>
 
                             {/* Step Indicator */}
-                            <div className="register-steps">
+                            <div className="register-steps" role="progressbar" aria-valuemin={1} aria-valuemax={3} aria-valuenow={currentStep} aria-label={`Step ${currentStep} of 3`}>
                                 {[1, 2, 3].map((step) => (
                                     <div key={step} className="register-step-group">
                                         <div
                                             className={`register-step-dot ${currentStep === step ? 'active' : ''} ${currentStep > step ? 'done' : ''}`}
+                                            aria-hidden="true"
                                         ></div>
                                         {step < 3 && (
-                                            <div className={`register-step-line ${currentStep > step ? 'active' : ''}`}></div>
+                                            <div className={`register-step-line ${currentStep > step ? 'active' : ''}`} aria-hidden="true"></div>
                                         )}
                                     </div>
                                 ))}
@@ -347,11 +347,29 @@ export default function Register() {
                                                     className="register-toggle-pass"
                                                     onClick={() => setPassVisible(!passVisible)}
                                                     aria-label="Toggle password visibility"
+                                                    aria-pressed={passVisible}
                                                 >
                                                     {passVisible ? <EyeOff size={18} /> : <Eye size={18} />}
                                                 </button>
                                                 {touched.password && !validatePass(password) && (
                                                     <div className="register-field-error visible">Password must be at least 8 characters</div>
+                                                )}
+                                            </div>
+
+                                            {/* Confirm Password */}
+                                            <div className="register-field">
+                                                <input
+                                                    type={passVisible ? 'text' : 'password'}
+                                                    className={`register-input register-input-pass ${touched.confirmPassword ? (password === confirmPassword && confirmPassword ? 'success' : 'error') : ''}`}
+                                                    placeholder="Confirm password"
+                                                    value={confirmPassword}
+                                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                                    onBlur={() => handleBlur('confirmPassword')}
+                                                    autoComplete="new-password"
+                                                />
+                                                <Lock size={18} className="register-input-icon" />
+                                                {touched.confirmPassword && confirmPassword && password !== confirmPassword && (
+                                                    <div className="register-field-error visible">Passwords do not match</div>
                                                 )}
                                             </div>
 
@@ -414,6 +432,7 @@ export default function Register() {
                                                             type="button"
                                                             className={`register-level-btn ${selectedLevel === level ? 'selected' : ''}`}
                                                             onClick={() => setSelectedLevel(level)}
+                                                            aria-pressed={selectedLevel === level}
                                                         >
                                                             {levelIcon(level)}
                                                             <span className="register-level-btn-text">{level.charAt(0).toUpperCase() + level.slice(1)}</span>
@@ -437,6 +456,7 @@ export default function Register() {
                                                             type="button"
                                                             className={`register-goal-btn ${selectedGoal === goal.id ? 'selected' : ''}`}
                                                             onClick={() => setSelectedGoal(goal.id)}
+                                                            aria-pressed={selectedGoal === goal.id}
                                                         >
                                                             {goalIcon(goal.id)}
                                                             <div className="register-goal-btn-label">{goal.label}</div>
@@ -455,6 +475,8 @@ export default function Register() {
                                                             type="button"
                                                             className={`register-day-btn ${selectedDays === String(day) ? 'selected' : ''}`}
                                                             onClick={() => setSelectedDays(String(day))}
+                                                            aria-pressed={selectedDays === String(day)}
+                                                            aria-label={`${day} days per week`}
                                                         >
                                                             {day}
                                                         </button>

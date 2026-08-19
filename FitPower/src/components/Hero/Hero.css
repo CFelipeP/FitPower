@@ -127,6 +127,11 @@
     color: white;
 }
 
+@media (max-width: 480px) {
+    .hero-title { font-size: clamp(2.125rem, 9vw, 3rem); }
+    .hero-scroll-indicator { display: none; }
+}
+
 .hero-desc {
     max-width: 500px;
     font-size: clamp(1.125rem, 2vw, 1.25rem);
@@ -202,7 +207,7 @@
 }
 
 .counter-label {
-    color: #737373;
+    color: var(--text-muted);
     font-size: 11px;
     margin-top: 4px;
     line-height: 1.2;
@@ -373,7 +378,7 @@
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    color: #525252;
+    color: var(--text-dim);
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.1em;

@@ -165,11 +165,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
 }
 
 .cp-compare-modal {
   width: 90%;
   max-width: 800px;
+  max-height: 92vh;
+  overflow-y: auto;
   animation: cp-fade-in .25s ease;
 }
 
@@ -312,3 +316,13 @@
   font-size: 13px;
   color: #888;
 }
+
+@media (max-width: 640px) {
+    .cp-photos-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px; }
+    .cp-modal { width: calc(100vw - 24px) !important; }
+}
+
+@media (max-width: 640px) {
+  .cp-container { padding: 16px 12px; }
+}
+

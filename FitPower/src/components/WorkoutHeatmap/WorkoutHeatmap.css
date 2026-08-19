@@ -77,6 +77,8 @@
   display: flex;
   gap: 6px;
   min-width: 700px;
+  width: max-content;
+  max-width: 100%;
 }
 
 .wh-day-labels {
@@ -96,7 +98,7 @@
 }
 
 .wh-grid {
-  flex: 1;
+  flex: 0 0 auto;
 }
 
 .wh-month-labels {

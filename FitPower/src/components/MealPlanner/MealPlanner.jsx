@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { apiFetch } from '../../lib/api'
-import { useToast } from '../../context/ToastContext'
+import { swalError } from '../../lib/alerts'
 import { Utensils, Search, Filter, Clock, ChefHat, Plus, X, Sun, Moon, Sunrise } from 'lucide-react'
 import './MealPlanner.css'
 
@@ -20,7 +20,6 @@ const MEAL_TYPE_COLORS = {
 }
 
 export default function MealPlanner() {
-  const { showToast } = useToast()
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState('all')
@@ -30,9 +29,9 @@ export default function MealPlanner() {
   useEffect(() => {
     apiFetch('/recipes')
       .then(data => setRecipes(data))
-      .catch(() => showToast('Error loading recipes'))
+      .catch(() => swalError('Error loading recipes'))
       .finally(() => setLoading(false))
-    }, [showToast])
+    }, [])
 
   const filteredRecipes = recipes.filter(r => {
     const matchesMeal = activeFilter === 'all' || r.mealType === activeFilter

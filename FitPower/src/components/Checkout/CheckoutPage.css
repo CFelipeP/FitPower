@@ -6,6 +6,12 @@
     justify-content: center;
 }
 
+.co-page-inline {
+    min-height: 0;
+    justify-content: flex-start;
+    background: transparent;
+}
+
 .co-container {
     max-width: 920px;
     width: 100%;
@@ -135,7 +141,7 @@
 }
 
 .co-dim {
-    color: #525252;
+    color: var(--text-dim);
     text-decoration: line-through;
 }
 
@@ -192,7 +198,7 @@
     gap: 6px;
     margin-top: 16px;
     font-size: 12px;
-    color: #737373;
+    color: var(--text-muted);
 }
 
 .co-loading {
@@ -207,7 +213,7 @@
 }
 
 .co-btn {
-    padding: 10px 20px;
+    padding: 12px 20px;
     border-radius: 10px;
     font-size: 14px;
     font-weight: 600;
@@ -215,6 +221,7 @@
     text-decoration: none;
     display: inline-block;
     font-family: inherit;
+    min-height: 48px;
 }
 
 .co-btn-secondary {
@@ -251,4 +258,21 @@
     font-size: 28px;
     font-weight: 700;
     margin: 0 auto 20px;
+}
+
+.co-coupon { display: flex; gap: 8px; margin-top: 14px; }
+.co-coupon-input { flex: 1; background: rgba(0, 0, 0, .3); border: 1px solid rgba(255, 255, 255, .12); border-radius: 10px; padding: 9px 12px; color: #fff; font-size: 13px; font-family: inherit; }
+.co-coupon-input:focus { outline: none; border-color: #ffd600; }
+.co-coupon-btn { white-space: nowrap; }
+.co-coupon-applied { display: inline-flex; align-items: center; gap: 4px; color: #4ade80; font-size: 12px; font-weight: 700; margin-left: 8px; }
+
+@media (max-width: 767px) {
+    .co-page { padding: 16px 12px; }
+    .co-container { padding: 0; }
+    .co-grid { grid-template-columns: 1fr !important; gap: 16px; }
+    .co-back-link { margin-bottom: 12px; }
+    .co-coupon { flex-wrap: wrap; }
+    .co-coupon-input { flex: 1 1 140px; }
+    .co-btn { width: 100%; justify-content: center; }
+    .co-plan-price { flex-wrap: wrap; }
 }

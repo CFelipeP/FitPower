@@ -239,3 +239,16 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 640px) {
+    .ar-form-row { grid-template-columns: 1fr !important; }
+    .ar-card { padding: 14px; }
+}
+
+@media (max-width: 640px) {
+  .ar-container { padding: 16px 12px; }
+}
+
+
+/* Catalog picker inside exercise rows */
+.ar-exercise-row .ep-wrap { margin: 8px 0 2px; }

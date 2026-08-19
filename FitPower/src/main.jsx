@@ -41,6 +41,13 @@ window.addEventListener('offline', () => {
     document.body.classList.add('is-offline')
 })
 
+// Offline workout queue: flush pending operations when connectivity returns.
+import('./lib/offlineQueue').then(({ installOfflineSync }) => {
+    import('./lib/api').then(({ apiFetch }) => {
+        installOfflineSync(apiFetch)
+    })
+}).catch(() => {})
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>

@@ -262,7 +262,7 @@
 }
 
 .dropdown-item-desc {
-    color: #737373;
+    color: var(--text-muted);
     font-size: 11px;
     margin-top: 1px;
 }
@@ -345,4 +345,9 @@
     padding: 12px 24px;
     border-radius: var(--radius-full);
     margin-top: 8px;
+}
+
+@media (max-width: 767px) {
+    .nav-links { gap: 4px; }
+    .nav-cta { padding: 8px 14px; }
 }

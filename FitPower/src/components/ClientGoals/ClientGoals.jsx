@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import { Target, Plus, X, Trash2, Edit3, Calendar, CheckCircle } from 'lucide-react'
 import './ClientGoals.css'
@@ -28,7 +29,7 @@ export default function ClientGoals() {
       const data = await apiFetch('/goals')
       setGoals(Array.isArray(data) ? data : [])
     } catch {
-      showToast('Error loading goals')
+      swalError('Error loading goals')
     } finally {
       setLoading(false)
     }
@@ -62,7 +63,7 @@ export default function ClientGoals() {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!form.title || !form.targetValue) {
-      showToast('Title and target value are required')
+      swalError('Title and target value are required')
       return
     }
     setSaving(true)
@@ -91,7 +92,7 @@ export default function ClientGoals() {
       setModalOpen(false)
       loadGoals()
     } catch (e) {
-      showToast(e.message || 'Error saving goal')
+      swalError(e.message || 'Error saving goal')
     } finally {
       setSaving(false)
     }
@@ -104,7 +105,7 @@ export default function ClientGoals() {
       setConfirmDelete(null)
       loadGoals()
     } catch {
-      showToast('Error deleting goal')
+      swalError('Error deleting goal')
     }
   }
 

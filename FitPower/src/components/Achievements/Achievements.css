@@ -30,9 +30,9 @@
 .achievement-stat-value { font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 4px; }
 .achievements-loading { padding: 20px; }
 
-.share-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
-.share-modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; max-width: 400px; width: 100%; position: relative; }
-.share-modal-close { position: absolute; top: 12px; right: 12px; background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; }
+.share-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; overflow-y: auto; }
+.share-modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; max-width: 400px; width: 100%; position: relative; max-height: 92vh; overflow-y: auto; }
+.share-modal-close { position: absolute; top: 12px; right: 12px; background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 10px; display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; }
 .share-modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
 .share-modal-icon { color: var(--power-500); }
 .share-modal-title { font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0; }
@@ -53,4 +53,9 @@
     .achievements-stat-label { font-size: 11px; }
     .achievements-grid { gap: 10px; }
     .share-modal { width: 95vw; padding: 20px 16px; }
+}
+
+@media (max-width: 640px) {
+    .ach-grid { grid-template-columns: repeat(4, 1fr) !important; gap: 8px; }
+    .ach-card { padding: 10px; }
 }

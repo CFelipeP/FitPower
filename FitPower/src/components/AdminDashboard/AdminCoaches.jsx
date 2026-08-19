@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
-import { Search, Filter, X, Check, Ban, Trash2, AlertTriangle, Award } from 'lucide-react'
+import { swalError } from '../../lib/alerts'
+import Avatar from '../Avatar/Avatar'
+import { Search, X, Check, Ban, Trash2, AlertTriangle, Award } from 'lucide-react'
 
 export default function AdminCoaches() {
     const { showToast } = useToast()
@@ -20,8 +22,8 @@ export default function AdminCoaches() {
         if (statusFilter) params.set('status', statusFilter)
         apiFetch(`/admin/coaches?${params}`)
             .then(d => setCoaches(Array.isArray(d) ? d : (d.coaches || d.data || [])))
-            .catch(() => showToast('Error loading coaches'))
-    }, [search, statusFilter, showToast])
+            .catch(() => swalError('Error loading coaches'))
+    }, [search, statusFilter])
 
     useEffect(() => { fetchCoaches() }, [fetchCoaches])
 
@@ -46,18 +48,14 @@ export default function AdminCoaches() {
 
     const approveCoach = async (id) => {
         try { await apiFetch(`/admin/coaches/${id}/approve`, { method: 'PUT', body: JSON.stringify({ status: 'approved' }) }); showToast('Coach approved'); fetchCoaches() }
-        catch (e) { showToast(e.message || 'Error') }
+        catch (e) { swalError(e.message || 'Error') }
     }
 
     const rejectCoach = async (id) => {
         try { await apiFetch(`/admin/coaches/${id}/approve`, { method: 'PUT', body: JSON.stringify({ status: 'rejected' }) }); showToast('Coach rejected'); fetchCoaches() }
-        catch (e) { showToast(e.message || 'Error') }
+        catch (e) { swalError(e.message || 'Error') }
     }
 
-    const suspendUser = async (id) => {
-        const coach = coaches.find(c => c.id === id) || selectedCoach
-        setConfirmAction({ type: 'suspend', user: coach })
-    }
 
     const deleteUser = async (id) => {
         const coach = coaches.find(c => c.id === id) || selectedCoach
@@ -88,7 +86,7 @@ export default function AdminCoaches() {
             setCoachModalOpen(false)
             setSelectedCoach(null)
             fetchCoaches()
-        } catch (e) { showToast(e.message || 'Error'); setConfirmAction(null) }
+        } catch (e) { swalError(e.message || 'Error'); setConfirmAction(null) }
     }
 
     const batchApprove = async () => {
@@ -100,7 +98,7 @@ export default function AdminCoaches() {
             showToast(`${selected.length} coaches approved`)
             setSelected([])
             fetchCoaches()
-        } catch (e) { showToast(e.message || 'Error') }
+        } catch (e) { swalError(e.message || 'Error') }
     }
 
     const batchReject = async () => {
@@ -112,7 +110,7 @@ export default function AdminCoaches() {
             showToast(`${selected.length} coaches rejected`)
             setSelected([])
             fetchCoaches()
-        } catch (e) { showToast(e.message || 'Error') }
+        } catch (e) { swalError(e.message || 'Error') }
     }
 
     return (
@@ -121,7 +119,7 @@ export default function AdminCoaches() {
                 <h1 className="ad-content-title"><Award size={24} /> Coach Management</h1>
                 <div className="ad-content-actions">
                     <div style={{ position: 'relative' }}>
-                        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#525252' }} />
+                        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
                         <input className="ad-content-search" style={{ paddingLeft: 36 }} placeholder="Search coaches..." value={search} onChange={e => handleSearch(e.target.value)} />
                     </div>
                     <select className="ad-content-search" style={{ minWidth: 120 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
@@ -156,7 +154,7 @@ export default function AdminCoaches() {
                         {coaches.map(c => (
                             <tr key={c.id} className="ad-user-row">
                                 <td><input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggleSelect(c.id)} style={{ accentColor: 'var(--power-500)' }} /></td>
-                                <td onClick={() => viewCoach(c)}><div className="ad-user-cell"><img loading="lazy" src={'https://picsum.photos/seed/coach-' + c.id + '/40/40.jpg'} alt="" className="ad-user-avatar" /><div className="ad-user-cell-info"><div>{c.firstName} {c.lastName}</div><div>{c.email}</div></div></div></td>
+                                <td onClick={() => viewCoach(c)}><div className="ad-user-cell"><Avatar name={c.firstName + ' ' + c.lastName} src={c.photo || null} size={40} className="ad-user-avatar" /><div className="ad-user-cell-info"><div>{c.firstName} {c.lastName}</div><div>{c.email}</div></div></div></td>
                                 <td><span className="ad-time">{(c.specializations || []).join(', ') || '-'}</span></td>
                                 <td><span className="ad-time">{c.experience ? c.experience + ' years' : '-'}</span></td>
                                 <td><span className="ad-time">{c.avgRating ? c.avgRating.toFixed(1) + ' ★' : '-'}</span></td>
@@ -179,7 +177,7 @@ export default function AdminCoaches() {
                             </tr>
                         ))}
                         {coaches.length === 0 && (
-                            <tr><td colSpan={7} style={{ textAlign: 'center', color: '#737373', padding: 32 }}>No coaches found</td></tr>
+                            <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>No coaches found</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -195,7 +193,7 @@ export default function AdminCoaches() {
                     {selectedCoach && (
                         <>
                             <div className="ad-modal-profile">
-                                <img loading="lazy" src={'https://picsum.photos/seed/coach-' + selectedCoach.id + '/80/80.jpg'} alt="" className="ad-modal-avatar" />
+                                <Avatar name={selectedCoach.firstName + ' ' + selectedCoach.lastName} src={selectedCoach.photo || null} size={80} className="ad-modal-avatar" />
                                 <div>
                                     <div className="ad-modal-user-name">{selectedCoach.firstName} {selectedCoach.lastName}</div>
                                     <div className="ad-modal-user-meta">{selectedCoach.email} · ID: {selectedCoach.id}</div>

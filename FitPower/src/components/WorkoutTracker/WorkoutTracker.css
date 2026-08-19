@@ -39,6 +39,7 @@
 .wt-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     padding: 10px 20px;
     border-radius: 12px;
@@ -50,6 +51,7 @@
     transition: all 0.25s ease;
     background: #f97316;
     color: #fff;
+    min-height: 44px;
 }
 
 .wt-btn:hover {
@@ -58,8 +60,9 @@
 }
 
 .wt-btn-sm {
-    padding: 6px 14px;
-    font-size: 12px;
+    padding: 10px 16px;
+    font-size: 13px;
+    min-height: 44px;
 }
 
 .wt-btn-outline {
@@ -172,10 +175,33 @@
     color: #fb923c;
 }
 
+.wt-status-inprogress {
+    background: rgba(255, 214, 0, 0.15);
+    color: #ffd600;
+}
+
 .wt-status-completed {
     background: rgba(34, 197, 94, 0.15);
     color: #4ade80;
 }
+
+/* Interrupted workout banner */
+.wt-resume-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    background: rgba(255, 214, 0, 0.07);
+    border: 1px solid rgba(255, 214, 0, 0.25);
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+}
+.wt-resume-info { display: flex; align-items: center; gap: 10px; color: #ffd600; }
+.wt-resume-title { font-weight: 700; font-size: 13px; color: #fff; }
+.wt-resume-sub { font-size: 12px; color: #a3a3a3; }
+.wt-resume-actions { display: flex; gap: 8px; }
 
 .wt-status svg {
     width: 14px;
@@ -264,6 +290,7 @@
 .wt-actions {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
     margin-top: 12px;
 }
@@ -449,12 +476,22 @@
     border: none;
     color: #555;
     cursor: pointer;
-    padding: 2px;
+    padding: 8px;
     transition: color 0.2s;
+    min-width: 40px;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .wt-exercise-entry button:hover {
     color: #ef4444;
+}
+
+.wt-exercise-entry button svg {
+    width: 18px;
+    height: 18px;
 }
 
 .wt-empty {
@@ -533,7 +570,7 @@
 .session-rpe-title { font-size: 14px; font-weight: 600; margin: 0 0 4px; color: var(--text-primary); }
 .session-rpe-subtitle { font-size: 12px; color: var(--text-secondary); margin: 0 0 12px; }
 .session-rpe-buttons { display: flex; gap: 4px; flex-wrap: wrap; }
-.session-rpe-btn { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.15s; }
+.session-rpe-btn { width: 44px; height: 44px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.15s; }
 .session-rpe-btn:hover { border-color: var(--power-500); color: var(--power-500); }
 .session-rpe-btn.selected { background: var(--power-500); color: #000; border-color: var(--power-500); }
 .session-rpe-display { display: flex; align-items: center; gap: 6px; margin-top: 12px; padding: 8px 12px; background: color-mix(in srgb, var(--power-500) 10%, transparent); border-radius: 8px; font-size: 13px; color: var(--power-500); }
@@ -543,10 +580,10 @@
     .workout-tracker { padding: 20px 16px; }
     .wt-header { flex-direction: column; align-items: flex-start; gap: 12px; }
     .wt-header h1 { font-size: 20px; }
-    .wt-exercise-form-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .wt-exercise-form-row { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
     .wt-session-top { flex-wrap: wrap; gap: 8px; }
     .wt-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
-    .wt-tab { white-space: nowrap; font-size: 13px; }
+    .wt-tab { white-space: nowrap; font-size: 13px; padding: 12px 16px; }
     .wt-form-card { padding: 20px; }
 }
 @media (max-width: 480px) {
@@ -556,7 +593,21 @@
     .wt-session-card { padding: 14px; }
     .wt-session-top { flex-direction: column; }
     .wt-session-title { font-size: 15px; }
-    .wt-session-actions { width: 100%; justify-content: flex-end; }
     .wt-header-actions { width: 100%; display: flex; gap: 8px; }
-    .wt-header-actions button { flex: 1; font-size: 13px; padding: 8px 12px; }
+    .wt-header-actions button { flex: 1; font-size: 13px; padding: 10px 12px; min-height: 44px; }
+    .wt-form-overlay { align-items: flex-end; padding: 0; }
+    .wt-form-card { border-radius: 20px 20px 0 0; max-height: 92vh; padding: 24px 16px; }
+    .wt-form-close { width: 44px; height: 44px; }
 }
+
+@media (max-width: 640px) {
+    .workout-tracker { padding: 16px 12px; }
+    .wt-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .wt-actions .wt-btn { flex: 1 1 45%; justify-content: center; }
+    .wt-tabs { overflow-x: auto; }
+    .wt-form-card { width: calc(100vw - 24px); max-height: 92vh; overflow-y: auto; }
+    .wt-resume-banner { flex-direction: column; align-items: flex-start; }
+}
+
+/* Catalog picker hint row in the new-session builder */
+.wt-form-picker-hint { margin: 8px 0; }

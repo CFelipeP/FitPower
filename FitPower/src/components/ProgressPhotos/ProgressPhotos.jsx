@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Camera, Plus, X, Trash2, Weight, Calendar, Upload, Link2, Tag, Scale, FileText } from 'lucide-react'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import './ProgressPhotos.css'
 
@@ -40,7 +41,7 @@ export default function ProgressPhotos() {
       const result = await apiFetch('/photos')
       setPhotos(Array.isArray(result) ? result : [])
     } catch {
-      showToast('Error loading photos')
+      swalError('Error loading photos')
     } finally {
       setLoading(false)
     }
@@ -68,7 +69,7 @@ export default function ProgressPhotos() {
       streamRef.current = stream
       setShowCamera(true)
     } catch {
-      showToast('Camera not available')
+      swalError('Camera not available')
     }
   }
 
@@ -104,7 +105,7 @@ export default function ProgressPhotos() {
     // Wait until the video has valid dimensions
     const ready = await waitForVideoReady(video)
     if (!ready || !video.videoWidth || !video.videoHeight) {
-      showToast('Camera is still initializing, please wait a moment')
+      swalError('Camera is still initializing, please wait a moment')
       return
     }
 
@@ -128,7 +129,7 @@ export default function ProgressPhotos() {
       closeCamera()
     } catch (err) {
       console.error('Capture error:', err)
-      showToast('Failed to capture photo. Please try again.')
+      swalError('Failed to capture photo. Please try again.')
       setCaptureError(true)
     }
   }
@@ -154,10 +155,19 @@ export default function ProgressPhotos() {
 
   async function handleAdd(e) {
     e.preventDefault()
+    const weight = form.bodyWeight ? parseFloat(form.bodyWeight) : null
+    if (weight !== null && (Number.isNaN(weight) || weight < 20 || weight > 500)) {
+      swalError('Body weight must be between 20 and 500 kg')
+      return
+    }
+    if (!capturedData && !form.photoUrl) {
+      swalError('Take a photo or paste an image URL')
+      return
+    }
     try {
       const payload = {
         photoType: form.photoType,
-        bodyWeight: form.bodyWeight ? parseFloat(form.bodyWeight) : null,
+        bodyWeight: weight,
         notes: form.notes || null,
       }
       if (capturedData) {
@@ -171,8 +181,8 @@ export default function ProgressPhotos() {
       setForm({ photoUrl: '', photoType: 'front', bodyWeight: '', notes: '' })
       clearCapture()
       loadPhotos()
-    } catch {
-      showToast('Error adding photo')
+    } catch (err) {
+      swalError(err.message || 'Error adding photo')
     }
   }
 
@@ -184,7 +194,7 @@ export default function ProgressPhotos() {
       setConfirmDelete(null)
       loadPhotos()
     } catch {
-      showToast('Error deleting photo')
+      swalError('Error deleting photo')
     }
   }
 
@@ -367,7 +377,7 @@ export default function ProgressPhotos() {
                   <span>Body Weight (kg)</span>
                   <div className="pp-input-wrap">
                     <Scale className="pp-input-icon" size={16} />
-                    <input name="bodyWeight" type="number" step="0.1" placeholder="Optional" value={form.bodyWeight} onChange={handleChange} />
+                    <input name="bodyWeight" type="number" step="0.1" min="20" max="500" placeholder="Optional" value={form.bodyWeight} onChange={handleChange} />
                   </div>
                 </label>
               </div>

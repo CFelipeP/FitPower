@@ -278,3 +278,16 @@
         height: 48px;
     }
 }
+
+@media (max-width: 640px) {
+    .vc-controls { flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .vc-remote-video { width: 100% !important; }
+    .vc-local-video { width: clamp(88px, 26vw, 160px) !important; height: auto; }
+    .vc-grid { position: relative; }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+    .vc-local-video { width: clamp(72px, 18vw, 120px) !important; }
+    .vc-controls { padding: 8px 6px; }
+    .vc-ctrl-btn { width: 44px; height: 44px; }
+}

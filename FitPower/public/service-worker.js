@@ -1,8 +1,8 @@
-const CACHE = 'fitpower-v3'
-const STATIC_CACHE = 'fitpower-static-v3'
-const FONT_CACHE = 'fitpower-fonts-v3'
-const API_CACHE = 'fitpower-api-v3'
-const DYNAMIC_CACHE = 'fitpower-dynamic-v3'
+const CACHE = 'fitpower-v4'
+const STATIC_CACHE = 'fitpower-static-v4'
+const FONT_CACHE = 'fitpower-fonts-v4'
+const API_CACHE = 'fitpower-api-v4'
+const DYNAMIC_CACHE = 'fitpower-dynamic-v4'
 
 const PRECACHE_URLS = [
     '/',
@@ -15,6 +15,11 @@ const STATIC_EXTENSIONS = /\.(css|js|mjs|jsx|ts|tsx)$/
 const FONT_EXTENSIONS = /\.(woff2?|ttf|otf|eot)$/
 const IMAGE_EXTENSIONS = /\.(png|jpg|jpeg|gif|svg|webp|avif|ico)$/
 const API_PATTERN = /^\/api\//
+
+// Public API GETs that contain no personal data and are safe to cache.
+const CACHEABLE_API_PATTERN = /^\/api\/(exercises|plans|recipes|blog|public|testimonials|challenges)/
+// Personal API GETs: NEVER cached (auth, profile, payments, health data...).
+const PRIVATE_API_PATTERN = /^\/api\/(auth|users|dashboard|subscriptions|stripe|paypal|payments|conversations|messages|photos|notifications|checkins|metrics|nutrition|tickets|workout-logs|routines|goals|measurements|habits|sleep|export|admin|coach|reviews|streak)/
 
 // Install: precache core assets
 self.addEventListener('install', (event) => {
@@ -65,6 +70,18 @@ async function networkFirst(request) {
         const cached = await caches.match(request)
         if (cached) return cached
         return new Response(JSON.stringify({ offline: true, message: 'You are offline' }), {
+            headers: { 'Content-Type': 'application/json' }
+        })
+    }
+}
+
+// Strategy: Network Only — personal data is never cached or served stale.
+async function networkOnly(request) {
+    try {
+        return await fetch(request)
+    } catch {
+        return new Response(JSON.stringify({ offline: true, message: 'You are offline' }), {
+            status: 503,
             headers: { 'Content-Type': 'application/json' }
         })
     }
@@ -152,8 +169,12 @@ async function networkFirstWithRoutineFallback(request) {
     try {
         const response = await fetch(request)
         if (response.ok) {
-            const cache = await caches.open(API_CACHE)
-            cache.put(request, response.clone())
+            // Routines are personal data: keep them only in IndexedDB (client
+            // side), never in the HTTP cache. Exercises are public content.
+            if (request.url.includes('/api/exercises')) {
+                const cache = await caches.open(API_CACHE)
+                cache.put(request, response.clone())
+            }
             const data = await response.clone().json()
             if (request.url.includes('/api/routines/daily')) {
                 saveToDB(ROUTINES_STORE, data)
@@ -165,8 +186,6 @@ async function networkFirstWithRoutineFallback(request) {
         }
         return response
     } catch {
-        const cached = await caches.match(request)
-        if (cached) return cached
         if (request.url.includes('/api/routines/daily')) {
             const routines = await getAllFromDB(ROUTINES_STORE)
             return new Response(JSON.stringify(routines.length ? routines : { offline: true, message: 'No saved routines available' }), {
@@ -174,6 +193,8 @@ async function networkFirstWithRoutineFallback(request) {
             })
         }
         if (request.url.includes('/api/exercises')) {
+            const cached = await caches.match(request)
+            if (cached) return cached
             const exercises = await getAllFromDB(EXERCISES_STORE)
             return new Response(JSON.stringify(exercises.length ? { exercises } : { offline: true, message: 'No saved exercises available' }), {
                 headers: { 'Content-Type': 'application/json' }
@@ -208,9 +229,14 @@ self.addEventListener('fetch', (event) => {
         return
     }
 
-    // API calls: network first (already handled above for specific routes)
+    // API calls
     if (API_PATTERN.test(url.pathname) || url.pathname.startsWith('/api/')) {
-        event.respondWith(networkFirst(request))
+        if (PRIVATE_API_PATTERN.test(url.pathname) && !CACHEABLE_API_PATTERN.test(url.pathname)) {
+            // Personal data: network only, never cached.
+            event.respondWith(networkOnly(request))
+        } else {
+            event.respondWith(networkFirst(request))
+        }
         return
     }
 

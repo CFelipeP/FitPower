@@ -1,10 +1,12 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import { Dumbbell, Plus, X, Calendar, Clock, Target } from 'lucide-react'
+import ExercisePicker from '../ExerciseLibrary/ExercisePicker'
 import './AssignRoutine.css'
 
-const emptyExercise = { name: '', sets: '', reps: '', restTime: '' }
+const emptyExercise = { name: '', sets: '', reps: '', restTime: '', exerciseId: '' }
 
 export default function AssignRoutine({ clientId }) {
   const { showToast } = useToast()
@@ -36,19 +38,35 @@ export default function AssignRoutine({ clientId }) {
     ))
   }
 
+  function pickCatalogExercise(index, ex) {
+    setExercises(p => p.map((row, i) =>
+      i === index ? { ...row, name: ex.name, exerciseId: ex.id } : row
+    ))
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (!clientId) {
-      showToast('No client selected')
+      swalError('No client selected')
       return
     }
     if (!form.date || !form.title) {
-      showToast('Date and title are required')
+      swalError('Date and title are required')
       return
     }
     const validExercises = exercises.filter(ex => ex.name.trim())
     if (validExercises.length === 0) {
-      showToast('Add at least one exercise')
+      swalError('Add at least one exercise')
+      return
+    }
+    for (const ex of validExercises) {
+      if (ex.sets && (Number.isNaN(parseInt(ex.sets, 10)) || parseInt(ex.sets, 10) < 1 || parseInt(ex.sets, 10) > 100)) {
+        swalError('Sets must be a number between 1 and 100')
+        return
+      }
+    }
+    if (form.duration && (Number.isNaN(parseInt(form.duration, 10)) || parseInt(form.duration, 10) < 1 || parseInt(form.duration, 10) > 600)) {
+      swalError('Duration must be between 1 and 600 minutes')
       return
     }
 
@@ -66,6 +84,7 @@ export default function AssignRoutine({ clientId }) {
             sets: ex.sets ? parseInt(ex.sets) : null,
             reps: ex.reps || null,
             restTime: ex.restTime || null,
+            exerciseId: ex.exerciseId ? parseInt(ex.exerciseId) : null,
           })),
         }),
       })
@@ -74,7 +93,7 @@ export default function AssignRoutine({ clientId }) {
       setExercises([{ ...emptyExercise }])
       setShowForm(false)
     } catch (e) {
-      showToast(e.message || 'Error assigning routine')
+      swalError(e.message || 'Error assigning routine')
     } finally {
       setSubmitting(false)
     }
@@ -119,7 +138,7 @@ export default function AssignRoutine({ clientId }) {
             </div>
             <div className="ar-field">
               <label><Clock size={14} /> Duration (min)</label>
-              <input type="number" name="duration" placeholder="e.g. 45" value={form.duration} onChange={handleChange} min="1" className="ar-input" />
+              <input type="number" name="duration" placeholder="e.g. 45" value={form.duration} onChange={handleChange} min="1" max="600" className="ar-input" />
             </div>
           </div>
 
@@ -148,6 +167,7 @@ export default function AssignRoutine({ clientId }) {
                     </button>
                   )}
                 </div>
+                <ExercisePicker onSelect={(picked) => pickCatalogExercise(i, picked)} />
                 <div className="ar-exercise-inputs">
                   <input
                     type="number"
@@ -155,6 +175,7 @@ export default function AssignRoutine({ clientId }) {
                     value={ex.sets}
                     onChange={e => updateExercise(i, 'sets', e.target.value)}
                     min="1"
+                    max="100"
                     className="ar-input ar-input-sm"
                   />
                   <input

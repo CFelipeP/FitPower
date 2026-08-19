@@ -77,7 +77,11 @@ export default function Programs() {
                         {programs.map((p, i) => (
                             <div key={p.id} className="program-card reveal-scale" style={{ transitionDelay: `${i * 0.1}s` }}>
                                 <div className="program-img-wrapper">
-                                    <img loading="lazy" src={p.image || 'https://picsum.photos/seed/fitpower-program/600/450.jpg'} alt={p.name} className="program-img" />
+                                    {p.image ? (
+                                        <img loading="lazy" src={p.image} alt={p.name} className="program-img" />
+                                    ) : (
+                                        <div className="program-img program-img-fallback" aria-hidden="true" />
+                                    )}
                                     <div className="program-overlay"></div>
                                 </div>
                                 <div className="program-content">

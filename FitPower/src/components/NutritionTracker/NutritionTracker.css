@@ -433,3 +433,13 @@
     .nt-macro-item { flex-direction: column; gap: 2px; padding: 8px; }
     .nt-macro-value { font-size: 16px; }
 }
+
+@media (max-width: 640px) {
+    .nt-container { padding: 16px 12px; }
+    .nt-modal { width: calc(100vw - 32px); max-height: 92vh; overflow-y: auto; }
+    .nt-summary-header { flex-wrap: wrap; gap: 8px; }
+}
+@media (max-width: 420px) {
+    .nt-meals-grid { grid-template-columns: 1fr !important; }
+    .nt-water-grid { grid-template-columns: repeat(4, 1fr); }
+}

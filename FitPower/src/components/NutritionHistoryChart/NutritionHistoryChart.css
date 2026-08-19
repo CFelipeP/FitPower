@@ -9,6 +9,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 16px;
 }
 
@@ -174,3 +176,9 @@
 
 .nhc-dot-consumed { background: #3b82f6; }
 .nhc-dot-target { background: #a1a1aa; opacity: 0.6; }
+
+@media (max-width: 640px) {
+  .nhc-container { padding: 14px 12px; }
+  .nhc-stats { grid-template-columns: repeat(2, 1fr); }
+  .nhc-legend { flex-wrap: wrap; gap: 8px 16px; }
+}

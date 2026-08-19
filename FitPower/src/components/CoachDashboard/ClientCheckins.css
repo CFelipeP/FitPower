@@ -236,7 +236,7 @@
 
 .cc-metric-label {
   font-size: 11px;
-  color: #737373;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: .3px;
 }
@@ -274,3 +274,13 @@
     margin-left: 0;
   }
 }
+
+@media (max-width: 640px) {
+    .cck-grid { grid-template-columns: 1fr !important; }
+    .cck-kpi-row { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+@media (max-width: 640px) {
+  .cc-container { padding: 16px 12px; }
+}
+

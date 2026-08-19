@@ -544,3 +544,77 @@ body.scroll-locked {
 .mobile-bottom-nav a.active {
     color: var(--power-500);
 }
+/* â•â•â• Global responsive hardening â•â•â• */
+img { max-width: 100%; height: auto; }
+video { max-width: 100%; }
+
+@media (max-width: 767px) {
+    .ad-table, .pm-table, .cd-earnings-table, .sp-invoice-table, .ls-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+    input, select, textarea { font-size: 16px !important; } /* prevent iOS zoom */
+}
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* ── Safe text wrapping (prevents horizontal overflow from long words) ── */
+p, li, h1, h2, h3, h4, h5, h6, span, a, div, label, td, th {
+    overflow-wrap: break-word;
+}
+
+/* ── Contain large charts / analytics on very wide screens (≥1920px) ── */
+@media (min-width: 1920px) {
+    .chart-wrap,
+    .chart-container,
+    .chart-content,
+    .pc-chart-wrap,
+    .cm-chart-wrap,
+    .cm-chart-svg,
+    .nhc-chart,
+    .wh-heatmap-wrap {
+        max-width: 900px;
+        margin-inline: auto;
+    }
+}
+
+/* ── Icon buttons get a comfortable touch target on touch devices ── */
+@media (pointer: coarse) {
+    .btn-icon, .icon-btn, [class*="btn-icon"] {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+/* ── Constrain tables inside wrappers on mobile so wide columns scroll ── */
+@media (max-width: 640px) {
+    .responsive-table-wrap table,
+    .ad-table-wrap table,
+    .pm-table-wrap table,
+    .wl-table-wrap table,
+    .cd-roster table,
+    .cm-table-wrap table,
+    .cn-table-wrap table {
+        min-width: 560px;
+    }
+}
+
+
+/* ── Keyboard focus visibility (WCAG 2.4.7) ───────────────────────────── */
+:focus-visible {
+    outline: 2px solid var(--power-500, #FFD600);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* ── Reduced motion (WCAG 2.3.3) ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

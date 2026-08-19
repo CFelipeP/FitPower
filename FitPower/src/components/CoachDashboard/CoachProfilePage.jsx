@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import {
     User, Mail, Star, MapPin, Phone, Globe,
@@ -18,7 +19,7 @@ const StarDisplay = ({ rating }) => (
     <div style={{ display: 'flex', gap: 2 }}>
         {[1, 2, 3, 4, 5].map(i => (
             <Star key={i} size={14} fill={i <= Math.round(rating || 0) ? '#FFD600' : 'none'}
-                color={i <= Math.round(rating || 0) ? '#FFD600' : '#525252'} />
+                color={i <= Math.round(rating || 0) ? '#FFD600' : 'var(--text-dim)'} />
         ))}
     </div>
 )
@@ -86,7 +87,7 @@ export default function CoachProfilePage() {
                     emergencyRelation: t.emergencyContact?.relation || '',
                 }))
             })
-        }).catch(() => showToast('Error loading profile'))
+        }).catch(() => swalError('Error loading profile'))
         .finally(() => setLoading(false))
     }, [showToast])
 
@@ -99,11 +100,11 @@ export default function CoachProfilePage() {
         if (!file) return
         const allowed = ['image/jpeg', 'image/png', 'image/jpg']
         if (!allowed.includes(file.type)) {
-            showToast('Solo se permiten archivos JPG, JPEG o PNG')
+            swalError('Only JPG, JPEG or PNG files are allowed')
             return
         }
         if (file.size > 5 * 1024 * 1024) {
-            showToast('La imagen no debe superar los 5MB')
+            swalError('The image must not exceed 5MB')
             return
         }
         setUploadingPhoto(true)
@@ -119,7 +120,7 @@ export default function CoachProfilePage() {
             }
             showToast('Foto subida correctamente')
         } catch {
-            showToast('Error al subir la foto')
+            swalError('Error al subir la foto')
         } finally {
             setUploadingPhoto(false)
         }
@@ -129,7 +130,7 @@ export default function CoachProfilePage() {
         e.preventDefault()
         const userId = getUserIdFromToken()
         if (!userId) {
-            showToast('Session expired')
+            swalError('Session expired')
             return
         }
         setSaving(true)
@@ -158,6 +159,9 @@ export default function CoachProfilePage() {
                     instagram: form.instagram,
                     youtube: form.youtube,
                     website: form.website,
+                    emergencyName: form.emergencyName,
+                    emergencyPhone: form.emergencyPhone,
+                    emergencyRelation: form.emergencyRelation,
                 }
                 const clean = {}
                 for (const [k, v] of Object.entries(payload)) {
@@ -175,7 +179,7 @@ export default function CoachProfilePage() {
             }, 1200)
         } catch {
             setSavingToast(null)
-            showToast('Error saving profile')
+            swalError('Error saving profile')
         } finally {
             setSaving(false)
         }
@@ -208,7 +212,7 @@ export default function CoachProfilePage() {
         select: { background: '#1a1a24', border: '1px solid #2a2a35', borderRadius: 10, padding: '10px 14px', color: '#fff', fontSize: 14, outline: 'none', fontFamily: 'inherit', cursor: 'pointer' },
         statBox: { textAlign: 'center', padding: '14px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)' },
         statValue: { fontSize: 22, fontWeight: 700, color: 'var(--power-500)' },
-        statLabel: { fontSize: 11, color: '#737373', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.3px' },
+        statLabel: { fontSize: 11, color: 'var(--text-muted)', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.3px' },
     }
 
     return (
@@ -237,9 +241,9 @@ export default function CoachProfilePage() {
                 )}
 
                 <form onSubmit={handleSubmit}>
-                    {/* ═══ HEADER CARD ═══ */}
+                    {/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â HEADER CARD Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */}
                     <div style={s.card}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: editing ? 24 : 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: editing ? 24 : 0, flexWrap: 'wrap' }}>
                             <div style={s.avatarWrap} onClick={() => editing && document.getElementById('profile-photo-input')?.click()}>
                                 {form.photo ? (
                                     <img loading="lazy" src={form.photo} alt="" style={s.avatar} />
@@ -266,14 +270,14 @@ export default function CoachProfilePage() {
                                     <span style={{ color: '#aaa', fontSize: 14, textTransform: 'capitalize' }}>
                                         {profile?.role || 'Coach'}
                                     </span>
-                                    <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#525252' }} />
+                                    <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--text-dim)' }} />
                                     <StarDisplay rating={trainer?.avgRating || 0} />
                                     <span style={{ color: '#888', fontSize: 13 }}>
-                                        {trainer?.avgRating ? `${trainer.avgRating.toFixed(1)}` : '—'}
+                                        {trainer?.avgRating ? `${trainer.avgRating.toFixed(1)}` : 'Ã¢â‚¬â€'}
                                     </span>
                                     {trainer?.status && (
                                         <>
-                                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#525252' }} />
+                                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--text-dim)' }} />
                                             <span style={{
                                                 display: 'inline-flex', alignItems: 'center', gap: 4,
                                                 padding: '2px 10px', borderRadius: 20,
@@ -306,7 +310,7 @@ export default function CoachProfilePage() {
                         {!editing && (
                             <div className="cd-grid-4" style={{ marginTop: 24 }}>
                                 <div style={s.statBox}>
-                                    <div style={s.statValue}>{trainer?.experience || '—'}</div>
+                                    <div style={s.statValue}>{trainer?.experience || 'Ã¢â‚¬â€'}</div>
                                     <div style={s.statLabel}>Years Exp.</div>
                                 </div>
                                 <div style={s.statBox}>
@@ -319,7 +323,7 @@ export default function CoachProfilePage() {
                                 </div>
                                 <div style={s.statBox}>
                                     <div style={s.statValue}>
-                                        {profile?.memberSince ? new Date(profile.memberSince).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
+                                        {profile?.memberSince ? new Date(profile.memberSince).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Ã¢â‚¬â€'}
                                     </div>
                                     <div style={s.statLabel}>Since</div>
                                 </div>
@@ -327,13 +331,13 @@ export default function CoachProfilePage() {
                         )}
                     </div>
 
-                    {/* ═══ EDIT SECTIONS ═══ */}
+                    {/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â EDIT SECTIONS Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */}
                     {editing && (
                         <>
                             {/* Personal Info */}
                             <div style={s.card}>
                                 <div style={s.cardTitle}><User size={14} /> Personal Info</div>
-                                <div style={s.row}>
+                                <div className="cpp-row">
                                     <div style={s.field}>
                                         <label style={s.label}>First Name</label>
                                         <input style={s.input} value={form.firstName} onChange={handleChange('firstName')} />
@@ -366,7 +370,7 @@ export default function CoachProfilePage() {
                                     }}>
                                         <Upload size={16} /> Choose Image
                                     </button>
-                                    <span style={{ fontSize: 11, color: '#666', marginTop: 4 }}>JPG, PNG · Max 5MB</span>
+                                    <span style={{ fontSize: 11, color: '#666', marginTop: 4 }}>JPG, PNG Ã‚Â· Max 5MB</span>
                                 </div>
                             </div>
 
@@ -388,7 +392,7 @@ export default function CoachProfilePage() {
                             {/* Professional Details */}
                             <div style={s.card}>
                                 <div style={s.cardTitle}><Award size={14} /> Professional Details</div>
-                                <div style={s.row}>
+                                <div className="cpp-row">
                                     <div style={s.field}>
                                         <label style={s.label}>Experience (years)</label>
                                         <input style={s.input} value={form.experience} onChange={handleChange('experience')} placeholder="e.g. 8" />
@@ -403,7 +407,7 @@ export default function CoachProfilePage() {
                                         </select>
                                     </div>
                                 </div>
-                                <div style={s.row}>
+                                <div className="cpp-row">
                                     <div style={{ ...s.field, marginTop: 16 }}>
                                         <label style={s.label}><MapPin size={12} style={{ marginRight: 4 }} /> Country</label>
                                         <input style={s.input} value={form.country} onChange={handleChange('country')} placeholder="United States" />
@@ -422,7 +426,7 @@ export default function CoachProfilePage() {
                             {/* Social Links */}
                             <div style={s.card}>
                                 <div style={s.cardTitle}><Globe size={14} /> Social Links</div>
-                                <div style={s.row}>
+                                <div className="cpp-row">
                                     <div style={s.field}>
                                         <label style={s.label}>Instagram</label>
                                         <input style={s.input} value={form.instagram} onChange={handleChange('instagram')} placeholder="@username" />
@@ -441,7 +445,7 @@ export default function CoachProfilePage() {
                             {/* Emergency Contact */}
                             <div style={s.card}>
                                 <div style={s.cardTitle}><Phone size={14} /> Emergency Contact</div>
-                                <div style={s.row}>
+                                <div className="cpp-row">
                                     <div style={s.field}>
                                         <label style={s.label}>Full Name</label>
                                         <input style={s.input} value={form.emergencyName} onChange={handleChange('emergencyName')} />
@@ -458,7 +462,7 @@ export default function CoachProfilePage() {
                             </div>
 
                             {/* Actions */}
-                            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 4 }}>
+                            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 4, flexWrap: 'wrap' }}>
                                 <button type="button" className="cd-btn cd-btn-secondary cd-btn-sm"
                                     onClick={() => setEditing(false)}>
                                     Cancel
@@ -471,7 +475,7 @@ export default function CoachProfilePage() {
                     )}
                 </form>
 
-                {/* ═══ VIEW MODE SECTIONS ═══ */}
+                {/* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â VIEW MODE SECTIONS Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */}
                 {!editing && trainer && (
                     <>
                         {/* About Me */}
@@ -480,13 +484,13 @@ export default function CoachProfilePage() {
                                 <div style={s.cardTitle}><Quote size={14} /> About Me</div>
                                 {trainer.bio && (
                                     <div style={{ marginBottom: trainer.philosophy ? 20 : 0 }}>
-                                        <div style={{ fontSize: 12, fontWeight: 600, color: '#737373', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Bio</div>
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Bio</div>
                                         <p style={{ color: '#d4d4d4', fontSize: 14, lineHeight: 1.7, margin: 0 }}>{trainer.bio}</p>
                                     </div>
                                 )}
                                 {trainer.philosophy && (
                                     <div>
-                                        <div style={{ fontSize: 12, fontWeight: 600, color: '#737373', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Training Philosophy</div>
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Training Philosophy</div>
                                         <p style={{ color: '#d4d4d4', fontSize: 14, lineHeight: 1.7, margin: 0, fontStyle: 'italic' }}>"{trainer.philosophy}"</p>
                                     </div>
                                 )}
@@ -496,14 +500,14 @@ export default function CoachProfilePage() {
                         {/* Professional Details */}
                         <div style={s.card}>
                             <div style={s.cardTitle}><Award size={14} /> Professional Details</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                            <div className="cpp-row cpp-gap-16">
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                     {trainer.experience && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,214,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 <Award size={16} style={{ color: 'var(--power-500)' }} />
                                             </div>
-                                            <div><div style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>{trainer.experience} years</div><div style={{ color: '#737373', fontSize: 12 }}>Experience</div></div>
+                                            <div><div style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>{trainer.experience} years</div><div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Experience</div></div>
                                         </div>
                                     )}
                                     {trainer.modality && (
@@ -511,7 +515,7 @@ export default function CoachProfilePage() {
                                             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(56,189,248,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 <Globe size={16} style={{ color: '#38bdf8' }} />
                                             </div>
-                                            <div><div style={{ color: '#fff', fontWeight: 600, fontSize: 14, textTransform: 'capitalize' }}>{trainer.modality}</div><div style={{ color: '#737373', fontSize: 12 }}>Modality</div></div>
+                                            <div><div style={{ color: '#fff', fontWeight: 600, fontSize: 14, textTransform: 'capitalize' }}>{trainer.modality}</div><div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Modality</div></div>
                                         </div>
                                     )}
                                 </div>
@@ -525,7 +529,7 @@ export default function CoachProfilePage() {
                                                 <div style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>
                                                     {[trainer.location?.city, trainer.location?.country].filter(Boolean).join(', ')}
                                                 </div>
-                                                <div style={{ color: '#737373', fontSize: 12 }}>Location</div>
+                                                <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Location</div>
                                             </div>
                                         </div>
                                     )}
@@ -534,7 +538,7 @@ export default function CoachProfilePage() {
                                             <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(52,211,153,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 <BookOpen size={16} style={{ color: '#34d399' }} />
                                             </div>
-                                            <div><div style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>{trainer.languages.map(l => l.name).join(', ')}</div><div style={{ color: '#737373', fontSize: 12 }}>Languages</div></div>
+                                            <div><div style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>{trainer.languages.map(l => l.name).join(', ')}</div><div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Languages</div></div>
                                         </div>
                                     )}
                                 </div>
@@ -542,7 +546,7 @@ export default function CoachProfilePage() {
                         </div>
 
                         {/* Specializations & Certifications */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+                        <div className="cpp-row cpp-gap-20" style={{ marginBottom: 20 }}>
                             {trainer.specializations?.length > 0 && (
                                 <div style={s.card}>
                                     <div style={s.cardTitle}><GraduationCap size={14} /> Specializations</div>
@@ -569,7 +573,7 @@ export default function CoachProfilePage() {
                                                 </div>
                                                 <div>
                                                     <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{c.certification}</div>
-                                                    {c.cert_id_number && <div style={{ color: '#737373', fontSize: 12 }}>ID: {c.cert_id_number}</div>}
+                                                    {c.cert_id_number && <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>ID: {c.cert_id_number}</div>}
                                                 </div>
                                             </div>
                                         ))}

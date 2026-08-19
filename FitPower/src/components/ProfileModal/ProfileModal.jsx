@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { apiFetch } from '../../lib/api'
+import { mediaUrl } from '../../lib/media'
 import { useToast } from '../../context/ToastContext'
+import { swalError } from '../../lib/alerts'
 import { X, Camera, Save } from 'lucide-react'
 import './ProfileModal.css'
 
@@ -41,7 +43,7 @@ export default function ProfileModal({ isOpen, onClose, onSaved }) {
                     trainingDays: data.trainingDays?.toString() || '',
                 })
             })
-            .catch(() => showToast('Error loading profile'))
+            .catch(() => swalError('Error loading profile'))
             .finally(() => setLoading(false))
     }, [isOpen, showToast])
 
@@ -53,7 +55,7 @@ export default function ProfileModal({ isOpen, onClose, onSaved }) {
         e.preventDefault()
         const userId = getUserIdFromToken()
         if (!userId) {
-            showToast('Session expired')
+            swalError('Session expired. Please log in again.')
             return
         }
         setSaving(true)
@@ -66,7 +68,7 @@ export default function ProfileModal({ isOpen, onClose, onSaved }) {
             onSaved?.()
             onClose()
         } catch {
-            showToast('Error saving profile')
+            swalError('Error saving profile')
         } finally {
             setSaving(false)
         }
@@ -91,11 +93,11 @@ export default function ProfileModal({ isOpen, onClose, onSaved }) {
                     <form onSubmit={handleSubmit} className="pm-form">
                         <div className="pm-avatar-section">
                             <div className="pm-avatar-wrap">
-                                <img loading="lazy"
-                                    src={form.photo && (form.photo.startsWith('http://') || form.photo.startsWith('https://')) ? form.photo : 'https://picsum.photos/seed/default/120/120.jpg'}
-                                    alt=""
-                                    className="pm-avatar"
-                                />
+                                {form.photo && mediaUrl(form.photo) ? (
+                                    <img loading="lazy" src={mediaUrl(form.photo)} alt="" className="pm-avatar" />
+                                ) : (
+                                    <div className="pm-avatar pm-avatar-initials">{(form.firstName || 'U')[0].toUpperCase()}</div>
+                                )}
                                 <div className="pm-avatar-overlay">
                                     <Camera size={18} />
                                 </div>

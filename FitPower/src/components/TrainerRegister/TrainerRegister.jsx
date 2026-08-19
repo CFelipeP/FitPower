@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
 import {
@@ -66,29 +67,91 @@ export default function TrainerRegister() {
     const photoInputRef = useRef(null)
     const certInputRef = useRef(null)
 
+    // Uploaded file paths (real files, stored server-side)
+    const [photoPath, setPhotoPath] = useState('')
+    const [certPath, setCertPath] = useState('')
+    const [photoUploading, setPhotoUploading] = useState(false)
+    const [certUploading, setCertUploading] = useState(false)
+
     const validateEmail = (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
     const validatePassword = (val) => val.length >= 8
+    const validateDob = (val) => {
+        if (!val) return false
+        const d = new Date(val)
+        if (Number.isNaN(d.getTime())) return false
+        if (d > new Date()) return false
+        const now = new Date()
+        let age = now.getFullYear() - d.getFullYear()
+        const m = now.getMonth() - d.getMonth()
+        if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--
+        return age >= 18 && age <= 100
+    }
     const formatPhoneSV = (val) => {
         const digits = val.replace(/\D/g, '').slice(0, 8)
         if (digits.length > 4) return digits.slice(0, 4) + '-' + digits.slice(4)
         return digits
     }
 
+    const uploadFile = async (endpoint, field, file) => {
+        const formData = new FormData()
+        formData.append(field, file)
+        const res = await fetch('/api' + endpoint, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': localStorage.getItem('csrf_token') || '' },
+            body: formData,
+        })
+        const data = await res.json()
+        if (!data.success) throw new Error(data.message || 'Upload failed')
+        return data.data.file
+    }
+
     const handlePhotoChange = (e) => {
         const file = e.target.files[0]
-        if (file && file.type.startsWith('image/')) {
-            const reader = new FileReader()
-            reader.onload = (ev) => setPhotoPreview(ev.target.result)
-            reader.readAsDataURL(file)
+        if (!file) return
+        if (!file.type.startsWith('image/')) {
+            showToast('Please select an image file (JPG or PNG)')
+            e.target.value = ''
+            return
         }
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('Photo must be under 5 MB')
+            e.target.value = ''
+            return
+        }
+        const reader = new FileReader()
+        reader.onload = (ev) => setPhotoPreview(ev.target.result)
+        reader.readAsDataURL(file)
+        setPhotoUploading(true)
+        uploadFile('/upload/application-photo', 'photo', file)
+            .then((path) => setPhotoPath(path))
+            .catch((err) => showToast(err.message || 'Photo upload failed'))
+            .finally(() => setPhotoUploading(false))
     }
 
     const handleCertUpload = (e) => {
         const file = e.target.files[0]
-        if (file) {
-            const name = file.name.length > 18 ? file.name.slice(0, 15) + '...' : file.name
-            setCertFileName(name)
+        if (!file) return
+        const ext = (file.name.split('.').pop() || '').toLowerCase()
+        if (!['pdf', 'jpg', 'jpeg', 'png'].includes(ext)) {
+            showToast('Only PDF, JPG or PNG files are allowed')
+            e.target.value = ''
+            return
         }
+        if (file.size > 10 * 1024 * 1024) {
+            showToast('Certificate must be under 10 MB')
+            e.target.value = ''
+            return
+        }
+        const name = file.name.length > 18 ? file.name.slice(0, 15) + '...' : file.name
+        setCertFileName(name)
+        setCertUploading(true)
+        uploadFile('/upload/application-cert', 'cert', file)
+            .then((path) => setCertPath(path))
+            .catch((err) => {
+                showToast(err.message || 'Certificate upload failed')
+                setCertFileName('')
+            })
+            .finally(() => setCertUploading(false))
     }
 
     const toggleSpec = (spec) => {
@@ -112,35 +175,50 @@ export default function TrainerRegister() {
         const v2 = lastName.trim().length >= 1
         const v3 = validateEmail(email)
         const v4 = phone.replace(/\D/g, '').length === 8
-        const v5 = !!dob
+        const v5 = validateDob(dob)
         const v6 = !!gender
         const v7 = validatePassword(password)
         const v8 = password === confirmPassword
-        if (!v8 && v7) { showToast('Passwords do not match'); return }
-        if (v1 && v2 && v3 && v4 && v5 && v6 && v7 && v8) goToStep(2)
+        if (!v1) { showToast('Please enter your first name'); return }
+        if (!v2) { showToast('Please enter your last name'); return }
+        if (!v3) { showToast('Please enter a valid email address'); return }
+        if (!v4) { showToast('Enter 8 digits (e.g. 7012-3456)'); return }
+        if (!v5) { showToast('You must be at least 18 years old to apply'); return }
+        if (!v6) { showToast('Please select your gender'); return }
+        if (!v7) { showToast('Password must be at least 8 characters'); return }
+        if (!v8) { showToast('Passwords do not match'); return }
+        goToStep(2)
     }
 
     // Step 2 → 3
     const handleToStep3 = () => {
         setTouched2({ certType: true, certId: true })
-        if (!certType || !certId.trim()) return
+        if (!certType) { showToast('Please select your certification body'); return }
+        if (!certId.trim()) { showToast('Please enter your certification ID'); return }
         if (!experience) { showToast('Please select your years of experience'); return }
         if (specs.length === 0) { showToast('Select at least one specialization'); return }
         if (langs.length === 0) { showToast('Select at least one language'); return }
+        if (certUploading) { showToast('Please wait for the certificate upload to finish'); return }
+        if (!certPath) { showToast('Please upload your certification file (PDF)'); return }
         goToStep(3)
     }
 
     // Step 3 → 4
     const handleToStep4 = () => {
+        if (photoUploading) { showToast('Please wait for the photo upload to finish'); return }
         goToStep(4)
     }
 
     // Submit
     const handleSubmit = async () => {
         if (!agreeTerms || !agreePrivacy) return
+        if (photoUploading || certUploading) {
+            showToast('Please wait for uploads to finish')
+            return
+        }
         setSubmitting(true)
         try {
-            const data = await apiFetch('/trainers', {
+            await apiFetch('/trainers', {
                 method: 'POST',
                 body: JSON.stringify({
                     firstName, lastName, email, phone, password,
@@ -150,14 +228,14 @@ export default function TrainerRegister() {
                     country, city, timezone, modality,
                     specializations: specs,
                     languages: langs,
+                    certType: certType || undefined,
+                    certId: certId || undefined,
+                    certFile: certPath || undefined,
+                    photo: photoPath || undefined,
                     emergName, emergPhone: emergPhone, emergRelation,
-                    agreeTerms, agreePrivacy,
+                    agreeTerms, agreePrivacy, agreeMarketing,
                 }),
             })
-            if (data?.token) {
-                localStorage.setItem('token', data.token)
-                localStorage.setItem('role', 'coach')
-            }
             setShowSuccess(true)
         } catch (e) {
             showToast(e.message || 'Server connection error')
@@ -181,7 +259,7 @@ export default function TrainerRegister() {
     ]
 
     const langList = [
-        'English', 'Español', 'Português', 'Français', 'Deutsch',
+        'English', 'Português', 'Français', 'Deutsch',
         'Italiano', '日本語', '中文', 'العربية', 'हिन्दी',
     ]
 
@@ -193,11 +271,7 @@ export default function TrainerRegister() {
 
                 {/* ═══ LEFT PANEL ═══ */}
                 <div className="tr-left">
-                    <img loading="lazy" 
-                        src="https://imagenes.elpais.com/resizer/v2/SQGSGL2DRRGYXAWYLAHJKSVHU4.jpg?auth=e1bf637745e3ce301bf7bba7fbbc5e59d04a35305f1381fd973afc6dc6c423bc&width=1200"
-                        alt="Trainer"
-                        className="tr-left-bg"
-                    />
+                    <div className="tr-left-bg" role="img" aria-label="Coaching atmosphere" />
                     <div className="tr-left-content">
                         <a href="/" className="tr-logo">
                             <div className="tr-logo-icon">
@@ -276,11 +350,11 @@ export default function TrainerRegister() {
 
                             {/* Step Indicator */}
                             {!showSuccess && (
-                                <div className="tr-steps">
+                                <div className="tr-steps" role="progressbar" aria-valuemin={1} aria-valuemax={4} aria-valuenow={currentStep} aria-label={`Step ${currentStep} of 4`}>
                                     {[1, 2, 3, 4].map((step) => (
                                         <div key={step} className="tr-step-group">
-                                            <div className={`tr-step-dot ${currentStep === step ? 'active' : ''} ${currentStep > step ? 'done' : ''}`}></div>
-                                            {step < 4 && <div className={`tr-step-line ${currentStep > step ? 'active' : ''}`}></div>}
+                                            <div className={`tr-step-dot ${currentStep === step ? 'active' : ''} ${currentStep > step ? 'done' : ''}`} aria-hidden="true"></div>
+                                            {step < 4 && <div className={`tr-step-line ${currentStep > step ? 'active' : ''}`} aria-hidden="true"></div>}
                                         </div>
                                     ))}
                                 </div>
@@ -426,6 +500,7 @@ export default function TrainerRegister() {
                                                     />
                                                     <Calendar size={18} className="tr-input-icon" />
                                                     {touched1.dob && !dob && <div className="tr-field-error visible">Required</div>}
+                                                    {touched1.dob && dob && !validateDob(dob) && <div className="tr-field-error visible">Must be 18 or older</div>}
                                                 </div>
                                                 <div className="tr-field">
                                                     <select
@@ -462,8 +537,7 @@ export default function TrainerRegister() {
 
                                             {/* Certification */}
                                             <div className="tr-select-group">
-                                                <label className="tr-select-label">Primary certification <span className="tr-required">*</span></label>
-                                                <div className="tr-field">
+                                                <label className="tr-select-label">Primary certification <span className="tr-required">*</span></label>                                                <div className="tr-field">
                                                     <select
                                                         className={`tr-input tr-input-select ${touched2.certType ? (certType ? 'success' : 'error') : ''}`}
                                                         value={certType}
@@ -510,13 +584,13 @@ export default function TrainerRegister() {
                                                         />
                                                         {!certFileName ? (
                                                             <div className="tr-upload-cert-placeholder">
-                                                                <Upload size={16} />
-                                                                <span>Upload cert (PDF)</span>
+                                                                {certUploading ? <span className="tr-spinner" /> : <Upload size={16} />}
+                                                                <span>{certUploading ? 'Uploading...' : 'Upload cert (PDF)'}</span>
                                                             </div>
                                                         ) : (
                                                             <div className="tr-upload-cert-file">
                                                                 <FileCheck size={16} />
-                                                                <span>{certFileName}</span>
+                                                                <span>{certFileName}{certUploading ? ' (uploading...)' : ''}</span>
                                                             </div>
                                                         )}
                                                     </label>
@@ -526,13 +600,14 @@ export default function TrainerRegister() {
                                             {/* Experience */}
                                             <div className="tr-select-group">
                                                 <label className="tr-select-label">Years of experience</label>
-                                                <div className="tr-exp-grid">
+                                                    <div className="tr-tags-grid">
                                                     {['0-1', '1-3', '3-5', '5-10', '10+'].map((exp) => (
                                                         <button
                                                             key={exp}
                                                             type="button"
                                                             className={`tr-tag-btn ${experience === exp ? 'selected' : ''}`}
                                                             onClick={() => setExperience(exp)}
+                                                            aria-pressed={experience === exp}
                                                         >
                                                             {exp}
                                                         </button>
@@ -548,12 +623,14 @@ export default function TrainerRegister() {
                                                 <div className="tr-tags-grid">
                                                     {specList.map((spec) => {
                                                         const Icon = spec.icon
+                                                        const selected = specs.includes(spec.id)
                                                         return (
                                                             <button
                                                                 key={spec.id}
                                                                 type="button"
-                                                                className={`tr-tag-btn ${specs.includes(spec.id) ? 'selected' : ''}`}
+                                                                className={`tr-tag-btn ${selected ? 'selected' : ''}`}
                                                                 onClick={() => toggleSpec(spec.id)}
+                                                                aria-pressed={selected}
                                                             >
                                                                 {renderIcon(Icon)} {spec.label}
                                                             </button>
@@ -566,16 +643,20 @@ export default function TrainerRegister() {
                                             <div className="tr-select-group">
                                                 <label className="tr-select-label">Languages spoken</label>
                                                 <div className="tr-tags-grid">
-                                                    {langList.map((lang) => (
-                                                        <button
-                                                            key={lang}
-                                                            type="button"
-                                                            className={`tr-tag-btn ${langs.includes(lang) ? 'selected' : ''}`}
-                                                            onClick={() => toggleLang(lang)}
-                                                        >
-                                                            {lang}
-                                                        </button>
-                                                    ))}
+                                                    {langList.map((lang) => {
+                                                        const selected = langs.includes(lang)
+                                                        return (
+                                                            <button
+                                                                key={lang}
+                                                                type="button"
+                                                                className={`tr-tag-btn ${selected ? 'selected' : ''}`}
+                                                                onClick={() => toggleLang(lang)}
+                                                                aria-pressed={selected}
+                                                            >
+                                                                {lang}
+                                                            </button>
+                                                        )
+                                                    })}
                                                 </div>
                                             </div>
 
@@ -829,33 +910,28 @@ export default function TrainerRegister() {
                                     <div className="tr-success-check">
                                         <Check size={40} className="tr-success-icon" />
                                     </div>
-                                    <h1 className="tr-title" style={{ textAlign: 'center' }}>Welcome to FitPower!</h1>
+                                    <h1 className="tr-title" style={{ textAlign: 'center' }}>Application submitted!</h1>
                                     <p className="tr-subtitle tr-subtitle-center">
-                                        Your coach profile is now active. Start setting up your programs, availability, and connect with clients right away.
+                                        Your coach application has been received and is now under review.
+                                        An administrator will verify your profile and certifications before you can start coaching.
                                     </p>
                                     <div className="tr-success-cards">
-                                        <div className="tr-success-card">
-                                            <div className="tr-success-card-icon tr-success-card-icon-blue">
-                                                <Mail size={12} />
-                                            </div>
-                                            <span className="tr-success-card-text">Confirmation email sent to your address</span>
-                                        </div>
-                                        <div className="tr-success-card">
-                                            <div className="tr-success-card-icon tr-success-card-icon-green">
-                                                <Award size={12} />
-                                            </div>
-                                            <span className="tr-success-card-text">Your profile is live and visible to clients</span>
-                                        </div>
                                         <div className="tr-success-card">
                                             <div className="tr-success-card-icon tr-success-card-icon-yellow">
                                                 <ClockIcon size={12} />
                                             </div>
-                                            <span className="tr-success-card-text">Start configuring your coaching services now</span>
+                                            <span className="tr-success-card-text">Status: under review. We'll notify you once it's processed.</span>
+                                        </div>
+                                        <div className="tr-success-card">
+                                            <div className="tr-success-card-icon tr-success-card-icon-blue">
+                                                <Mail size={12} />
+                                            </div>
+                                            <span className="tr-success-card-text">Log in to your account to follow your application status.</span>
                                         </div>
                                     </div>
-                                    <a href="/coach/dashboard" className="tr-btn-primary btn-shine tr-btn-success">
-                                        Ir al Dashboard
-                                    </a>
+                                    <Link to="/login" className="tr-btn-primary btn-shine tr-btn-success">
+                                        Go to Login
+                                    </Link>
                                 </div>
                             )}
 

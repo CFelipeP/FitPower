@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import {
     Dumbbell, Calendar, Heart,
@@ -64,9 +65,9 @@ export default function OnboardingWizard() {
     }, [navigate])
 
     const handleNext = () => {
-        if (step === 1 && !primaryGoal) { showToast('Please select a primary goal'); return }
-        if (step === 2 && !fitnessLevel) { showToast('Please select your fitness level'); return }
-        if (step === 3 && !trainingDays) { showToast('Please select training days'); return }
+        if (step === 1 && !primaryGoal) { swalError('Please select a primary goal'); return }
+        if (step === 2 && !fitnessLevel) { swalError('Please select your fitness level'); return }
+        if (step === 3 && !trainingDays) { swalError('Please select training days'); return }
         setDirection('next')
         setStep((s) => s + 1)
     }
@@ -78,20 +79,21 @@ export default function OnboardingWizard() {
 
     const handleSubmit = async () => {
         const token = localStorage.getItem('token')
-        if (!token) { showToast('Session expired. Please log in again.'); return }
+        if (!token) { swalError('Session expired. Please log in again.'); return }
         const userId = decodeToken(token)
-        if (!userId) { showToast('Invalid session'); return }
+        if (!userId) { swalError('Invalid session'); return }
         setSubmitting(true)
         try {
+            const days = parseInt(trainingDays, 10)
             await apiFetch(`/users/${userId}`, {
                 method: 'PUT',
-                body: JSON.stringify({ fitnessLevel, primaryGoal, trainingDays }),
+                body: JSON.stringify({ fitnessLevel, primaryGoal, trainingDays: Number.isFinite(days) ? days : 4 }),
             })
             showToast('Profile completed!')
             const role = localStorage.getItem('role')
             navigate(role === 'admin' ? '/admin/dashboard' : '/client/dashboard')
         } catch (err) {
-            showToast(err.message || 'Failed to save profile')
+            swalError(err.message || 'Failed to save profile')
         } finally {
             setSubmitting(false)
         }
@@ -104,20 +106,21 @@ export default function OnboardingWizard() {
         return <Icon size={28} className="ow-goal-icon" />
     }
 
-    const formatGoal = (g) => g ? g.replace('-', ' ') : ''
+    const formatGoal = (g) => g ? g.replace(/-/g, ' ') : ''
 
     return (
         <div className="ow-overlay">
             <div className="ow-card">
                 {/* Progress Dots */}
-                <div className="ow-progress">
+                <div className="ow-progress" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step} aria-label={`Step ${step} of ${STEPS.length}`}>
                     {STEPS.map((s) => (
                         <div key={s.id} className="ow-progress-group">
                             <div
                                 className={`ow-dot ${step === s.id ? 'active' : ''} ${step > s.id ? 'done' : ''}`}
+                                aria-hidden="true"
                             />
                             {s.id < STEPS.length && (
-                                <div className={`ow-line ${step > s.id ? 'active' : ''}`} />
+                                <div className={`ow-line ${step > s.id ? 'active' : ''}`} aria-hidden="true" />
                             )}
                         </div>
                     ))}
@@ -140,10 +143,12 @@ export default function OnboardingWizard() {
                                 return (
                                     <button
                                         key={goal.id}
+                                        type="button"
                                         className={`ow-option-card ${primaryGoal === goal.id ? 'selected' : ''}`}
                                         onClick={() => setPrimaryGoal(goal.id)}
+                                        aria-pressed={primaryGoal === goal.id}
                                     >
-                                        <Icon size={32} className="ow-option-icon" />
+                                        <Icon size={32} className="ow-option-icon" aria-hidden="true" />
                                         <span className="ow-option-label">{goal.label}</span>
                                         <span className="ow-option-desc">{goal.desc}</span>
                                     </button>
@@ -158,10 +163,12 @@ export default function OnboardingWizard() {
                             {LEVELS.map((level) => (
                                 <button
                                     key={level.id}
+                                    type="button"
                                     className={`ow-option-row ${fitnessLevel === level.id ? 'selected' : ''}`}
                                     onClick={() => setFitnessLevel(level.id)}
+                                    aria-pressed={fitnessLevel === level.id}
                                 >
-                                    <div className="ow-option-radio">
+                                    <div className="ow-option-radio" aria-hidden="true">
                                         {fitnessLevel === level.id && <div className="ow-radio-dot" />}
                                     </div>
                                     <div className="ow-option-text">
@@ -180,8 +187,11 @@ export default function OnboardingWizard() {
                                 {DAYS.map((day) => (
                                     <button
                                         key={day}
+                                        type="button"
                                         className={`ow-day-btn ${trainingDays === String(day) ? 'selected' : ''}`}
                                         onClick={() => setTrainingDays(String(day))}
+                                        aria-pressed={trainingDays === String(day)}
+                                        aria-label={`${day} day${day === 1 ? '' : 's'} per week`}
                                     >
                                         <span className="ow-day-num">{day}</span>
                                         <span className="ow-day-label">{day === 1 ? 'day' : 'days'}</span>
@@ -197,7 +207,7 @@ export default function OnboardingWizard() {
                     {/* Step 4 — Summary */}
                     {step === 4 && (
                         <div className="ow-summary">
-                            <div className="ow-check-circle">
+                            <div className="ow-check-circle" aria-hidden="true">
                                 <Check size={32} />
                             </div>
                             <h2 className="ow-title ow-title-center">{STEPS[3].title}</h2>

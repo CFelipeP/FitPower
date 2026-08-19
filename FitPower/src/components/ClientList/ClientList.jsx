@@ -12,6 +12,7 @@ export default function ClientList({ onSelectClient }) {
     useEffect(() => {
         apiFetch('/clients')
             .then(d => setClients(d.clients || []))
+            .catch(() => setClients([]))
             .finally(() => setLoading(false))
     }, [])
 

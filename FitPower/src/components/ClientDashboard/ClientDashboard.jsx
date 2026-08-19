@@ -4,12 +4,13 @@ import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
 import { exportProgressData } from '../../lib/export'
+import { mediaUrl } from '../../lib/media'
 import {
     Zap, X, LayoutDashboard, CalendarDays, Dumbbell, Utensils,
     BarChart3, Trophy, Users, MessageCircle, Target, Settings, Crown,
     Search, Bell, ChevronDown, Flame, Timer,
-    Sunrise, Sun, Moon, Play, ArrowRight,
-    Heart, LogOut, User, Cookie, Camera, Video, Calculator
+    Sunrise, Sun, Moon, Play,
+    Heart, LogOut, User, Cookie, Camera, Video, Calculator, Snowflake
 } from 'lucide-react'
 import ProfileEditModal from '../ProfileModal/ProfileEditModal'
 import NotificationsDropdown from '../NotificationsDropdown/NotificationsDropdown'
@@ -21,6 +22,7 @@ import ProgressCharts from '../ProgressCharts/ProgressCharts'
 import ExerciseLibrary from '../ExerciseLibrary/ExerciseLibrary'
 import DailyCheckin from '../DailyCheckin/DailyCheckin'
 import MealPlanner from '../MealPlanner/MealPlanner'
+import FeatureGate from '../FeatureGate'
 import ProgressPhotos from '../ProgressPhotos/ProgressPhotos'
 import SmartRoutine from '../SmartRoutine/SmartRoutine'
 import Leaderboard from '../Leaderboard/Leaderboard'
@@ -30,13 +32,112 @@ import ClientTrainingVideos from './ClientTrainingVideos'
 import SubscriptionPlans from '../SubscriptionPlans/SubscriptionPlans'
 import WorkoutHeatmap from '../WorkoutHeatmap/WorkoutHeatmap'
 import TDEECalculator from '../TDEECalculator/TDEECalculator'
+import ClientGoals from '../ClientGoals/ClientGoals'
 import ProgressSlider from '../ProgressPhotos/ProgressSlider'
 import Achievements from '../Achievements/Achievements'
+import ClientTickets from '../ClientTickets/ClientTickets'
 
 import Sidebar from '../Sidebar/Sidebar'
+import { DashboardSkeleton } from '../LoadingSkeleton/LoadingSkeleton'
 import '../DashboardShared.css'
 import './ClientDashboard.css'
 import { Counter } from '../Counter'
+
+// Shared header for every client view (search, notifications, avatar).
+// Kept in this file to avoid prop-drilling a new module; used 5x below.
+function ClientHeader({ notifBtnRef, notifOpen, setNotifOpen, unreadCount, userPhoto, userName, onSelectExercise }) {
+    const [search, setSearch] = useState('')
+    const [results, setResults] = useState([])
+    const [searchOpen, setSearchOpen] = useState(false)
+    const debounceRef = useRef(null)
+
+    const runSearch = useCallback((q) => {
+        const term = q.trim()
+        if (term.length < 2) {
+            setResults([])
+            return
+        }
+        apiFetch(`/exercises?search=${encodeURIComponent(term)}`)
+            .then((d) => setResults(Array.isArray(d) ? d.slice(0, 8) : []))
+            .catch(() => setResults([]))
+    }, [])
+
+    const handleChange = (value) => {
+        setSearch(value)
+        setSearchOpen(true)
+        if (debounceRef.current) clearTimeout(debounceRef.current)
+        debounceRef.current = setTimeout(() => runSearch(value), 350)
+    }
+
+    return (
+        <header className="cl-header">
+            <div className="cl-header-inner">
+                <div className="cl-header-left">
+                    <div className="cl-search-wrap" style={{ position: 'relative' }}>
+                        <Search className="cl-search-icon" />
+                        <input
+                            type="text"
+                            placeholder="Search exercises..."
+                            className="cl-search-input"
+                            aria-label="Search exercises"
+                            role="combobox"
+                            aria-expanded={searchOpen && results.length > 0}
+                            value={search}
+                            onChange={e => handleChange(e.target.value)}
+                            onFocus={() => setSearchOpen(true)}
+                            onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
+                        />
+                        {searchOpen && results.length > 0 && (
+                            <div className="cd-search-dropdown" role="listbox" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 60 }}>
+                                {results.map((r) => (
+                                    <div
+                                        key={r.id}
+                                        role="option"
+                                        aria-selected="false"
+                                        tabIndex={0}
+                                        className="cd-search-result"
+                                        onClick={() => { setSearch(''); setSearchOpen(false); onSelectExercise?.(r) }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault()
+                                                setSearch(''); setSearchOpen(false); onSelectExercise?.(r)
+                                            }
+                                        }}
+                                    >
+                                        <span className="cd-search-type">{r.category || 'exercise'}</span>
+                                        <div className="cd-search-result-info">
+                                            <span className="cd-search-result-label">{r.name}</span>
+                                            <span className="cd-search-result-sub">{r.muscleGroup || r.equipment || ''}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {searchOpen && search.trim().length >= 2 && results.length === 0 && (
+                            <div className="cd-search-dropdown" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 60 }}>
+                                <div className="cd-search-empty">No exercises found</div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <div className="cl-header-right">
+                    <div className="cl-notif-wrap" ref={notifBtnRef} onClick={() => setNotifOpen(!notifOpen)}>
+                        <Bell className="cl-notif-bell" />
+                        {unreadCount > 0 ? <span className="cl-notif-badge">{unreadCount}</span> : <div className="cl-notif-dot" />}
+                    </div>
+                    <div className="cl-avatar-wrap">
+                        {userPhoto ? (
+                            <img loading="lazy" src={userPhoto} alt="User avatar" className="cl-avatar" />
+                        ) : (
+                            <div className="cl-avatar cl-avatar-initials">{(userName || 'U').trim().charAt(0).toUpperCase()}</div>
+                        )}
+                        <ChevronDown className="cl-avatar-chevron" />
+                    </div>
+                </div>
+            </div>
+        </header>
+    )
+}
 
 const navSections = [
     { type: 'heading', label: 'Main' },
@@ -47,17 +148,19 @@ const navSections = [
     { type: 'item', label: 'Progress', icon: BarChart3 },
     { type: 'heading', label: 'Health' },
     { type: 'item', label: 'Daily Check-in', icon: Heart },
+    { type: 'item', label: 'Goals', icon: Target },
     { type: 'item', label: 'Macro Calculator', icon: Calculator },
     { type: 'item', label: 'Meal Planner', icon: Utensils },
     { type: 'item', label: 'Progress Photos', icon: Camera },
     { type: 'heading', label: 'Community' },
     { type: 'item', label: 'Training Videos', icon: Video },
     { type: 'item', label: 'Social Feed', icon: Users },
-    { type: 'item', label: 'Exercises', icon: Dumbbell },
+    { type: 'item', label: 'My Exercises', icon: Dumbbell },
     { type: 'item', label: 'Leaderboard', icon: Users },
     { type: 'heading', label: 'Account' },
     { type: 'item', label: 'Profile', icon: User },
     { type: 'item', label: 'Settings', icon: Settings },
+    { type: 'item', label: 'Support', icon: MessageCircle },
     { type: 'item', label: 'Upgrade Plan', icon: Crown },
     { type: 'item', label: 'Log Out', icon: LogOut },
 ]
@@ -77,6 +180,7 @@ export default function ClientDashboard() {
     const { showToast } = useToast()
     const { logout: authLogout } = useAuth()
     const [notifOpen, setNotifOpen] = useState(false)
+    const [unreadCount, setUnreadCount] = useState(0)
     const [profileModalOpen, setProfileModalOpen] = useState(false)
     const [profileForm, setProfileForm] = useState({
         firstName: '', lastName: '', email: '', photo: '',
@@ -92,7 +196,9 @@ export default function ClientDashboard() {
     const [countersVisible, setCountersVisible] = useState(false)
     const [barAnimated, setBarAnimated] = useState(false)
     const [data, setData] = useState(null)
+    const [planSubtitle, setPlanSubtitle] = useState('FITPOWER MEMBER')
     const [loading, setLoading] = useState(true)
+    const [loadError, setLoadError] = useState(null)
     const [profileData, setProfileData] = useState(null)
     const [profileLoading, setProfileLoading] = useState(false)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -122,19 +228,52 @@ export default function ClientDashboard() {
     const ringPos = useRef({ x: 0, y: 0 })
     const rafRef = useRef(null)
 
-    useEffect(() => {
+    const loadDashboard = useCallback(() => {
         apiFetch('/dashboard/client')
             .then(d => {
                 setData(d)
+                setLoadError(null)
                 if (d.waterCount !== undefined) setWaterCount(d.waterCount)
                 if (d.mealChecked) setMealChecked(d.mealChecked)
+                if (d.notifications) setUnreadCount(d.notifications.filter(n => !n.read).length)
             })
-            .catch(() => showToast('Error loading data'))
+            .catch((e) => setLoadError(e.message || 'Check your connection and try again.'))
             .finally(() => setLoading(false))
         apiFetch('/auth/me')
-            .then(u => setUserPhoto(u.photo || ''))
+            .then(u => setUserPhoto(mediaUrl(u.photo)))
             .catch(() => {})
-    }, [showToast])
+        // Show the real plan name instead of a hardcoded label.
+        apiFetch('/entitlements')
+            .then(e => setPlanSubtitle(e?.planName ? e.planName.toUpperCase() + ' MEMBER' : 'FREE MEMBER'))
+            .catch(() => {})
+    }, [])
+
+    useEffect(() => { loadDashboard() }, [loadDashboard])
+
+    // Refresh dashboard data whenever the user returns to this tab so new
+    // workouts, coach assignments and messages appear without manual reload.
+    useEffect(() => {
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') loadDashboard()
+        }
+        document.addEventListener('visibilitychange', onVisible)
+        return () => document.removeEventListener('visibilitychange', onVisible)
+    }, [loadDashboard])
+
+    // Poll unread notifications so new coach assignments/messages appear in
+    // near real time without a manual refresh.
+    useEffect(() => {
+        const fetchUnread = () => {
+            apiFetch('/notifications?unread=true')
+                .then(n => setUnreadCount(Number.isFinite(n?.unreadCount) ? n.unreadCount : (Array.isArray(n) ? n.length : 0)))
+                .catch(() => {})
+        }
+        fetchUnread()
+        const interval = setInterval(() => {
+            if (document.visibilityState === 'visible') fetchUnread()
+        }, 60000)
+        return () => clearInterval(interval)
+    }, [])
 
     useEffect(() => {
         if (activeNav === 'Profile') {
@@ -161,12 +300,15 @@ export default function ClientDashboard() {
     }, [showToast])
 
     useEffect(() => {
+        const lastMove = { t: 0 }
         const handleMouse = (e) => {
             cursorPos.current = { x: e.clientX, y: e.clientY }
+            lastMove.t = Date.now()
             if (cursorDotRef.current) {
                 cursorDotRef.current.style.left = e.clientX + 'px'
                 cursorDotRef.current.style.top = e.clientY + 'px'
             }
+            if (!rafRef.current) rafRef.current = requestAnimationFrame(animate)
         }
         const animate = () => {
             ringPos.current.x += (cursorPos.current.x - ringPos.current.x) * 0.15
@@ -175,7 +317,16 @@ export default function ClientDashboard() {
                 cursorRingRef.current.style.left = ringPos.current.x + 'px'
                 cursorRingRef.current.style.top = ringPos.current.y + 'px'
             }
-            rafRef.current = requestAnimationFrame(animate)
+            // Pause the loop when the cursor is idle and the ring has
+            // converged (saves CPU/battery on idle dashboards).
+            const converged =
+                Math.abs(ringPos.current.x - cursorPos.current.x) < 0.5 &&
+                Math.abs(ringPos.current.y - cursorPos.current.y) < 0.5
+            if (!converged || Date.now() - lastMove.t < 1000) {
+                rafRef.current = requestAnimationFrame(animate)
+            } else {
+                rafRef.current = null
+            }
         }
         document.addEventListener('mousemove', handleMouse)
         rafRef.current = requestAnimationFrame(animate)
@@ -272,6 +423,16 @@ export default function ClientDashboard() {
         })
     }
 
+    const handleFreezeStreak = async () => {
+        try {
+            await apiFetch('/streak/freeze', { method: 'POST', body: JSON.stringify({}) })
+            showToast('Streak protected for today — rest easy.')
+            apiFetch('/dashboard/client').then(setData).catch(() => {})
+        } catch (e) {
+            showToast(e.message || 'Could not freeze your streak')
+        }
+    }
+
     return (
         <div className="client-dashboard cl-grid-bg cl-noise">
             <div className="cl-cursor-dot" ref={cursorDotRef} />
@@ -282,9 +443,22 @@ export default function ClientDashboard() {
                 activeNav={activeNav}
                 onNavClick={handleNavClick}
                 userName={data?.userName || 'Athlete'}
-                userSubtitle="PRO PLAN"
-                avatarUrl={userPhoto || `https://picsum.photos/seed/${data?.id || 'user-1'}/80/80.jpg`}
+                userSubtitle={planSubtitle}
+                avatarUrl={userPhoto || ''}
                 role="client"
+                mobileRight={(
+                    <div className="cl-mobile-right">
+                        <button className="cl-mobile-icon-btn" ref={notifBtnRef} onClick={() => setNotifOpen(!notifOpen)} aria-label="Notifications">
+                            <Bell size={18} />
+                            <span className="cl-mobile-notif-dot" />
+                        </button>
+                        {userPhoto ? (
+                            <img loading="lazy" src={userPhoto} alt="User avatar" className="cl-avatar cl-mobile-avatar" />
+                        ) : (
+                            <div className="cl-avatar cl-avatar-initials cl-mobile-avatar">{(profileData?.firstName || data?.userName || 'U').trim().charAt(0).toUpperCase()}</div>
+                        )}
+                    </div>
+                )}
                 collapsed={sidebarCollapsed}
                 onToggle={handleSidebarToggle}
                 mobileOpen={sidebarMobileOpen}
@@ -292,12 +466,20 @@ export default function ClientDashboard() {
             />
 
             {loading && (
-                <div style={{
-                    position: 'fixed', inset: 0, zIndex: 9999,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: '#0a0a0f'
-                }}>
-                    <div className="cl-spinner" />
+                <div className="cl-dash-loading">
+                    <DashboardSkeleton />
+                </div>
+            )}
+
+            {!loading && loadError && (
+                <div className="cl-dash-error" role="alert">
+                    <div className="cl-dash-error-card">
+                        <h2>We couldn't load your dashboard</h2>
+                        <p>{loadError}</p>
+                        <button className="cl-btn cl-btn-primary" onClick={() => { setLoadError(null); setLoading(true); loadDashboard() }}>
+                            Try Again
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -313,28 +495,32 @@ export default function ClientDashboard() {
             <main className="cl-main" style={{ marginLeft: sidebarCollapsed ? 64 : 260 }}>
                 {activeNav === 'Dashboard' ? (
                     <>
-                        <header className="cl-header">
-                            <div className="cl-header-inner">
-                                <div className="cl-header-left">
-                                    <div className="cl-search-wrap">
-                                        <Search className="cl-search-icon" />
-                                        <input type="text" placeholder="Search workouts, exercises..." className="cl-search-input" />
-                                    </div>
-                                </div>
-                                <div className="cl-header-right">
-                                    <div className="cl-notif-wrap" ref={notifBtnRef} onClick={() => setNotifOpen(!notifOpen)}>
-                                        <Bell className="cl-notif-bell" />
-                                        <div className="cl-notif-dot" />
-                                    </div>
-                                    <div className="cl-avatar-wrap">
-                                        <img loading="lazy" src={userPhoto || 'https://picsum.photos/seed/user-1/36/36.jpg'} alt="User avatar" className="cl-avatar" />
-                                        <ChevronDown className="cl-avatar-chevron" />
-                                    </div>
-                                </div>
-                            </div>
-                        </header>
+                        <ClientHeader
+                            notifBtnRef={notifBtnRef}
+                            notifOpen={notifOpen}
+                            setNotifOpen={setNotifOpen}
+                            unreadCount={unreadCount}
+                            userPhoto={userPhoto}
+                            userName={profileData?.firstName || data?.userName || 'U'}
+                            onSelectExercise={() => setActiveNav('Exercises')}
+                        />
                         <div className="cl-content">
                     <div className="cl-space">
+                        {/* ═══ COACH APPLICATION STATUS ═══ */}
+                        {data?.coachApplication && (
+                            <div className={'cl-app-banner cl-app-' + data.coachApplication.status}>
+                                {data.coachApplication.status === 'pending' && (
+                                    <>Your coach application is under review. We'll notify you when an administrator processes it.</>
+                                )}
+                                {data.coachApplication.status === 'approved' && (
+                                    <>Your coach application was approved! Log out and log back in as a coach.</>
+                                )}
+                                {data.coachApplication.status === 'rejected' && (
+                                    <>Your coach application was rejected. Contact support if you have questions.</>
+                                )}
+                            </div>
+                        )}
+
                         {/* ═══ WELCOME + QUICK STATS ═══ */}
                         <section className="cl-fade">
                             <div className="cl-welcome-wrap">
@@ -346,15 +532,34 @@ export default function ClientDashboard() {
                                         </h1>
                                         <p className="cl-welcome-desc">
                                             You're on a <span className="cl-highlight-yellow"><strong>{data?.kpis?.streak || 0}-day streak</strong></span>.
-                                            Keep pushing.
+                                            {data?.streak?.atRisk
+                                                ? ' Complete a workout today to keep it.'
+                                                : ' Keep pushing.'}
                                         </p>
+                                        {data?.streak?.atRisk && (
+                                            <button
+                                                className="cl-streak-freeze-btn"
+                                                disabled={!data?.streak?.freezeAvailable}
+                                                onClick={handleFreezeStreak}
+                                            >
+                                                <Snowflake size={14} />
+                                                {data?.streak?.freezeAvailable
+                                                    ? 'Freeze streak for today (1/month)'
+                                                    : 'Freeze used this month'}
+                                            </button>
+                                        )}
                                     </div>
                                     <button
                                         className="cl-btn cl-btn-primary"
                                         style={{ marginTop: '24px' }}
-                                        onClick={() => { if (data?.nextWorkout) setModalOpen(true) }}
+                                        onClick={() => {
+                                            if (data?.nextWorkout) setModalOpen(true)
+                                            else if (data?.activeProgram) setActiveNav('Workouts')
+                                            else setActiveNav('Programs')
+                                        }}
                                     >
-                                        <Play className="" style={{ width: 16, height: 16 }} /> Start Today's Workout
+                                        <Play className="" style={{ width: 16, height: 16 }} />
+                                        {data?.nextWorkout ? "Start Today's Workout" : data?.activeProgram ? 'View My Workouts' : 'Find a Program'}
                                     </button>
                                 </div>
                                 <div className="cl-kpi-grid">
@@ -366,9 +571,9 @@ export default function ClientDashboard() {
                                     <div className="cl-card cl-kpi-card">
                                         <div className="cl-kpi-icon-box cl-yellow"><Dumbbell /></div>
                                         <div className="cl-kpi-value">
-                                            {data?.kpis?.workouts?.split('/')[0] || '0'}<span className="cl-kpi-value-sub">/{data?.kpis?.workouts?.split('/')[1] || '6'}</span>
+                                            {data?.kpis?.workouts?.split('/')[0] || '—'}<span className="cl-kpi-value-sub">/{data?.kpis?.workouts?.split('/')[1] || '—'}</span>
                                         </div>
-                                        <div className="cl-kpi-label">Workouts this week</div>
+                                        <div className="cl-kpi-label">Workouts this month</div>
                                     </div>
                                     <div className="cl-card cl-kpi-card">
                                         <div className="cl-kpi-icon-box cl-green"><Timer /></div>
@@ -393,7 +598,7 @@ export default function ClientDashboard() {
                                 </div>
                                 <div style={{ marginBottom: 8 }}>
                                     <h4 style={{ fontWeight: 600, color: '#fff', fontSize: 16, marginBottom: 4 }}>{data?.activeProgram?.name || 'No active program'}</h4>
-                                    <p style={{ color: '#737373', fontSize: 12, marginBottom: 16 }}>Coach: {data?.activeProgram?.coach || '—'} · {data?.activeProgram?.duration || ''}</p>
+                                    <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>Coach: {data?.activeProgram?.coach || '—'} · {data?.activeProgram?.duration || ''}</p>
                                 </div>
                                 <div className="cl-prog-ring-wrap">
                                     <div className="cl-prog-ring">
@@ -424,7 +629,7 @@ export default function ClientDashboard() {
                                                 <span className="cl-prog-bar-value">{data?.activeProgram?.avgRPE || '—'}</span>
                                             </div>
                                             <div className="cl-prog-bar-track">
-                                                <div className="cl-prog-bar-fill cl-green" style={{ width: barAnimated ? '72%' : '0%' }} />
+                                                <div className="cl-prog-bar-fill cl-green" style={{ width: barAnimated ? (parseFloat(data?.activeProgram?.avgRPE || '0') * 10) + '%' : '0%' }} />
                                             </div>
                                         </div>
                                     </div>
@@ -434,21 +639,25 @@ export default function ClientDashboard() {
 
                                     <div className="cl-card">
                                 <div className="cl-section-hdr">
-                                    <h3 className="cl-section-title">This Week</h3>
-                                    <span className="cl-section-sub">Total: <span style={{ color: '#4ade80', marginLeft: 4 }}>{data?.kpis?.totalHours || 0}h</span></span>
+                                    <h3 className="cl-section-title">This Month</h3>
                                 </div>
-                                <div className="cl-weekly-chart">
-                                    {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => (
-                                        <div key={day} className="cl-bar-col">
-                                            <span className="cl-bar-label">{day}</span>
-                                            <div
-                                                className={'cl-bar-fill' + (i < 5 ? ' cl-active' : ' cl-dim')}
-                                                style={{ height: barAnimated ? (i < 5 ? 60 + Math.sin(i * 10) * 20 + 60 : 8) + '%' : '0%' }}
-                                            />
-                                            <span className={'cl-bar-value' + (i >= 5 ? ' cl-dim' : '')}>{i < 5 ? '—' : '—'}</span>
-                                        </div>
-                                    ))}
+                                <div className="cl-month-summary">
+                                    <div className="cl-month-row">
+                                        <span className="cl-month-label">Workouts completed</span>
+                                        <span className="cl-month-value">{data?.kpis?.workouts || '—'}</span>
+                                    </div>
+                                    <div className="cl-month-row">
+                                        <span className="cl-month-label">Total time</span>
+                                        <span className="cl-month-value">{data?.kpis?.totalHours || 0}h</span>
+                                    </div>
+                                    <div className="cl-month-row">
+                                        <span className="cl-month-label">Avg. RPE</span>
+                                        <span className="cl-month-value">{data?.activeProgram?.avgRPE || '—'}</span>
+                                    </div>
                                 </div>
+                                {(data?.kpis?.workouts?.split('/')[0] === '0' || !data?.kpis?.workouts) && (
+                                    <p className="cl-month-hint">Complete a workout session to start building your month.</p>
+                                )}
                             </div>
                         </section>
 
@@ -534,20 +743,19 @@ export default function ClientDashboard() {
                                 className="cl-card cl-next-card"
                                 onClick={() => { if (data?.nextWorkout) setModalOpen(true) }}
                             >
-                                <div className="cl-next-bg">
-                                    <img loading="lazy" src="https://picsum.photos/seed/fitpower-hiit/600/400.jpg" alt="Workout preview" />
+                                <div className="cl-next-bg cl-next-bg-plain">
+                                    <Dumbbell size={48} style={{ color: 'rgba(255, 214, 0, 0.25)' }} />
                                 </div>
                                 <div className="cl-next-overlay" />
                                 <div className="cl-next-content">
                                     <span className="cl-next-badge">Next up</span>
                                     <h4 className="cl-next-title">{data?.nextWorkout?.title || 'No upcoming workout'}</h4>
-                                    <p className="cl-next-desc">{data?.nextWorkout?.desc || 'Rest and recover'}</p>
-                                    {data?.nextWorkout && (
+                                    <p className="cl-next-desc">{data?.nextWorkout?.date ? data.nextWorkout.date + (data.nextWorkout.time ? ' · ' + data.nextWorkout.time : '') : 'Rest and recover'}</p>
+                                    {data?.nextWorkout?.trainer && (
                                         <div className="cl-next-coach">
-                                            <img loading="lazy" src="https://picsum.photos/seed/coach-alex/60/60.jpg" alt="Coach" className="cl-next-coach-img" />
                                             <div>
-                                                <div className="cl-next-coach-name">{data.nextWorkout.coach}</div>
-                                                <div className="cl-next-coach-time">Starts at {data.nextWorkout.startsAt}</div>
+                                                <div className="cl-next-coach-name">{data.nextWorkout.trainer}</div>
+                                                <div className="cl-next-coach-time">Coach</div>
                                             </div>
                                         </div>
                                     )}
@@ -555,9 +763,16 @@ export default function ClientDashboard() {
                             </div>
                         </section>
 
-                        {/* ═══ SMART ROUTINE ═══ */}
+                        {/* ═══ SMART ROUTINE (AI-powered programming — Pro+) ═══ */}
                         <section className="cl-fade-d3">
-                            <SmartRoutine />
+                            <FeatureGate
+                                feature="ai_programming"
+                                mode="locked"
+                                fallbackTitle="AI-powered programming"
+                                fallbackDesc="Generates your daily smart routine with the Pro plan. This feature requires the Pro plan."
+                            >
+                                <SmartRoutine />
+                            </FeatureGate>
                         </section>
 
                         {/* ═══ BODY METRICS + MEAL PLAN ═══ */}
@@ -565,7 +780,7 @@ export default function ClientDashboard() {
                             <div className="cl-card-static">
                                 <div className="cl-section-hdr">
                                     <h3 className="cl-section-title-sm">Body Metrics</h3>
-                                    <span className="cl-section-sub">Updated 3 days ago</span>
+                                    <span className="cl-section-sub">{data?.bodyMetrics?.updated ? 'Updated ' + data.bodyMetrics.updated : ''}</span>
                                 </div>
                                 <div className="cl-metrics-grid">
                                     <div className="cl-metric-item">
@@ -621,12 +836,6 @@ export default function ClientDashboard() {
                         <section className="cl-fade-d4">
                             <div className="cl-section-hdr">
                                 <h3 className="cl-section-title">Recent Activity</h3>
-                                <button
-                                    className="" style={{ color: 'var(--power-500)', fontSize: 14, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: 4 }}
-                                    onClick={() => showToast('All activity shown below')}
-                                >
-                                    View all <ArrowRight style={{ width: 16, height: 16 }} />
-                                </button>
                             </div>
                             <div className="cl-activity">
                                 {activities.map((a, i) => (
@@ -679,42 +888,42 @@ export default function ClientDashboard() {
         </div>
     ) : activeNav === 'Training Videos' ? (
         <ClientTrainingVideos />
-    ) : activeNav === 'Exercises' ? (
+    ) : activeNav === 'My Exercises' ? (
         <ExerciseLibrary />
     ) : activeNav === 'Daily Check-in' ? (
         <DailyCheckin />
     ) : activeNav === 'Meal Planner' ? (
-        <MealPlanner />
+        <FeatureGate
+            feature="custom_nutrition"
+            mode="locked"
+            fallbackTitle="Custom nutrition plans"
+            fallbackDesc="Plan your meals with personalized meal plans. This feature requires the Pro plan."
+        >
+            <MealPlanner />
+        </FeatureGate>
     ) : activeNav === 'Progress Photos' ? (
         <ProgressPhotos />
     ) : activeNav === 'Settings' ? (
         <SettingsPanel />
     ) : activeNav === 'Macro Calculator' ? (
         <TDEECalculator />
+    ) : activeNav === 'Goals' ? (
+        <ClientGoals />
+    ) : activeNav === 'Support' ? (
+        <ClientTickets />
     ) : activeNav === 'Leaderboard' ? (
         <Leaderboard />
     ) : activeNav === 'Social Feed' ? (
         <div className="cl-social-feed-view">
-            <header className="cl-header">
-                <div className="cl-header-inner">
-                    <div className="cl-header-left">
-                        <div className="cl-search-wrap">
-                            <Search className="cl-search-icon" />
-                            <input type="text" placeholder="Search workouts, exercises..." className="cl-search-input" />
-                        </div>
-                    </div>
-                    <div className="cl-header-right">
-                        <div className="cl-notif-wrap" ref={notifBtnRef} onClick={() => setNotifOpen(!notifOpen)}>
-                            <Bell className="cl-notif-bell" />
-                            <div className="cl-notif-dot" />
-                        </div>
-                        <div className="cl-avatar-wrap">
-                            <img loading="lazy" src={userPhoto || 'https://picsum.photos/seed/user-1/36/36.jpg'} alt="User avatar" className="cl-avatar" />
-                            <ChevronDown className="cl-avatar-chevron" />
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <ClientHeader
+                notifBtnRef={notifBtnRef}
+                notifOpen={notifOpen}
+                setNotifOpen={setNotifOpen}
+                unreadCount={unreadCount}
+                userPhoto={userPhoto}
+                userName={profileData?.firstName || data?.userName || 'U'}
+                onSelectExercise={() => setActiveNav('Exercises')}
+            />
             <div className="cl-content">
                 <div className="cl-space">
                     <SocialFeed />
@@ -724,26 +933,15 @@ export default function ClientDashboard() {
         </div>
     ) : activeNav === 'Profile' ? (
         <div className="cl-profile-view">
-            <header className="cl-header">
-                <div className="cl-header-inner">
-                    <div className="cl-header-left">
-                        <div className="cl-search-wrap">
-                            <Search className="cl-search-icon" />
-                            <input type="text" placeholder="Search workouts, exercises..." className="cl-search-input" />
-                        </div>
-                    </div>
-                    <div className="cl-header-right">
-                        <div className="cl-notif-wrap" ref={notifBtnRef} onClick={() => setNotifOpen(!notifOpen)}>
-                            <Bell className="cl-notif-bell" />
-                            <div className="cl-notif-dot" />
-                        </div>
-                        <div className="cl-avatar-wrap">
-                            <img loading="lazy" src={userPhoto || 'https://picsum.photos/seed/user-1/36/36.jpg'} alt="User avatar" className="cl-avatar" />
-                            <ChevronDown className="cl-avatar-chevron" />
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <ClientHeader
+                notifBtnRef={notifBtnRef}
+                notifOpen={notifOpen}
+                setNotifOpen={setNotifOpen}
+                unreadCount={unreadCount}
+                userPhoto={userPhoto}
+                userName={profileData?.firstName || data?.userName || 'U'}
+                onSelectExercise={() => setActiveNav('Exercises')}
+            />
             <div className="cl-content">
                 <div className="cl-space">
                     {profileLoading ? (
@@ -753,7 +951,7 @@ export default function ClientDashboard() {
                             <div className="cl-profile-cover">
                                 <div className="cl-profile-avatar-large">
                                     {profileData.photo ? (
-                                        <img src={profileData.photo} alt="" />
+                                        <img src={mediaUrl(profileData.photo)} alt="" />
                                     ) : (
                                         <span>{profileData.firstName?.[0]}{profileData.lastName?.[0]}</span>
                                     )}
@@ -799,26 +997,15 @@ export default function ClientDashboard() {
         </div>
     ) : activeNav === 'Upgrade Plan' ? (
         <div className="cl-upgrade-view">
-            <header className="cl-header">
-                <div className="cl-header-inner">
-                    <div className="cl-header-left">
-                        <div className="cl-search-wrap">
-                            <Search className="cl-search-icon" />
-                            <input type="text" placeholder="Search workouts, exercises..." className="cl-search-input" />
-                        </div>
-                    </div>
-                    <div className="cl-header-right">
-                        <div className="cl-notif-wrap" ref={notifBtnRef} onClick={() => setNotifOpen(!notifOpen)}>
-                            <Bell className="cl-notif-bell" />
-                            <div className="cl-notif-dot" />
-                        </div>
-                        <div className="cl-avatar-wrap">
-                            <img loading="lazy" src={userPhoto || 'https://picsum.photos/seed/user-1/36/36.jpg'} alt="User avatar" className="cl-avatar" />
-                            <ChevronDown className="cl-avatar-chevron" />
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <ClientHeader
+                notifBtnRef={notifBtnRef}
+                notifOpen={notifOpen}
+                setNotifOpen={setNotifOpen}
+                unreadCount={unreadCount}
+                userPhoto={userPhoto}
+                userName={profileData?.firstName || data?.userName || 'U'}
+                onSelectExercise={() => setActiveNav('Exercises')}
+            />
             <div className="cl-content">
                 <div className="cl-space">
                     <SubscriptionPlans />
@@ -828,26 +1015,15 @@ export default function ClientDashboard() {
         </div>
     ) : (
         <>
-            <header className="cl-header">
-                <div className="cl-header-inner">
-                    <div className="cl-header-left">
-                        <div className="cl-search-wrap">
-                            <Search className="cl-search-icon" />
-                            <input type="text" placeholder="Search workouts, exercises..." className="cl-search-input" />
-                        </div>
-                    </div>
-                    <div className="cl-header-right">
-                        <div className="cl-notif-wrap" ref={notifBtnRef} onClick={() => setNotifOpen(!notifOpen)}>
-                            <Bell className="cl-notif-bell" />
-                            <div className="cl-notif-dot" />
-                        </div>
-                        <div className="cl-avatar-wrap">
-                            <img loading="lazy" src={userPhoto || 'https://picsum.photos/seed/user-1/36/36.jpg'} alt="User avatar" className="cl-avatar" />
-                            <ChevronDown className="cl-avatar-chevron" />
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <ClientHeader
+                notifBtnRef={notifBtnRef}
+                notifOpen={notifOpen}
+                setNotifOpen={setNotifOpen}
+                unreadCount={unreadCount}
+                userPhoto={userPhoto}
+                userName={profileData?.firstName || data?.userName || 'U'}
+                onSelectExercise={() => setActiveNav('Exercises')}
+            />
             <div className="cl-content">
                 <div className="cl-space">
                     <div className="cl-spacer" />
@@ -861,49 +1037,26 @@ export default function ClientDashboard() {
             <div className={'cl-modal-overlay' + (modalOpen ? ' cl-modal-open' : '')} onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false) }}>
                 <div className="cl-modal-box">
                     <div className="cl-modal-img-wrap">
-                        <img loading="lazy" src="https://picsum.photos/seed/fitpower-upper/800/400.jpg" alt="Activity preview" className="cl-modal-img" />
+                        <div className="cl-modal-img cl-modal-img-plain">
+                            <Dumbbell size={64} style={{ color: 'rgba(255, 214, 0, 0.25)' }} />
+                        </div>
                         <div className="cl-modal-img-overlay" />
                         <button className="cl-modal-close-btn" onClick={() => setModalOpen(false)}><X /></button>
                         <div className="cl-modal-img-content">
-                            <span className="cl-modal-tag">Strength · Upper Body</span>
-                            <h3 className="cl-modal-img-title">Upper Body Power</h3>
-                            <p className="cl-modal-img-sub">Coach Alex · 50 min · Intermediate</p>
+                            <span className="cl-modal-tag">Scheduled session</span>
+                            <h3 className="cl-modal-img-title">{data?.nextWorkout?.title || 'Workout'}</h3>
+                            <p className="cl-modal-img-sub">{data?.nextWorkout?.trainer || '—'}{data?.nextWorkout?.date ? ' · ' + data.nextWorkout.date + (data.nextWorkout.time ? ' ' + data.nextWorkout.time : '') : ''}</p>
                         </div>
                     </div>
                     <div className="cl-modal-body">
-                        <div className="cl-modal-stats">
-                            <div className="cl-modal-stat">
-                                <div className="cl-modal-stat-value">12</div>
-                                <div className="cl-modal-stat-label">Exercises</div>
-                            </div>
-                            <div className="cl-modal-stat">
-                                <div className="cl-modal-stat-value cl-yellow">4</div>
-                                <div className="cl-modal-stat-label">Supersets</div>
-                            </div>
-                            <div className="cl-modal-stat">
-                                <div className="cl-modal-stat-value">~520</div>
-                                <div className="cl-modal-stat-label">Calories</div>
-                            </div>
-                        </div>
-                        <div className="cl-modal-exercises">
-                            {[
-                                'Bench Press — 4×10 @ 70% 1RM',
-                                'Incline Dumbbell Press — 3×12',
-                                'Cable Flyes — 3×15',
-                                'Lateral Raises — 3×12',
-                                'Tricep Pushdowns — 3×15',
-                            ].map((ex, i) => (
-                                <div key={i} className="cl-modal-ex">
-                                    <div className="cl-modal-ex-num">{i + 1}</div>
-                                    <span className="cl-modal-ex-text">{ex}</span>
-                                </div>
-                            ))}
-                        </div>
+                        <p className="cl-modal-note">
+                            This session is scheduled in your calendar. You can see its exercises and complete it from the Workouts section.
+                        </p>
                         <button
                             className="cl-modal-start"
-                            onClick={() => { setModalOpen(false) }}
+                            onClick={() => { setModalOpen(false); setActiveNav('Workouts') }}
                         >
-                            Start Workout Session
+                            Go to My Workouts
                         </button>
                     </div>
                 </div>

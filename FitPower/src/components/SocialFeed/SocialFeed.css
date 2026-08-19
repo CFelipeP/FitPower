@@ -18,18 +18,24 @@
 .social-feed-author-name { font-size: 14px; font-weight: 600; color: var(--text-primary); display: block; }
 .social-feed-post-time { font-size: 12px; color: var(--text-muted); }
 .social-feed-type-icon { color: var(--power-500); }
-.social-feed-post-content { font-size: 14px; color: var(--text-primary); line-height: 1.6; margin-bottom: 12px; }
-.social-feed-post-actions { display: flex; gap: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
-.social-feed-action-btn { display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 13px; padding: 4px 8px; border-radius: 8px; transition: all 0.2s; }
+.social-feed-post-content { font-size: 14px; color: var(--text-primary); line-height: 1.6; margin-bottom: 12px; overflow-wrap: anywhere; }
+.social-feed-post-actions { display: flex; gap: 16px; padding-top: 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.social-feed-action-btn { display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 13px; padding: 8px 12px; border-radius: 8px; transition: all 0.2s; min-height: 40px; }
 .social-feed-action-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
 .social-feed-action-btn.liked { color: var(--power-500); }
 .social-feed-comment-input-row { margin-top: 8px; }
-.social-feed-comment-input { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-hover); color: var(--text-primary); font-size: 13px; outline: none; }
+.social-feed-comment-input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-hover); color: var(--text-primary); font-size: 13px; outline: none; }
 .social-feed-comment-input:focus { border-color: var(--power-500); }
 
 @media (max-width: 480px) {
     .social-feed-post-actions { gap: 10px; }
-    .social-feed-post-actions button { font-size: 12px; padding: 6px 10px; }
+    .social-feed-post-actions button { font-size: 12px; padding: 10px 12px; min-height: 44px; }
     .social-feed-composer { padding: 14px; }
-    .social-feed-composer-input { font-size: 14px; }
+    .social-feed-composer-input { font-size: 16px; }
+    .social-feed-input, .social-feed-comment-input { font-size: 16px; }
+}
+
+@media (max-width: 640px) {
+    .social-feed-container { padding: 16px 12px; }
+    .social-feed-post-header { flex-wrap: wrap; }
 }

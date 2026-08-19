@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import { Plus, X, Edit3, Trash2, Utensils } from 'lucide-react'
 
@@ -24,9 +25,9 @@ export default function AdminRecipes() {
       const q = search ? `?search=${encodeURIComponent(search)}` : ''
       const data = await apiFetch(`/recipes${q}`)
       setRecipes(Array.isArray(data) ? data : [])
-    } catch { showToast('Error loading recipes') }
+    } catch { swalError('Error loading recipes') }
     finally { setLoading(false) }
-  }, [search, showToast])
+  }, [search])
 
   useEffect(() => { load() }, [load])
 
@@ -53,16 +54,22 @@ export default function AdminRecipes() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.name) { showToast('Name is required'); return }
+    if (!form.name) { swalError('Name is required'); return }
+    const calories = form.calories ? parseInt(form.calories, 10) : null
+    const protein = form.protein ? parseFloat(form.protein) : null
+    const carbs = form.carbs ? parseFloat(form.carbs) : null
+    const fat = form.fat ? parseFloat(form.fat) : null
+    const prepTime = form.prepTime ? parseInt(form.prepTime, 10) : null
+    if (calories !== null && (!Number.isFinite(calories) || calories < 0 || calories > 10000)) { swalError('Calories must be between 0 and 10000'); return }
+    for (const [label, val] of [['Protein', protein], ['Carbs', carbs], ['Fat', fat]]) {
+      if (val !== null && (!Number.isFinite(val) || val < 0 || val > 500)) { swalError(`${label} must be between 0 and 500 g`); return }
+    }
+    if (prepTime !== null && (!Number.isFinite(prepTime) || prepTime < 1 || prepTime > 600)) { swalError('Prep time must be between 1 and 600 minutes'); return }
     setSaving(true)
     try {
       const payload = {
         name: form.name, mealType: form.mealType, description: form.description || null,
-        calories: form.calories ? parseInt(form.calories) : null,
-        protein: form.protein ? parseFloat(form.protein) : null,
-        carbs: form.carbs ? parseFloat(form.carbs) : null,
-        fat: form.fat ? parseFloat(form.fat) : null,
-        prepTime: form.prepTime ? parseInt(form.prepTime) : null,
+        calories, protein, carbs, fat, prepTime,
         difficulty: form.difficulty, imageUrl: form.imageUrl || null,
         ingredients: form.ingredients ? form.ingredients.split('\n').filter(Boolean) : [],
         instructions: form.instructions || null,
@@ -75,7 +82,7 @@ export default function AdminRecipes() {
         showToast('Recipe created!')
       }
       setModalOpen(false); load()
-    } catch (e) { showToast(e.message || 'Error saving recipe') }
+    } catch (e) { swalError(e.message || 'Error saving recipe') }
     finally { setSaving(false) }
   }
 
@@ -83,7 +90,7 @@ export default function AdminRecipes() {
     try {
       await apiFetch(`/recipes/${id}`, { method: 'DELETE' })
       showToast('Recipe deleted'); setConfirmDelete(null); load()
-    } catch { showToast('Error deleting recipe') }
+    } catch { swalError('Error deleting recipe') }
   }
 
   const mealLabels = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' }
@@ -143,7 +150,7 @@ export default function AdminRecipes() {
             <div className="ad-modal-header"><h3>{editing ? 'Edit Recipe' : 'New Recipe'}</h3>
               <button className="ad-modal-close" onClick={() => setModalOpen(false)}><X /></button>
             </div>
-            <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: 24 }}>
+            <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, padding: 24 }}>
               <div style={{ gridColumn: '1 / -1' }}><label className="ad-form-label">Name *</label>
                 <input name="name" value={form.name} onChange={handleChange} className="ad-content-search" style={{ width: '100%' }} required /></div>
               <div><label className="ad-form-label">Meal Type</label>

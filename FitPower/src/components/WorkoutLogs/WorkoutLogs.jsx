@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import { Dumbbell, Plus, X } from 'lucide-react'
 import './WorkoutLogs.css'
@@ -28,7 +29,7 @@ export default function WorkoutLogs() {
             setTotal(data.total || 0)
             setPage(data.page || 1)
         } catch {
-            showToast('Error loading workout logs')
+            swalError('Error loading workout logs')
         } finally {
             setLoading(false)
         }
@@ -60,20 +61,35 @@ export default function WorkoutLogs() {
         e.preventDefault()
         const validExercises = logExercises.filter(ex => ex.exerciseId && ex.sets)
         if (!validExercises.length) {
-            showToast('Add at least one exercise with sets')
+            swalError('Add at least one exercise with sets')
             return
+        }
+        for (const ex of validExercises) {
+            const sets = parseInt(ex.sets, 10)
+            if (Number.isNaN(sets) || sets < 1 || sets > 100) {
+                swalError('Sets must be a number between 1 and 100')
+                return
+            }
+            const weight = ex.weight ? parseFloat(ex.weight) : null
+            if (ex.weight && (Number.isNaN(weight) || weight < 0 || weight > 2000)) {
+                swalError('Weight must be a number between 0 and 2000')
+                return
+            }
         }
 
         setSubmitting(true)
         try {
-            const body = { exercises: validExercises.map(ex => ({
-                exerciseId: parseInt(ex.exerciseId),
-                sets: parseInt(ex.sets),
-                reps: ex.reps || null,
-                weight: ex.weight || null,
-                notes: ex.notes || null,
-            }))}
-            if (sessionId) body.sessionId = parseInt(sessionId)
+            const body = { exercises: validExercises.map(ex => {
+                const weight = ex.weight ? parseFloat(ex.weight) : null
+                return {
+                    exerciseId: parseInt(ex.exerciseId, 10),
+                    sets: parseInt(ex.sets, 10),
+                    reps: ex.reps || null,
+                    weight: Number.isFinite(weight) ? weight : null,
+                    notes: ex.notes || null,
+                }
+            })}
+            if (sessionId) body.sessionId = parseInt(sessionId, 10)
 
             await apiFetch('/workout-logs', { method: 'POST', body: JSON.stringify(body) })
             showToast('Workout logged!')
@@ -82,7 +98,7 @@ export default function WorkoutLogs() {
             setSessionId('')
             loadLogs()
         } catch (e) {
-            showToast(e.message || 'Error logging workout')
+            swalError(e.message || 'Error logging workout')
         } finally {
             setSubmitting(false)
         }
@@ -149,6 +165,8 @@ export default function WorkoutLogs() {
                                         value={ex.sets}
                                         onChange={e => updateExercise(i, 'sets', e.target.value)}
                                         min="1"
+                                        max="100"
+                                        step="1"
                                         required
                                     />
                                     <input
@@ -159,11 +177,14 @@ export default function WorkoutLogs() {
                                         onChange={e => updateExercise(i, 'reps', e.target.value)}
                                     />
                                     <input
-                                        type="text"
+                                        type="number"
                                         className="wl-input"
                                         placeholder="Weight (e.g. 135)"
                                         value={ex.weight}
                                         onChange={e => updateExercise(i, 'weight', e.target.value)}
+                                        min="0"
+                                        max="2000"
+                                        step="0.5"
                                     />
                                 </div>
                                 <input

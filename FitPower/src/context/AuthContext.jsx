@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { apiFetch } from '../lib/api'
 
 const AuthContext = createContext(null)
@@ -106,11 +106,15 @@ export function AuthProvider({ children }) {
         return { user: data.data.user, needsPasswordSetup: data.data.needsPasswordSetup }
     }, [saveToken])
 
-    const isAuthenticated = !!token && !!user
-    const role = user?.role || localStorage.getItem('role')
+    const isAuthenticated = initialized && !!token && !!user
+    const role = user?.role ?? localStorage.getItem('role')
+
+    const value = useMemo(() => ({
+        user, token, loading, login, googleLogin, register, logout, isAuthenticated, role, initialized,
+    }), [user, token, loading, login, googleLogin, register, logout, isAuthenticated, role, initialized])
 
     return (
-        <AuthContext.Provider value={{ user, token, loading, login, googleLogin, register, logout, isAuthenticated, role, initialized }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     )

@@ -8,10 +8,12 @@ import { I18nProvider } from './context/I18nContext'
 import { useScrollRestore } from './hooks/useScrollRestore'
 
 import { AuthProvider } from './context/AuthContext'
+import { EntitlementsProvider } from './context/EntitlementsContext'
 import Toast from './components/Toast/Toast.jsx'
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary.jsx'
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute.jsx'
 import { DashboardSkeleton } from './components/LoadingSkeleton/LoadingSkeleton.jsx'
+import SessionShell from './components/SessionShell/SessionShell.jsx'
 
 const Navbar = lazy(() => import('./components/Navbar/Navbar.jsx'))
 const Hero = lazy(() => import('./components/Hero/Hero.jsx'))
@@ -29,6 +31,8 @@ const Register = lazy(() => import('./components/Register/Register.jsx'))
 const TrainerRegister = lazy(() => import('./components/TrainerRegister/TrainerRegister.jsx'))
 const AdminDashboard = lazy(() => import('./components/AdminDashboard/AdminDashboard.jsx'))
 const CoachDashboard = lazy(() => import('./components/CoachDashboard/CoachDashboard.jsx'))
+const CoachConnectResult = lazy(() => import('./components/CoachDashboard/CoachConnectResult.jsx'))
+const CoachTickets = lazy(() => import('./components/CoachTickets/CoachTickets.jsx'))
 const CoachCatalog = lazy(() => import('./components/CoachCatalog/CoachCatalog.jsx'))
 const CoachProfile = lazy(() => import('./components/CoachProfile/CoachProfile.jsx'))
 const ClientDashboard = lazy(() => import('./components/ClientDashboard/ClientDashboard.jsx'))
@@ -75,6 +79,7 @@ function App() {
             <ToastProvider>
                 <AuthProvider>
                 <I18nProvider>
+                <EntitlementsProvider>
                 <ErrorBoundary>
                     <Toast />
                     <Suspense fallback={null}><Navbar /></Suspense>
@@ -93,6 +98,16 @@ function App() {
                             <Route path="/coach/dashboard" element={
                                 <ProtectedRoute allowedRoles={['coach']}>
                                     <Suspense fallback={<DashboardSkeleton />}><CoachDashboard /></Suspense>
+                                </ProtectedRoute>
+                            } />
+                            <Route path="/coach/connect-stripe/return" element={
+                                <ProtectedRoute allowedRoles={['coach']}>
+                                    <Suspense fallback={<DashboardSkeleton />}><CoachConnectResult mode="return" /></Suspense>
+                                </ProtectedRoute>
+                            } />
+                            <Route path="/coach/connect-stripe/refresh" element={
+                                <ProtectedRoute allowedRoles={['coach']}>
+                                    <Suspense fallback={<DashboardSkeleton />}><CoachConnectResult mode="refresh" /></Suspense>
                                 </ProtectedRoute>
                             } />
                             <Route path="/client/dashboard" element={
@@ -140,32 +155,44 @@ function App() {
                                     <Suspense fallback={<DashboardSkeleton />}><CoachAssignRoutine /></Suspense>
                                 </ProtectedRoute>
                             } />
+                            <Route path="/coach/tickets" element={
+                                <SessionShell>
+                                    <ProtectedRoute allowedRoles={['coach']}>
+                                        <Suspense fallback={<DashboardSkeleton />}><CoachTickets /></Suspense>
+                                    </ProtectedRoute>
+                                </SessionShell>
+                            } />
                             <Route path="/client/goals" element={
-                                <ProtectedRoute allowedRoles={['client']}>
-                                    <Suspense fallback={<DashboardSkeleton />}><ClientGoalsPage /></Suspense>
-                                </ProtectedRoute>
+                                <SessionShell>
+                                    <ProtectedRoute allowedRoles={['client']}>
+                                        <Suspense fallback={<DashboardSkeleton />}><ClientGoalsPage /></Suspense>
+                                    </ProtectedRoute>
+                                </SessionShell>
                             } />
                             <Route path="/client/nutrition" element={
-                                <ProtectedRoute allowedRoles={['client']}>
-                                    <Suspense fallback={<DashboardSkeleton />}><TDEECalculatorPage /></Suspense>
-                                </ProtectedRoute>
+                                <SessionShell>
+                                    <ProtectedRoute allowedRoles={['client']}>
+                                        <Suspense fallback={<DashboardSkeleton />}><TDEECalculatorPage /></Suspense>
+                                    </ProtectedRoute>
+                                </SessionShell>
                             } />
-                            <Route path="/forum" element={<Forum />} />
-                            <Route path="/blog" element={<Blog />} />
+                            <Route path="/forum" element={<SessionShell><Forum /></SessionShell>} />
+                            <Route path="/blog" element={<SessionShell><Blog /></SessionShell>} />
                             <Route path="/blog/:slug" element={
-                                <Suspense fallback={<DashboardSkeleton />}><BlogArticle /></Suspense>
+                                <SessionShell><Suspense fallback={<DashboardSkeleton />}><BlogArticle /></Suspense></SessionShell>
                             } />
-                            <Route path="/coaches" element={<Suspense fallback={<DashboardSkeleton />}><CoachCatalog /></Suspense>} />
-                            <Route path="/coaches/:id" element={<Suspense fallback={<DashboardSkeleton />}><CoachProfile /></Suspense>} />
-                            <Route path="/leaderboard" element={<Leaderboard />} />
-                            <Route path="/plans" element={<SubscriptionPlans standalone={true} />} />
-                            <Route path="/payment/success" element={<PaymentResult />} />
-                            <Route path="/payment/cancel" element={<PaymentResult />} />
-                            <Route path="/checkout" element={<CheckoutPage />} />
+                            <Route path="/coaches" element={<SessionShell><Suspense fallback={<DashboardSkeleton />}><CoachCatalog /></Suspense></SessionShell>} />
+                            <Route path="/coaches/:id" element={<SessionShell><Suspense fallback={<DashboardSkeleton />}><CoachProfile /></Suspense></SessionShell>} />
+                            <Route path="/leaderboard" element={<SessionShell><Leaderboard /></SessionShell>} />
+                            <Route path="/plans" element={<SessionShell><SubscriptionPlans standalone={true} /></SessionShell>} />
+                            <Route path="/payment/success" element={<SessionShell><PaymentResult /></SessionShell>} />
+                            <Route path="/payment/cancel" element={<SessionShell><PaymentResult /></SessionShell>} />
+                            <Route path="/checkout" element={<SessionShell><CheckoutPage /></SessionShell>} />
                             <Route path="*" element={<NotFound />} />
                         </Routes>
                     </Suspense>
                 </ErrorBoundary>
+                </EntitlementsProvider>
                 </I18nProvider>
                 </AuthProvider>
             </ToastProvider>

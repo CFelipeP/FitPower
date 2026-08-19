@@ -46,6 +46,12 @@
     background: var(--bg-card);
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.skeleton-kpi > div,
+.skeleton-kpi > span {
+    max-width: 100%;
 }
 
 .skeleton-content-row {
@@ -67,5 +73,12 @@
     }
     .skeleton-content-row {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .skeleton-dashboard,
+    .skeleton-card {
+        padding: 16px;
     }
 }

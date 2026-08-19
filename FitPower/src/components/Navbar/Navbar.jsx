@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Zap, Menu, X, ChevronDown, LogOut, LayoutDashboard, Users, Dumbbell, CalendarDays, MessageCircle, BarChart3, Utensils, Target, Settings, Globe, Sun, Moon } from 'lucide-react'
+import { Zap, Menu, X, ChevronDown, LogOut, LayoutDashboard, Users, Dumbbell, CalendarDays, MessageCircle, BarChart3, Utensils, Target, Settings } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useI18n } from '../../context/I18nContext'
-import { useTheme } from '../../context/ThemeContext'
 import './Navbar.css'
 
-const DASHBOARD_ROUTES = ['/admin/dashboard', '/coach/dashboard', '/client/dashboard', '/onboarding']
+const DASHBOARD_ROUTES = ['/admin/dashboard', '/coach/dashboard', '/client/dashboard', '/onboarding', '/checkout']
 
 const roleNavLinks = {
     admin: [
@@ -35,10 +34,7 @@ export default function Navbar() {
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const dropdownRef = useRef(null)
     const { isAuthenticated, role, logout: authLogout } = useAuth()
-    const { lang, setLang, t } = useI18n()
-    const { theme, toggleTheme } = useTheme()
-    const [langOpen, setLangOpen] = useState(false)
-    const langRef = useRef(null)
+    const { t } = useI18n()
     const location = useLocation()
     const navigate = useNavigate()
 
@@ -55,9 +51,6 @@ export default function Navbar() {
         const handleClickOutside = (e) => {
             if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
                 setDropdownOpen(false)
-            }
-            if (langRef.current && !langRef.current.contains(e.target)) {
-                setLangOpen(false)
             }
         }
         document.addEventListener('mousedown', handleClickOutside)
@@ -78,6 +71,9 @@ export default function Navbar() {
     const links = currentRole ? roleNavLinks[currentRole] || [] : []
 
     if (isDashboardRoute) return null
+
+    // No navbar while a user session is active — except on the public homepage.
+    if (isAuthenticated && location.pathname !== '/') return null
 
     return (
         <nav className={`navbar ${scrolled ? 'scrolled' : ''}`}>
@@ -111,25 +107,6 @@ export default function Navbar() {
                 )}
 
                 <div className="nav-actions">
-                    <div className="nav-lang-switcher" ref={langRef}>
-                        <button className="btn-icon" onClick={() => setLangOpen(!langOpen)} aria-label="Switch language" title={lang === 'en' ? 'Español' : 'English'}>
-                            <Globe size={18} />
-                            <span className="lang-label">{lang.toUpperCase()}</span>
-                        </button>
-                        <div className={`lang-menu ${langOpen ? 'open' : ''}`}>
-                            <button className={`lang-option ${lang === 'en' ? 'active' : ''}`} onClick={() => { setLang('en'); setLangOpen(false) }}>
-                                <span className="lang-flag">🇺🇸</span> English
-                            </button>
-                            <button className={`lang-option ${lang === 'es' ? 'active' : ''}`} onClick={() => { setLang('es'); setLangOpen(false) }}>
-                                <span className="lang-flag">🇲🇽</span> Español
-                            </button>
-                        </div>
-                    </div>
-
-                    <button className="btn-icon nav-theme-toggle" onClick={toggleTheme} aria-label="Toggle theme" title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
-                        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-                    </button>
-
                     {isLoggedIn ? (
                         <div className="nav-dropdown" ref={dropdownRef}>
                             <button

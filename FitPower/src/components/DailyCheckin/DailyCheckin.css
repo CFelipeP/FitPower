@@ -147,7 +147,7 @@
 
 .dc-energy-grid {
     display: flex;
-    gap: 4px;
+    gap: 6px;
 }
 
 .dc-energy-btn {
@@ -161,6 +161,7 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s;
+    min-height: 40px;
 }
 
 .dc-energy-btn:hover {
@@ -278,4 +279,11 @@
     width: 24px;
     text-align: right;
     flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+    .dc-container { padding: 16px 12px; }
+    .dc-header { flex-wrap: wrap; gap: 8px; }
+    .dc-section { padding: 16px 12px; }
+    .dc-energy-buttons { flex-wrap: wrap; }
 }

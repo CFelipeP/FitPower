@@ -9,12 +9,20 @@ self.addEventListener('message', (event) => {
     const messaging = firebase.messaging();
 
     messaging.onBackgroundMessage((payload) => {
-      const { title, body, icon, url } = payload.data || {};
-      self.registration.showNotification(title || 'FitPower', {
-        body: body || '',
-        icon: icon || '/favicon.svg',
+      // When a `notification` payload is present the browser already displays
+      // it; only build a display notification from data-only messages.
+      if (payload.notification && (payload.notification.title || payload.notification.body)) {
+        return;
+      }
+      const data = payload.data || {};
+      const title = data.title || 'FitPower';
+      const body = data.body || '';
+      const url = data.url || '/';
+      self.registration.showNotification(title, {
+        body,
+        icon: '/favicon.svg',
         badge: '/favicon.svg',
-        data: { url: url || '/' },
+        data: { url },
         vibrate: [200, 100, 200],
       });
     });

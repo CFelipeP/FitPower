@@ -4,7 +4,16 @@ import { apiFetch } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
 import './ExerciseLibrary.css'
 
-const CATEGORIES = ['All', 'Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio']
+const CATEGORIES = [
+    { value: 'all', label: 'All' },
+    { value: 'chest', label: 'Chest' },
+    { value: 'back', label: 'Back' },
+    { value: 'legs', label: 'Legs' },
+    { value: 'shoulders', label: 'Shoulders' },
+    { value: 'arms', label: 'Arms' },
+    { value: 'core', label: 'Core' },
+    { value: 'cardio', label: 'Cardio' },
+]
 
 const DIFFICULTY_COLORS = {
     beginner: 'cm-difficulty-beginner',
@@ -17,15 +26,21 @@ export default function ExerciseLibrary() {
     const [exercises, setExercises] = useState([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
-    const [category, setCategory] = useState('All')
+    const [debouncedSearch, setDebouncedSearch] = useState('')
+    const [category, setCategory] = useState('all')
     const [selected, setSelected] = useState(null)
+
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+        return () => clearTimeout(timer)
+    }, [search])
 
     useEffect(() => {
         let cancelled = false
 
         const params = new URLSearchParams()
-        if (category !== 'All') params.set('category', category)
-        if (search.trim()) params.set('search', search.trim())
+        if (category !== 'all') params.set('category', category)
+        if (debouncedSearch) params.set('search', debouncedSearch)
 
         apiFetch(`/exercises?${params.toString()}`)
             .then((data) => {
@@ -42,14 +57,14 @@ export default function ExerciseLibrary() {
             })
 
         return () => { cancelled = true }
-    }, [category, search, showToast])
+    }, [category, debouncedSearch, showToast])
 
     return (
         <div className="cm-exercise-library">
             <header className="cm-el-header">
                 <div className="cm-el-title-row">
                     <Dumbbell size={28} className="cm-el-logo" />
-                    <h1 className="cm-el-title">Exercise Library</h1>
+                    <h1 className="cm-el-title">My Exercises</h1>
                 </div>
                 <div className="cm-el-search-wrap">
                     <Search size={18} className="cm-el-search-icon" />
@@ -72,11 +87,11 @@ export default function ExerciseLibrary() {
                 <Filter size={16} className="cm-el-filter-icon" />
                 {CATEGORIES.map((cat) => (
                     <button
-                        key={cat}
-                        className={`cm-el-filter-btn ${category === cat ? 'active' : ''}`}
-                        onClick={() => setCategory(cat)}
+                        key={cat.value}
+                        className={`cm-el-filter-btn ${category === cat.value ? 'active' : ''}`}
+                        onClick={() => setCategory(cat.value)}
                     >
-                        {cat}
+                        {cat.label}
                     </button>
                 ))}
             </div>
@@ -196,7 +211,33 @@ export default function ExerciseLibrary() {
                                 </div>
                             )}
 
-                            {selected.videoUrl && (
+                            {selected.linkedVideos && selected.linkedVideos.length > 0 && (
+                                <div className="cm-el-modal-section">
+                                    <h4>Video Demo</h4>
+                                    <div className="exercise-video-container">
+                                        <video
+                                            src={`/api/${selected.linkedVideos[0].filePath}`}
+                                            controls
+                                            className="exercise-video"
+                                            preload="metadata"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {selected.videoUrl && selected.videoUrl.endsWith('.gif') ? (
+                                <div className="exercise-video-container">
+                                    <img
+                                        src={selected.videoUrl}
+                                        alt={`${selected.name} demo`}
+                                        className="exercise-video cm-el-repo-gif"
+                                        loading="lazy"
+                                    />
+                                    {selected.source === 'github_exercises_dataset' && (
+                                        <span className="cm-el-attribution">© Gym visual — gymvisual.com</span>
+                                    )}
+                                </div>
+                            ) : selected.videoUrl ? (
                                 <div className="exercise-video-container">
                                     <iframe
                                         src={selected.videoUrl.replace('watch?v=', 'embed/')}
@@ -206,7 +247,7 @@ export default function ExerciseLibrary() {
                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                     />
                                 </div>
-                            )}
+                            ) : null}
                         </div>
                     </div>
                 </div>

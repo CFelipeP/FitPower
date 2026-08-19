@@ -51,6 +51,14 @@ function proxyRequest(targetPort, req, res) {
   req.pipe(proxy)
 }
 
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
+  'Permissions-Policy': 'camera=(self), microphone=(self), geolocation=()',
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${PROXY_PORT}`)
 
@@ -59,14 +67,38 @@ const server = http.createServer((req, res) => {
     return
   }
 
-  let filePath = path.join(DIST, url.pathname === '/' ? 'index.html' : url.pathname)
+  // Path traversal guard: normalize and verify the resolved path stays
+  // inside DIST before serving any file.
+  let filePath = path.resolve(DIST, '.' + url.pathname)
+  if (!filePath.startsWith(DIST + path.sep) && filePath !== DIST) {
+    res.writeHead(403, { 'Content-Type': 'text/plain' })
+    res.end('Forbidden')
+    return
+  }
+
   fs.stat(filePath, (err, stat) => {
     if (err || stat.isDirectory()) {
       filePath = path.join(DIST, 'index.html')
     }
     const ext = path.extname(filePath)
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' })
-    fs.createReadStream(filePath).pipe(res)
+    const headers = {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      ...SECURITY_HEADERS,
+    }
+    if (ext === '.html') {
+      headers['Cache-Control'] = 'no-cache'
+    } else if (ext === '.js' || ext === '.css') {
+      headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    }
+    res.writeHead(200, headers)
+    const stream = fs.createReadStream(filePath)
+    stream.on('error', () => {
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' })
+      }
+      res.end()
+    })
+    stream.pipe(res)
   })
 })
 
@@ -74,8 +106,9 @@ const wsProxy = new WebSocketServer({ noServer: true })
 
 wsProxy.on('connection', (browserWs, req) => {
   const url = new URL(req.url, `http://127.0.0.1:${PROXY_PORT}`)
-  const targetPort = url.pathname === '/mediasoup' ? 5181
-    : url.pathname === '/chat' ? 5180 : null
+  const pathname = url.pathname.replace(/^\/ws/, '')
+  const targetPort = pathname === '/mediasoup' ? 5181
+    : pathname === '/chat' ? 5180 : null
 
   if (!targetPort) {
     browserWs.close(4004, 'Unknown path')
@@ -109,7 +142,8 @@ wsProxy.on('connection', (browserWs, req) => {
 
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, `http://127.0.0.1:${PROXY_PORT}`)
-  if (url.pathname === '/mediasoup' || url.pathname === '/chat') {
+  const pathname = url.pathname.replace(/^\/ws/, '')
+  if (pathname === '/mediasoup' || pathname === '/chat') {
     wsProxy.handleUpgrade(req, socket, head, (ws) => {
       wsProxy.emit('connection', ws, req)
     })

@@ -43,8 +43,9 @@ module.exports = {
       max_memory_restart: '300M',
       env: {
         NODE_ENV: 'production',
-        API_BASE_URL: 'http://127.0.0.1:8088',
-        MEDIASOUP_ANNOUNCED_IP: process.env.MEDIASOUP_ANNOUNCED_IP || '192.168.0.14',
+        API_BASE_URL: process.env.API_BASE_URL || 'http://127.0.0.1:8088',
+        // Auto-detected by mediasoup-server.js when not set.
+        MEDIASOUP_ANNOUNCED_IP: process.env.MEDIASOUP_ANNOUNCED_IP || '',
         TURN_URL: process.env.TURN_URL || '',
         TURN_USERNAME: process.env.TURN_USERNAME || '',
         TURN_CREDENTIAL: process.env.TURN_CREDENTIAL || '',

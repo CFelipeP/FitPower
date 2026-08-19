@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Calculator, Flame, Utensils, Save, Upload } from 'lucide-react'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import './TDEECalculator.css'
 
@@ -29,10 +30,10 @@ function loadSaved() {
 }
 
 function calculateBMR(weight, height, age, sex) {
-  if (!weight || !height || !age) return 0
   const w = parseFloat(weight)
   const h = parseFloat(height)
-  const a = parseInt(age)
+  const a = parseInt(age, 10)
+  if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(a) || w <= 0 || h <= 0 || a <= 0) return 0
   if (sex === 'male') {
     return 10 * w + 6.25 * h - 5 * a + 5
   }
@@ -106,7 +107,7 @@ export default function TDEECalculator() {
       setServerSaved(true)
       showToast('Nutrition targets saved to your profile!')
     } catch {
-      showToast('Saved locally. Could not save to server.')
+      swalError('Saved locally. Could not save to server.')
     } finally {
       setSaving(false)
     }

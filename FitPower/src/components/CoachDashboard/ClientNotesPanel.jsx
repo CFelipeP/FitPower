@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
+import { confirmSwal, swalError } from '../../lib/alerts'
 import { FileText, Plus, Trash2, X, Tag, Calendar } from 'lucide-react'
 import './ClientNotesPanel.css'
 
@@ -69,12 +70,13 @@ export default function ClientNotesPanel({ selectedClientId, onSelectClient }) {
     }
 
     const handleDeleteNote = async (noteId) => {
+        if (!(await confirmSwal('This note will be permanently deleted.', 'Delete note?'))) return
         try {
             await apiFetch(`/coach/notes/${noteId}`, { method: 'DELETE' })
             setNotes(prev => prev.filter(n => n.id !== noteId))
             showToast('Note deleted')
         } catch {
-            showToast('Error deleting note')
+            swalError('Error deleting note')
         }
     }
 

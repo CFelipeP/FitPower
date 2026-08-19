@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useToast } from '../../context/ToastContext'
-import { useI18n } from '../../context/I18nContext'
-import { useTheme } from '../../context/ThemeContext'
 
 import { apiFetch } from '../../lib/api'
+import { mediaUrl } from '../../lib/media'
 import {
     Bell, Eye, Palette, Ruler, Clock,
     Mail, Smartphone, MessageSquare,
-    Save, Loader2, Globe, Sun, Moon,
+    Save, Loader2,
     BarChart3
 } from 'lucide-react'
 import './Settings.css'
@@ -21,8 +20,6 @@ const TABS = [
 
 export default function Settings({ compact = false }) {
     const { showToast } = useToast()
-    const { lang, setLang } = useI18n()
-    const { theme, toggleTheme } = useTheme()
     const [activeTab, setActiveTab] = useState('notifications')
     const [settings, setSettings] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -40,8 +37,8 @@ export default function Settings({ compact = false }) {
     useEffect(() => {
         apiFetch('/auth/me')
             .then(data => {
-                if (data.photo && (data.photo.startsWith('http://') || data.photo.startsWith('https://'))) {
-                    setUserPhoto(data.photo)
+                if (data.photo) {
+                    setUserPhoto(mediaUrl(data.photo))
                 }
             })
             .catch(() => {})
@@ -100,11 +97,11 @@ export default function Settings({ compact = false }) {
                         </div>
                         <div className="stg-header-right">
                             <div className="stg-avatar-wrap">
-                                <img loading="lazy"
-                                    src={userPhoto || "https://picsum.photos/seed/settings-user/36/36.jpg"}
-                                    alt="Profile"
-                                    className="stg-avatar"
-                                />
+                                {userPhoto ? (
+                                    <img loading="lazy" src={userPhoto} alt="Profile" className="stg-avatar" />
+                                ) : (
+                                    <div className="stg-avatar stg-avatar-initials">{(settings?.firstName || 'U')[0].toUpperCase()}</div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -196,8 +193,25 @@ export default function Settings({ compact = false }) {
                                         <div className="stg-row-info">
                                             <MessageSquare size={20} />
                                             <div>
+                                                <div className="stg-row-label">In-app Notifications</div>
+                                                <div className="stg-row-desc">Show notifications inside the app</div>
+                                            </div>
+                                        </div>
+                                        <label className="stg-toggle">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.notifications_inapp !== false}
+                                                onChange={() => handleToggle('notifications_inapp')}
+                                            />
+                                            <span className="stg-toggle-slider" />
+                                        </label>
+                                    </div>
+                                    <div className="stg-row">
+                                        <div className="stg-row-info">
+                                            <Smartphone size={20} />
+                                            <div>
                                                 <div className="stg-row-label">SMS Notifications</div>
-                                                <div className="stg-row-desc">Receive SMS alerts</div>
+                                                <div className="stg-row-desc">Receive SMS alerts (not available yet)</div>
                                             </div>
                                         </div>
                                         <label className="stg-toggle">
@@ -210,6 +224,36 @@ export default function Settings({ compact = false }) {
                                         </label>
                                     </div>
                                 </div>
+
+                                <h4 className="stg-subsection-title">Push categories</h4>
+                                <p className="stg-section-desc">Choose which push notifications you receive on this device.</p>
+                                <div className="stg-card">
+                                    {[
+                                        { key: 'notifications_push_workout', label: 'Workouts & streaks', desc: 'Workout reminders, streak alerts, weekly summaries' },
+                                        { key: 'notifications_push_coach', label: 'Coach & messages', desc: 'New messages, video calls, assigned routines' },
+                                        { key: 'notifications_push_payments', label: 'Payments', desc: 'Payment failures, subscription updates' },
+                                        { key: 'notifications_push_achievements', label: 'Achievements', desc: 'New achievements and milestones' },
+                                        { key: 'notifications_push_system', label: 'System', desc: 'Account and support updates' },
+                                    ].map(cat => (
+                                        <div className="stg-row" key={cat.key}>
+                                            <div className="stg-row-info">
+                                                <Bell size={20} />
+                                                <div>
+                                                    <div className="stg-row-label">{cat.label}</div>
+                                                    <div className="stg-row-desc">{cat.desc}</div>
+                                                </div>
+                                            </div>
+                                            <label className="stg-toggle">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={settings[cat.key] !== false}
+                                                    onChange={() => handleToggle(cat.key)}
+                                                />
+                                                <span className="stg-toggle-slider" />
+                                            </label>
+                                        </div>
+                                    ))}
+                                </div>
                             </section>
                         )}
 
@@ -218,25 +262,6 @@ export default function Settings({ compact = false }) {
                                 <h3 className="stg-section-title">Appearance</h3>
                                 <p className="stg-section-desc">Customize your visual experience.</p>
                                 <div className="stg-card">
-                                    <div className="stg-row">
-                                        <div className="stg-row-info">
-                                            <Globe size={20} />
-                                            <div>
-                                                <div className="stg-row-label">Language</div>
-                                                <div className="stg-row-desc">Choose your preferred language</div>
-                                            </div>
-                                        </div>
-                                        <div className="stg-select-wrap">
-                                            <select
-                                                className="stg-select"
-                                                value={lang}
-                                                onChange={e => setLang(e.target.value)}
-                                            >
-                                                <option value="en">🇺🇸 English</option>
-                                                <option value="es">🇲🇽 Español</option>
-                                            </select>
-                                        </div>
-                                    </div>
                                     <div className="stg-row">
                                         <div className="stg-row-info">
                                             <Clock size={20} />
@@ -263,23 +288,6 @@ export default function Settings({ compact = false }) {
                                                 <option value="Europe/London">Europe/London</option>
                                             </select>
                                         </div>
-                                    </div>
-                                    <div className="stg-row">
-                                        <div className="stg-row-info">
-                                            {theme === 'dark' ? <Moon size={20} /> : <Sun size={20} />}
-                                            <div>
-                                                <div className="stg-row-label">Theme</div>
-                                                <div className="stg-row-desc">Switch between light and dark mode</div>
-                                            </div>
-                                        </div>
-                                        <label className="stg-toggle" style={{ cursor: 'pointer' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={theme === 'light'}
-                                                onChange={toggleTheme}
-                                            />
-                                            <span className="stg-toggle-slider" />
-                                        </label>
                                     </div>
                                 </div>
                             </section>

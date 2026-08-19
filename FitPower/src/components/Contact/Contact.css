@@ -42,7 +42,7 @@
 }
 
 .contact-label {
-    color: #737373;
+    color: var(--text-muted);
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -106,7 +106,7 @@
 
 .form-group input::placeholder,
 .form-group textarea::placeholder {
-    color: #525252;
+    color: var(--text-dim);
 }
 
 .form-group input:focus,

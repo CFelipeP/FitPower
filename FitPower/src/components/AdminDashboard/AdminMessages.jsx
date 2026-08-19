@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { MessageCircle, Send, Mail, MailOpen } from 'lucide-react'
 
 export default function AdminMessages() {
@@ -11,15 +12,15 @@ export default function AdminMessages() {
 
     const fetchMessages = useCallback(() => {
         apiFetch('/admin/messages')
-            .then(d => setMessages(d.messages || d.data || []))
-            .catch(() => showToast('Error loading messages'))
-    }, [showToast])
+            .then(d => setMessages(Array.isArray(d) ? d : (d.messages || d.data || [])))
+            .catch(() => swalError('Error loading messages'))
+    }, [])
 
     useEffect(() => { fetchMessages() }, [fetchMessages])
 
     const viewMessage = async (msg) => {
         setSelectedMsg(msg)
-        if (!msg.read_at) {
+        if (!msg.readAt) {
             try { await apiFetch(`/admin/messages/${msg.id}`, { method: 'PUT', body: JSON.stringify({}) }); fetchMessages() }
             catch { /* ignore */ }
         }
@@ -28,7 +29,7 @@ export default function AdminMessages() {
     const handleReply = async () => {
         if (!replyText.trim() || !selectedMsg) return
         try { await apiFetch(`/admin/messages/${selectedMsg.id}/reply`, { method: 'POST', body: JSON.stringify({ message: replyText }) }); showToast('Reply sent'); setReplyText(''); fetchMessages() }
-        catch (e) { showToast(e.message || 'Error') }
+        catch (e) { swalError(e.message || 'Error') }
     }
 
     return (
@@ -39,24 +40,24 @@ export default function AdminMessages() {
             <div className="ad-section-grid ad-section-grid-2" style={{ padding: '24px' }}>
                 <div className="ad-dash-card" style={{ margin: 0 }}>
                     {messages.map(msg => (
-                        <div key={msg.id} className="ad-prog-item" style={{ borderBottom: '1px solid rgba(255,255,255,.05)', padding: '12px 0', cursor: 'pointer', opacity: msg.read_at ? 0.6 : 1 }} onClick={() => viewMessage(msg)}>
-                            <div style={{ marginRight: 8, color: msg.read_at ? '#525252' : 'var(--power-500)' }}>
-                                {msg.read_at ? <MailOpen size={16} /> : <Mail size={16} />}
+                        <div key={msg.id} className="ad-prog-item" style={{ borderBottom: '1px solid rgba(255,255,255,.05)', padding: '12px 0', cursor: 'pointer', opacity: msg.readAt ? 0.6 : 1 }} onClick={() => viewMessage(msg)}>
+                            <div style={{ marginRight: 8, color: msg.readAt ? 'var(--text-dim)' : 'var(--power-500)' }}>
+                                {msg.readAt ? <MailOpen size={16} /> : <Mail size={16} />}
                             </div>
                             <div className="ad-prog-info" style={{ flex: 1 }}>
                                 <div className="ad-prog-name">{msg.name || msg.senderName || 'Unknown'}</div>
-                                <div className="ad-prog-enroll">{msg.subject} · {msg.createdAt ? new Date(msg.createdAt).toLocaleString() : ''}</div>
+                                <div className="ad-prog-enroll">{msg.subject} Â· {msg.createdAt ? new Date(msg.createdAt).toLocaleString() : ''}</div>
                             </div>
                         </div>
                     ))}
-                    {messages.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: '#737373' }}>No messages</div>}
+                    {messages.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No messages</div>}
                 </div>
                 <div className="ad-dash-card" style={{ margin: 0 }}>
                     {selectedMsg ? (
                         <>
                             <div style={{ marginBottom: 16 }}>
                                 <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>{selectedMsg.name || selectedMsg.senderName}</div>
-                                <div style={{ color: '#737373', fontSize: 13 }}>{selectedMsg.email} · {selectedMsg.createdAt ? new Date(selectedMsg.createdAt).toLocaleString() : ''}</div>
+                                <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{selectedMsg.email} Â· {selectedMsg.createdAt ? new Date(selectedMsg.createdAt).toLocaleString() : ''}</div>
                                 <div style={{ color: '#a3a3a3', fontSize: 14, marginTop: 4 }}>{selectedMsg.subject}</div>
                             </div>
                             <div style={{ background: 'rgba(255,255,255,.02)', borderRadius: 8, padding: 16, marginBottom: 16, color: '#d4d4d4', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
@@ -64,7 +65,7 @@ export default function AdminMessages() {
                             </div>
                             {(selectedMsg.replies || []).map((r, i) => (
                                 <div key={i} style={{ padding: '8px 12px', marginBottom: 8, background: 'rgba(255,214,0,.05)', borderRadius: 8, fontSize: 13 }}>
-                                    <div style={{ fontWeight: 600, marginBottom: 4 }}>Admin · {r.createdAt ? new Date(r.createdAt).toLocaleString() : ''}</div>
+                                    <div style={{ fontWeight: 600, marginBottom: 4 }}>Admin Â· {r.createdAt ? new Date(r.createdAt).toLocaleString() : ''}</div>
                                     <div style={{ color: '#d4d4d4' }}>{r.message || r.text}</div>
                                 </div>
                             ))}
@@ -74,7 +75,7 @@ export default function AdminMessages() {
                             </div>
                         </>
                     ) : (
-                        <div style={{ padding: 24, textAlign: 'center', color: '#737373' }}>Select a message to view</div>
+                        <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Select a message to view</div>
                     )}
                 </div>
             </div>

@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import PricingPlans from './PricingPlans'
 import { createMockPlan } from '../../__tests__/mocks'
@@ -11,6 +12,15 @@ vi.mock('../../lib/api', () => ({
 vi.mock('../../context/ToastContext', () => ({
     useToast: () => ({ showToast: vi.fn() }),
 }))
+
+const renderWithRouter = (ui, initialEntries = ['/']) => render(
+    <MemoryRouter initialEntries={initialEntries}>
+        <Routes>
+            <Route path="/" element={ui} />
+            <Route path="/checkout" element={<div>checkout-page</div>} />
+        </Routes>
+    </MemoryRouter>
+)
 
 const mockPlans = [
     createMockPlan({ id: 1, name: 'Starter', price_monthly: 19, price_yearly: 13, popular: false, features: [{ name: 'AI Workouts' }, { name: 'Basic Analytics' }] }),
@@ -29,12 +39,12 @@ describe('PricingPlans Component', () => {
 
     it('shows loading state initially', async () => {
         apiFetch.mockReturnValue(new Promise(() => {}))
-        const { container } = render(<PricingPlans />)
+        const { container } = renderWithRouter(<PricingPlans />)
         expect(container.querySelector('.pricing-loading')).toBeTruthy()
     })
 
     it('renders all plans after loading', async () => {
-        render(<PricingPlans />)
+        renderWithRouter(<PricingPlans />)
 
         await waitFor(() => {
             expect(screen.getByText('Starter')).toBeTruthy()
@@ -44,7 +54,7 @@ describe('PricingPlans Component', () => {
     })
 
     it('shows monthly prices by default', async () => {
-        render(<PricingPlans />)
+        renderWithRouter(<PricingPlans />)
 
         await waitFor(() => {
             expect(screen.getByText('$19')).toBeTruthy()
@@ -54,7 +64,7 @@ describe('PricingPlans Component', () => {
     })
 
     it('shows yearly prices when toggled', async () => {
-        render(<PricingPlans />)
+        renderWithRouter(<PricingPlans />)
 
         await waitFor(() => {
             expect(screen.getByText('Starter')).toBeTruthy()
@@ -69,7 +79,7 @@ describe('PricingPlans Component', () => {
     })
 
     it('shows monthly prices after toggling back', async () => {
-        render(<PricingPlans />)
+        renderWithRouter(<PricingPlans />)
 
         await waitFor(() => {
             expect(screen.getByText('Starter')).toBeTruthy()
@@ -84,7 +94,7 @@ describe('PricingPlans Component', () => {
     })
 
     it('marks popular plan with badge', async () => {
-        render(<PricingPlans />)
+        renderWithRouter(<PricingPlans />)
 
         await waitFor(() => {
             const popularBadges = document.querySelectorAll('.pricing-card-badge')
@@ -94,7 +104,7 @@ describe('PricingPlans Component', () => {
     })
 
     it('marks popular card with popular class', async () => {
-        render(<PricingPlans />)
+        renderWithRouter(<PricingPlans />)
 
         await waitFor(() => {
             const popularCards = document.querySelectorAll('.pricing-card.popular')
@@ -102,10 +112,10 @@ describe('PricingPlans Component', () => {
         })
     })
 
-    it('disables subscribe button during purchase', async () => {
+    it('navigates to checkout when subscribing', async () => {
         apiFetch.mockResolvedValue(mockPlans)
 
-        render(<PricingPlans />)
+        renderWithRouter(<PricingPlans />)
 
         await waitFor(() => {
             expect(screen.getByText('Starter')).toBeTruthy()
@@ -114,16 +124,15 @@ describe('PricingPlans Component', () => {
         const subscribeBtns = document.querySelectorAll('.pricing-card-btn')
         expect(subscribeBtns.length).toBe(3)
 
-        apiFetch.mockImplementation(() => new Promise(() => {}))
         await userEvent.click(subscribeBtns[0])
 
         await waitFor(() => {
-            expect(subscribeBtns[0].disabled).toBe(true)
+            expect(screen.getByText('checkout-page')).toBeTruthy()
         })
     })
 
     it('renders feature lists for each plan', async () => {
-        render(<PricingPlans />)
+        renderWithRouter(<PricingPlans />)
 
         await waitFor(() => {
             expect(screen.getByText('AI Workouts')).toBeTruthy()
@@ -133,7 +142,7 @@ describe('PricingPlans Component', () => {
     })
 
     it('shows save amount for yearly billing', async () => {
-        render(<PricingPlans />)
+        renderWithRouter(<PricingPlans />)
 
         await waitFor(() => {
             expect(screen.getByText('Starter')).toBeTruthy()
@@ -148,7 +157,7 @@ describe('PricingPlans Component', () => {
     })
 
     it('toggles active class on billing buttons', async () => {
-        render(<PricingPlans />)
+        renderWithRouter(<PricingPlans />)
 
         await waitFor(() => {
             expect(screen.getByText('Starter')).toBeTruthy()

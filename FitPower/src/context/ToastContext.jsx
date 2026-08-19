@@ -1,13 +1,19 @@
-import { createContext, useContext, useState, useCallback, useMemo } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect } from 'react'
 
 const ToastContext = createContext()
 
 export function ToastProvider({ children }) {
-    const [toast, setToast] = useState({ show: false, msg: '' })
+    const [toast, setToast] = useState({ show: false, msg: '', type: 'success' })
+    const timerRef = useRef(null)
 
-    const showToast = useCallback((msg) => {
-        setToast({ show: true, msg })
-        setTimeout(() => setToast({ show: false, msg: '' }), 3000)
+    useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+
+    const showToast = useCallback((msg, type = 'success') => {
+        if (timerRef.current) clearTimeout(timerRef.current)
+        setToast({ show: true, msg, type })
+        timerRef.current = setTimeout(() => {
+            setToast({ show: false, msg: '', type })
+        }, 3000)
     }, [])
 
     const value = useMemo(() => ({ toast, showToast }), [toast, showToast])

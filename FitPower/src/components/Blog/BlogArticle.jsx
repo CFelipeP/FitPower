@@ -18,7 +18,7 @@ export default function BlogArticle() {
     }, [slug])
 
     if (loading) return <div className="blog-article-loading"><div className="cl-spinner" /></div>
-    if (!article) return <div className="blog-article-loading"><p>Artículo no encontrado</p><Link to="/blog">Volver al blog</Link></div>
+    if (!article) return <div className="blog-article-loading"><p>Article not found</p><Link to="/blog">Back to blog</Link></div>
 
     return (
         <div className="blog-article-page">

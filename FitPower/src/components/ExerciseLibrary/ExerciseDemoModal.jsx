@@ -4,14 +4,26 @@ import './ExerciseDemoModal.css'
 export default function ExerciseDemoModal({ exercise, onClose }) {
     if (!exercise) return null
 
+    const linkedVideo = exercise.linkedVideos && exercise.linkedVideos.length > 0 ? exercise.linkedVideos[0] : null
+    // Repository demos are animation GIFs (© Gym visual) — shown as images.
+    const isGif = (exercise.gifUrl && exercise.gifUrl.endsWith('.gif')) || ((exercise.video_url || exercise.videoUrl) || '').endsWith('.gif')
+    const demoUrl = isGif ? (exercise.gifUrl || exercise.video_url || exercise.videoUrl) : (linkedVideo ? `/api/${linkedVideo.filePath}` : (exercise.video_url || exercise.videoUrl || null))
+
     return (
         <div className="edm-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
             <div className="edm-modal" onClick={e => e.stopPropagation()}>
                 <button className="edm-close" onClick={onClose}><X size={18} /></button>
 
-                {exercise.video_url || exercise.videoUrl ? (
+                {isGif ? (
                     <div className="edm-video-wrap">
-                        <video className="edm-video" src={exercise.video_url || exercise.videoUrl} controls autoPlay />
+                        <img className="edm-video cm-el-repo-gif" src={demoUrl} alt={`${exercise.name} demo`} loading="lazy" />
+                        {exercise.source === 'github_exercises_dataset' && (
+                            <span className="cm-el-attribution">© Gym visual — gymvisual.com</span>
+                        )}
+                    </div>
+                ) : demoUrl ? (
+                    <div className="edm-video-wrap">
+                        <video className="edm-video" src={demoUrl} controls autoPlay />
                     </div>
                 ) : (
                     <div className="edm-no-video">

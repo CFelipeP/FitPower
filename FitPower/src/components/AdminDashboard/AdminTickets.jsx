@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { MessageCircle, Search, Send } from 'lucide-react'
 
 export default function AdminTickets() {
@@ -16,21 +17,21 @@ export default function AdminTickets() {
         if (search) params.set('search', search)
         if (severityFilter) params.set('severity', severityFilter)
         apiFetch(`/admin/tickets?${params}`)
-            .then(d => setTickets(d.tickets || d.data || []))
-            .catch(() => showToast('Error loading tickets'))
-    }, [search, severityFilter, showToast])
+            .then(d => setTickets(Array.isArray(d) ? d : (d.tickets || d.data || [])))
+            .catch(() => swalError('Error loading tickets'))
+    }, [search, severityFilter])
 
     useEffect(() => { fetchTickets() }, [fetchTickets])
 
     const handleReply = async (ticketId) => {
         if (!replyText.trim()) return
         try { await apiFetch(`/admin/tickets/${ticketId}/reply`, { method: 'POST', body: JSON.stringify({ message: replyText }) }); showToast('Reply sent'); setReplyText(''); fetchTickets() }
-        catch (e) { showToast(e.message || 'Error sending reply') }
+        catch (e) { swalError(e.message || 'Error sending reply') }
     }
 
     const markResolved = async (ticketId) => {
         try { await apiFetch(`/admin/tickets/${ticketId}`, { method: 'PUT', body: JSON.stringify({ status: 'resolved' }) }); showToast('Ticket resolved'); fetchTickets() }
-        catch (e) { showToast(e.message || 'Error') }
+        catch (e) { swalError(e.message || 'Error') }
     }
 
     const statusClass = (s) => {
@@ -46,7 +47,7 @@ export default function AdminTickets() {
                 <h1 className="ad-content-title"><MessageCircle size={24} /> Support Tickets</h1>
                 <div className="ad-content-actions">
                     <div style={{ position: 'relative' }}>
-                        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#525252' }} />
+                        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
                         <input className="ad-content-search" style={{ paddingLeft: 36 }} placeholder="Search tickets..." value={search} onChange={e => setSearch(e.target.value)} />
                     </div>
                     <select className="ad-content-search" style={{ minWidth: 120 }} value={severityFilter} onChange={e => setSeverityFilter(e.target.value)}>
@@ -87,8 +88,8 @@ export default function AdminTickets() {
                                         <div style={{ fontSize: 13, color: '#d4d4d4' }}>{r.message || r.text}</div>
                                     </div>
                                 ))}
-                                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                                    <input className="ad-content-search" style={{ flex: 1, minWidth: 'unset' }} placeholder="Write a reply..." value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleReply(t.id) }} />
+                                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                                    <input className="ad-content-search" style={{ flex: '1 1 160px', minWidth: 'unset' }} placeholder="Write a reply..." value={replyText} onChange={e => setReplyText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleReply(t.id) }} />
                                     <button className="ad-btn ad-btn-primary ad-btn-xs" onClick={() => handleReply(t.id)} disabled={!replyText.trim()}><Send size={14} /> Send</button>
                                     {t.status !== 'resolved' && t.status !== 'closed' && (
                                         <button className="ad-btn ad-btn-secondary ad-btn-xs" onClick={() => markResolved(t.id)}>Resolve</button>
@@ -98,7 +99,7 @@ export default function AdminTickets() {
                         )}
                     </div>
                 ))}
-                {tickets.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: '#737373' }}>No tickets found</div>}
+                {tickets.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No tickets found</div>}
             </div>
         </div>
     )

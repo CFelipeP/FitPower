@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
+import { confirmSwal, swalError } from '../../lib/alerts'
 import {
     CalendarDays, Plus, X, Clock, Users, Edit2, Trash2, ChevronLeft, ChevronRight
 } from 'lucide-react'
@@ -83,7 +84,7 @@ export default function CoachCalendar() {
                 setSessions(sessionsData)
                 setPrograms(programsData.programs || programsData)
             })
-            .catch(() => showToast('Error loading calendar data'))
+            .catch(() => swalError('Error loading calendar data'))
             .finally(() => setLoading(false))
     }, [showToast])
 
@@ -139,14 +140,14 @@ export default function CoachCalendar() {
         })
     }
 
-    function handleDelete(session) {
-        if (!confirm('Delete this session?')) return
+    async function handleDelete(session) {
+        if (!(await confirmSwal('Delete this session?'))) return
         apiFetch(`/sessions/${session.id}`, { method: 'DELETE' })
             .then(() => {
                 setSessions(prev => prev.filter(s => s.id !== session.id))
                 showToast('Session deleted')
             })
-            .catch(() => showToast('Error deleting session'))
+            .catch(() => swalError('Error deleting session'))
     }
 
     function handleFormChange(e) {
@@ -183,7 +184,7 @@ export default function CoachCalendar() {
                 setFormData({ ...emptyForm })
                 showToast(isEdit ? 'Session updated' : 'Session created')
             })
-            .catch(() => showToast(isEdit ? 'Error updating session' : 'Error creating session'))
+            .catch(() => swalError(isEdit ? 'Error updating session' : 'Error creating session'))
     }
 
     function closeForm() {

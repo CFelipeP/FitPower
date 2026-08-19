@@ -11,7 +11,7 @@
     align-items: center;
     justify-content: center;
     padding: 80px 24px;
-    color: #737373;
+    color: var(--text-muted);
     gap: 16px;
 }
 .cds-spinner {
@@ -26,7 +26,7 @@
 .cds-empty {
     text-align: center;
     padding: 80px 24px;
-    color: #737373;
+    color: var(--text-muted);
 }
 .cds-empty h3 {
     margin: 12px 0 4px;
@@ -34,7 +34,7 @@
     color: #a3a3a3;
 }
 .cds-empty-sm {
-    color: #737373;
+    color: var(--text-muted);
     font-size: 14px;
     padding: 8px 0;
 }
@@ -69,7 +69,7 @@
 }
 .cds-subtitle {
     font-size: 13px;
-    color: #737373;
+    color: var(--text-muted);
     margin: 2px 0 0;
 }
 
@@ -109,7 +109,7 @@
 }
 .cds-ci-label {
     font-size: 12px;
-    color: #737373;
+    color: var(--text-muted);
     display: flex;
     align-items: center;
     gap: 4px;
@@ -187,7 +187,7 @@
 }
 .cds-goal-target {
     font-size: 12px;
-    color: #737373;
+    color: var(--text-muted);
     margin: 6px 0 0;
 }
 
@@ -291,11 +291,11 @@
 }
 .cds-metric-unit {
     font-size: 12px;
-    color: #737373;
+    color: var(--text-muted);
 }
 .cds-metric-label {
     font-size: 11px;
-    color: #737373;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: .5px;
 }
@@ -350,7 +350,7 @@
 }
 .cds-macro-label {
     font-size: 11px;
-    color: #737373;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: .4px;
 }
@@ -379,7 +379,7 @@
 }
 .cds-meal-dot {
     font-size: 14px;
-    color: #525252;
+    color: var(--text-dim);
     cursor: help;
 }
 .cds-meal-done {
@@ -387,7 +387,7 @@
 }
 .cds-meal-label {
     font-size: 11px;
-    color: #737373;
+    color: var(--text-muted);
     margin-left: 4px;
 }
 
@@ -454,7 +454,7 @@
 }
 .cds-ach-locked {
     background: rgba(255,255,255,.04);
-    color: #525252;
+    color: var(--text-dim);
     border: 1px solid rgba(255,255,255,.06);
     opacity: .6;
 }
@@ -496,7 +496,7 @@
 }
 .cds-kpi-card .cds-kpi-label {
     font-size: 11px;
-    color: #737373;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: .5px;
 }
@@ -504,7 +504,7 @@
     opacity: .6;
 }
 .cds-dot-dim {
-    background: #525252 !important;
+    background: var(--text-dim) !important;
 }
 
 /* Activity */
@@ -541,7 +541,7 @@
 }
 .cds-activity-time {
     font-size: 12px;
-    color: #737373;
+    color: var(--text-muted);
     margin-top: 2px;
     display: block;
 }
@@ -564,4 +564,13 @@
     .cds-metrics-grid {
         grid-template-columns: repeat(2, 1fr);
     }
+}
+
+@media (max-width: 640px) {
+    .cds-kpis { grid-template-columns: repeat(2, 1fr); }
+    .cds-kpi-card { padding: 12px; }
+}
+
+@media (max-width: 380px) {
+    .cds-kpis { grid-template-columns: 1fr; }
 }

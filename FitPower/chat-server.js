@@ -1,9 +1,28 @@
 import { WebSocketServer } from 'ws'
 import { createServer } from 'http'
 import { verifyToken } from './chat-auth.js'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import dotenv from 'dotenv'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// Load shared credentials from the API .env so internal calls are authenticated.
+const dotenvCandidates = [
+    path.join(__dirname, '..', 'api', '.env'),
+    path.join(__dirname, 'api', '.env'),
+]
+for (const candidate of dotenvCandidates) {
+    if (fs.existsSync(candidate)) {
+        dotenv.config({ path: candidate })
+        break
+    }
+}
 
 const PORT = 5180
 const API_BASE = process.env.API_BASE_URL || 'http://127.0.0.1:8088'
+const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET || ''
 
 const clients = new Map()
 
@@ -22,8 +41,8 @@ wss.on('connection', (ws, req) => {
       // A token supplied at connection time must verify; otherwise the
       // connection is refused (no unverified identity is ever trusted).
       if (!verifyToken(token)) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Token inválido' }))
-        ws.close(4401, 'Token inválido')
+        ws.send(JSON.stringify({ type: 'error', message: 'Invalid token' }))
+        ws.close(4401, 'Invalid token')
         return
       }
       ws.authToken = token
@@ -36,7 +55,7 @@ wss.on('connection', (ws, req) => {
             const msg = JSON.parse(raw)
             await handleMessage(ws, msg)
         } catch {
-            ws.send(JSON.stringify({ type: 'error', message: 'Mensaje inválido' }))
+            ws.send(JSON.stringify({ type: 'error', message: 'Invalid message' }))
         }
     })
 
@@ -52,7 +71,7 @@ async function handleMessage(ws, msg) {
     switch (msg.type) {
         case 'auth': {
             if (!msg.token || !verifyToken(msg.token)) {
-                ws.send(JSON.stringify({ type: 'error', message: 'Token inválido' }))
+                ws.send(JSON.stringify({ type: 'error', message: 'Invalid token' }))
                 return
             }
             const res = await fetch(`${API_BASE}/api/auth/me`, {
@@ -60,7 +79,7 @@ async function handleMessage(ws, msg) {
             })
             const data = await res.json()
             if (!data.success) {
-                ws.send(JSON.stringify({ type: 'error', message: 'Token inválido' }))
+                ws.send(JSON.stringify({ type: 'error', message: 'Invalid token' }))
                 return
             }
             ws.userId = data.data.id
@@ -75,14 +94,14 @@ async function handleMessage(ws, msg) {
             const convId = msg.conversationId
             if (!convId) break
             if (!ws.userId || !ws.authToken) {
-                ws.send(JSON.stringify({ type: 'error', message: 'Debes autenticarte' }))
+                ws.send(JSON.stringify({ type: 'error', message: 'You must authenticate' }))
                 break
             }
             const res = await fetch(`${API_BASE}/api/messages/${convId}`, {
                 headers: { Authorization: `Bearer ${ws.authToken}` },
             })
             if (!res.ok) {
-                ws.send(JSON.stringify({ type: 'error', message: 'No puedes suscribirte a esta conversación' }))
+                ws.send(JSON.stringify({ type: 'error', message: 'You cannot subscribe to this conversation' }))
                 break
             }
             ws.conversations.add(convId)
@@ -123,12 +142,34 @@ async function handleMessage(ws, msg) {
                 createdAt: data.data.createdAt || new Date().toISOString(),
             }
 
+            let liveRecipient = false
             for (const [, conns] of clients) {
                 for (const conn of conns) {
                     if (conn.conversations.has(conversationId)) {
                         conn.send(JSON.stringify(messageData))
+                        if (conn.userId !== senderId) liveRecipient = true
                     }
                 }
+            }
+
+            // If the other participant is not connected live, notify them
+            // (in-app + push) so messages are never silently lost.
+            if (!liveRecipient && INTERNAL_SECRET) {
+                try {
+                    await fetch(`${API_BASE}/api/system/chat-notify`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Internal-Secret': INTERNAL_SECRET,
+                        },
+                        body: JSON.stringify({
+                            conversationId,
+                            senderId,
+                            messageId: data.data.id,
+                            content,
+                        }),
+                    })
+                } catch { /* best effort */ }
             }
             break
         }

@@ -99,11 +99,23 @@ const steps = [
 export default function DriverTour({ visible }) {
     const startTour = useCallback(() => {
         const isMobile = window.innerWidth <= 768
+        const mobileSteps = isMobile
+            ? steps
+                .filter(s => s.element !== '.sb-sidebar')
+                .map(s => ({
+                    ...s,
+                    popover: {
+                        ...s.popover,
+                        side: 'auto',
+                        align: 'center',
+                    },
+                }))
+            : steps
         const driverObj = driver({
             animate: !isMobile,
             showProgress: true,
             showButtons: ['next', 'previous', 'close'],
-            steps,
+            steps: mobileSteps,
             popoverClass: 'driver-tour-theme',
             stagePadding: isMobile ? 4 : 8,
             overlayPadding: isMobile ? 2 : 4,

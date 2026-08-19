@@ -1,16 +1,23 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { apiFetch } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
+import { confirmSwal, swalError } from '../../lib/alerts'
 import {
-    CheckCircle, Dumbbell, Clock, Flame, Plus, X, Trash2, ChevronDown, ClipboardList, Activity, Timer
+    CheckCircle, Dumbbell, Clock, Flame, Plus, X, Trash2, ChevronDown, ClipboardList, Activity, Timer, Play
 } from 'lucide-react'
 import RestTimer from '../RestTimer/RestTimer'
+import GuidedWorkout from '../GuidedWorkout/GuidedWorkout'
+import ExercisePicker from '../ExerciseLibrary/ExercisePicker'
+import { useAuth } from '../../context/AuthContext'
+import { getWorkoutSnapshot, clearWorkoutSnapshot } from '../../lib/offlineQueue'
 import './WorkoutTracker.css'
 
-const emptyExercise = { name: '', sets: '', reps: '', weight: '', notes: '' }
+const emptyExercise = { name: '', sets: '', reps: '', weight: '', notes: '', exerciseId: '' }
 
 export default function WorkoutTracker() {
     const { showToast } = useToast()
+    const { user } = useAuth()
+    const isClient = (user?.role || 'client') === 'client'
     const [sessions, setSessions] = useState([])
     const [loading, setLoading] = useState(true)
     const [expandedId, setExpandedId] = useState(null)
@@ -18,6 +25,8 @@ export default function WorkoutTracker() {
     const [showNewForm, setShowNewForm] = useState(false)
     const [showAddExercise, setShowAddExercise] = useState(null)
     const [restTimerExercise, setRestTimerExercise] = useState(null)
+    const [activeSession, setActiveSession] = useState(null)
+    const [resumeSnapshot, setResumeSnapshot] = useState(null)
 
     const [newSession, setNewSession] = useState({
         title: '', date: '', description: '', type: 'strength'
@@ -39,6 +48,43 @@ export default function WorkoutTracker() {
     useEffect(() => {
         apiFetch('/sessions').then(setSessions).catch(() => showToast('Error loading sessions')).finally(() => setLoading(false))
     }, [showToast])
+
+    // Interrupted workout recovery: if a local snapshot exists, offer to resume.
+    useEffect(() => {
+        const snapshot = getWorkoutSnapshot()
+        if (!snapshot) return
+        apiFetch('/sessions')
+            .then(list => {
+                const match = list.find(s => s.id === snapshot.sessionId)
+                if (match && match.status !== 'completed') {
+                    setResumeSnapshot({ snapshot, session: match })
+                } else {
+                    clearWorkoutSnapshot()
+                }
+            })
+            .catch(() => {
+                // Offline: still allow resuming from the local snapshot.
+                setResumeSnapshot({ snapshot, session: { id: snapshot.sessionId, title: snapshot.title || 'Unfinished workout', exercises: snapshot.exercises || [], date: snapshot.date } })
+            })
+    }, [showToast])
+
+    function startSession(session) {
+        setResumeSnapshot(null)
+        setActiveSession(session)
+    }
+
+    function discardResume() {
+        clearWorkoutSnapshot()
+        setResumeSnapshot(null)
+        const sessionId = resumeSnapshot?.snapshot?.sessionId
+        if (sessionId) {
+            apiFetch(`/sessions/${sessionId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ status: 'scheduled' }),
+            }).catch(() => {})
+        }
+        loadSessions()
+    }
 
     async function handleRpeRating(sessionId, rating) {
         try {
@@ -67,6 +113,7 @@ export default function WorkoutTracker() {
     }
 
     async function deleteExercise(sessionId, exerciseId) {
+        if (!(await confirmSwal('Remove this exercise from the session?', 'Delete exercise?'))) return
         try {
             await apiFetch(`/sessions/${sessionId}/exercises/${exerciseId}`, {
                 method: 'DELETE'
@@ -74,7 +121,7 @@ export default function WorkoutTracker() {
             showToast('Exercise deleted')
             loadSessions()
         } catch {
-            showToast('Error deleting exercise')
+            swalError('Error deleting exercise')
         }
     }
 
@@ -98,7 +145,13 @@ export default function WorkoutTracker() {
     }
 
     function handleNewExerciseChange(field, value) {
-        setExerciseForm(prev => ({ ...prev, [field]: value }))
+        // Manual name edit breaks the catalog link — drop it to avoid a mismatched reference.
+        const next = field === 'name' ? { ...exerciseForm, name: value, exerciseId: '' } : { ...exerciseForm, [field]: value }
+        setExerciseForm(next)
+    }
+
+    function pickCatalogExercise(ex) {
+        setExerciseForm(prev => ({ ...prev, name: ex.name, exerciseId: ex.id }))
     }
 
     function addExerciseToList() {
@@ -139,7 +192,7 @@ export default function WorkoutTracker() {
 
     const filteredSessions = sessions.filter(s => {
         if (activeTab === 'all') return true
-        if (activeTab === 'scheduled') return s.status === 'scheduled'
+        if (activeTab === 'scheduled') return s.status === 'scheduled' || s.status === 'in_progress'
         if (activeTab === 'completed') return s.status === 'completed'
         return true
     })
@@ -150,6 +203,7 @@ export default function WorkoutTracker() {
 
     function getStatusLabel(status) {
         if (status === 'completed') return { label: 'Completed', cls: 'wt-status-completed' }
+        if (status === 'in_progress') return { label: 'In Progress', cls: 'wt-status-inprogress' }
         return { label: 'Scheduled', cls: 'wt-status-scheduled' }
     }
 
@@ -195,6 +249,24 @@ export default function WorkoutTracker() {
                     Completed
                 </button>
             </div>
+
+            {resumeSnapshot && (
+                <div className="wt-resume-banner">
+                    <div className="wt-resume-info">
+                        <Clock size={16} />
+                        <div>
+                            <div className="wt-resume-title">We found an unfinished workout</div>
+                            <div className="wt-resume-sub">{resumeSnapshot.session.title || 'Workout session'}</div>
+                        </div>
+                    </div>
+                    <div className="wt-resume-actions">
+                        <button className="wt-btn wt-btn-sm" onClick={discardResume}>Discard</button>
+                        <button className="wt-btn wt-btn-sm" style={{ background: 'var(--power-500)', color: '#111', border: 'none' }} onClick={() => startSession(resumeSnapshot.session)}>
+                            <Play style={{ width: 12, height: 12 }} /> Continue
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {filteredSessions.length === 0 ? (
                 <div className="wt-empty">
@@ -315,32 +387,48 @@ export default function WorkoutTracker() {
 
                                         <div className="wt-actions">
                                             {session.status !== 'completed' && (
+                                                <>
+                                                    <button
+                                                        className="wt-btn wt-btn-sm"
+                                                        style={{ background: 'var(--power-500)', color: '#111', border: 'none' }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            startSession(session)
+                                                        }}
+                                                    >
+                                                        <Play style={{ width: 14, height: 14 }} />
+                                                        {session.status === 'in_progress' ? 'Continue' : 'Start'} Workout
+                                                    </button>
+                                                    <button
+                                                        className="wt-btn wt-btn-success wt-btn-sm"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            completeSession(session.id)
+                                                        }}
+                                                    >
+                                                        <CheckCircle style={{ width: 14, height: 14 }} />
+                                                        Mark Completed
+                                                    </button>
+                                                </>
+                                            )}
+                                            {!isClient && (
                                                 <button
-                                                    className="wt-btn wt-btn-success wt-btn-sm"
+                                                    className="wt-btn wt-btn-sm"
                                                     onClick={(e) => {
                                                         e.stopPropagation()
-                                                        completeSession(session.id)
+                                                        setShowAddExercise(showAddExercise === session.id ? null : session.id)
+                                                        setExerciseForm({ ...emptyExercise })
                                                     }}
                                                 >
-                                                    <CheckCircle style={{ width: 14, height: 14 }} />
-                                                    Complete Workout
+                                                    <Plus style={{ width: 14, height: 14 }} />
+                                                    Add Exercise
                                                 </button>
                                             )}
-                                            <button
-                                                className="wt-btn wt-btn-sm"
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    setShowAddExercise(showAddExercise === session.id ? null : session.id)
-                                                    setExerciseForm({ ...emptyExercise })
-                                                }}
-                                            >
-                                                <Plus style={{ width: 14, height: 14 }} />
-                                                Add Exercise
-                                            </button>
                                         </div>
 
-                                        {showAddExercise === session.id && (
-                                            <div className="wt-exercise-form" style={{ marginTop: 12 }}>
+                                        {showAddExercise === session.id && !isClient && (
+                                            <div className="wt-exercise-form" style={{ marginTop: 12 }} onClick={e => e.stopPropagation()}>
+                                                <ExercisePicker onSelect={pickCatalogExercise} placeholder="Search catalog to add exercise..." />
                                                 <div className="wt-exercise-form-row">
                                                     <input
                                                         placeholder="Exercise name"
@@ -407,8 +495,7 @@ export default function WorkoutTracker() {
             )}
 
             {showNewForm && (
-                <div className="wt-form-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowNewForm(false) }}>
-                    <div className="wt-form-card">
+                <div className="wt-form-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowNewForm(false) }}>                    <div className="wt-form-card">
                         <div className="wt-form-header">
                             <h2>Log New Workout</h2>
                             <button className="wt-form-close" onClick={() => setShowNewForm(false)}>
@@ -468,41 +555,48 @@ export default function WorkoutTracker() {
                                     </button>
                                 </div>
                             ))}
-                            <div className="wt-exercise-form-row" style={{ marginTop: 8 }}>
-                                <input
-                                    placeholder="Name"
-                                    value={exerciseForm.name}
-                                    onChange={e => setExerciseForm(prev => ({ ...prev, name: e.target.value }))}
-                                />
-                                <input
-                                    type="number"
-                                    placeholder="Sets"
-                                    value={exerciseForm.sets}
-                                    onChange={e => setExerciseForm(prev => ({ ...prev, sets: e.target.value }))}
-                                />
-                                <input
-                                    type="number"
-                                    placeholder="Reps"
-                                    value={exerciseForm.reps}
-                                    onChange={e => setExerciseForm(prev => ({ ...prev, reps: e.target.value }))}
-                                />
-                                <input
-                                    type="number"
-                                    placeholder="Weight"
-                                    value={exerciseForm.weight}
-                                    onChange={e => setExerciseForm(prev => ({ ...prev, weight: e.target.value }))}
-                                />
-                            </div>
-                            <div className="wt-exercise-form-footer">
-                                <input
-                                    placeholder="Notes (optional)"
-                                    value={exerciseForm.notes}
-                                    onChange={e => setExerciseForm(prev => ({ ...prev, notes: e.target.value }))}
-                                />
-                                <button className="wt-btn wt-btn-sm" onClick={addExerciseToList}>
-                                    Add to list
-                                </button>
-                            </div>
+                            {!isClient && (
+                                <>
+                                    <div className="wt-exercise-form-row" style={{ marginTop: 8 }}>
+                                        <input
+                                            placeholder="Name"
+                                            value={exerciseForm.name}
+                                            onChange={e => handleNewExerciseChange('name', e.target.value)}
+                                        />
+                                        <input
+                                            type="number"
+                                            placeholder="Sets"
+                                            value={exerciseForm.sets}
+                                            onChange={e => setExerciseForm(prev => ({ ...prev, sets: e.target.value }))}
+                                        />
+                                        <input
+                                            type="number"
+                                            placeholder="Reps"
+                                            value={exerciseForm.reps}
+                                            onChange={e => setExerciseForm(prev => ({ ...prev, reps: e.target.value }))}
+                                        />
+                                        <input
+                                            type="number"
+                                            placeholder="Weight"
+                                            value={exerciseForm.weight}
+                                            onChange={e => setExerciseForm(prev => ({ ...prev, weight: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="wt-form-picker-hint">
+                                        <ExercisePicker onSelect={pickCatalogExercise} placeholder="…or search the catalog to fill the name" />
+                                    </div>
+                                    <div className="wt-exercise-form-footer">
+                                        <input
+                                            placeholder="Notes (optional)"
+                                            value={exerciseForm.notes}
+                                            onChange={e => setExerciseForm(prev => ({ ...prev, notes: e.target.value }))}
+                                        />
+                                        <button className="wt-btn wt-btn-sm" onClick={addExerciseToList}>
+                                            Add to list
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         <button
@@ -514,6 +608,17 @@ export default function WorkoutTracker() {
                         </button>
                     </div>
                 </div>
+            )}
+
+            {activeSession && (
+                <GuidedWorkout
+                    session={activeSession}
+                    onClose={() => {
+                        setActiveSession(null)
+                        loadSessions()
+                    }}
+                    onFinished={() => loadSessions()}
+                />
             )}
         </div>
     )

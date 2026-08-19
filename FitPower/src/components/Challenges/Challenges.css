@@ -289,3 +289,8 @@
 .ch-btn-leave:hover {
     background: rgba(239, 68, 68, .2);
 }
+
+@media (max-width: 640px) {
+    .ch-wrap { padding: 16px 12px; }
+    .ch-card { padding: 14px; }
+}

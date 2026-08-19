@@ -1,32 +1,25 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 
 const ThemeContext = createContext()
 
-function getInitialTheme() {
-    const stored = localStorage.getItem('theme')
-    if (stored === 'light' || stored === 'dark') return stored
-    if (window.matchMedia?.('(prefers-color-scheme: light)').matches) return 'light'
-    return 'dark'
-}
+const DARK_THEME = 'dark'
 
 export function ThemeProvider({ children }) {
-    const [theme, setThemeState] = useState(getInitialTheme)
+    const [theme] = useState(DARK_THEME)
 
     useEffect(() => {
-        document.documentElement.setAttribute('data-theme', theme)
-        localStorage.setItem('theme', theme)
-    }, [theme])
-
-    const toggleTheme = useCallback(() => {
-        setThemeState(prev => (prev === 'dark' ? 'light' : 'dark'))
+        document.documentElement.setAttribute('data-theme', DARK_THEME)
+        document.documentElement.style.colorScheme = DARK_THEME
+        try { localStorage.setItem('theme', DARK_THEME) } catch { /* storage unavailable */ }
     }, [])
 
-    const setTheme = useCallback((t) => {
-        if (t === 'light' || t === 'dark') setThemeState(t)
-    }, [])
+    const toggleTheme = useCallback(() => {}, [])
+    const setTheme = useCallback(() => {}, [])
+
+    const value = useMemo(() => ({ theme, toggleTheme, setTheme }), [theme, toggleTheme, setTheme])
 
     return (
-        <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
+        <ThemeContext.Provider value={value}>
             {children}
         </ThemeContext.Provider>
     )

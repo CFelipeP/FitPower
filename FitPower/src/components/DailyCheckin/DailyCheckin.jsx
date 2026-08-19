@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import { Sun, Moon, Cloud, Activity, Calendar, Smile } from 'lucide-react'
 import './DailyCheckin.css'
@@ -61,8 +62,10 @@ export default function DailyCheckin() {
             setCheckedIn(true)
             setDirty(false)
             showToast('Check-in saved!')
+            const unlocked = result?.newAchievements || []
+            unlocked.forEach(a => showToast(`Trophy unlocked: ${a.label} (+${a.points} pts)`))
         } catch (e) {
-            showToast(e.message || 'Failed to save check-in')
+            swalError(e.message || 'Failed to save check-in')
         } finally {
             setSaving(false)
         }
@@ -226,7 +229,7 @@ export default function DailyCheckin() {
                                     <div
                                         className="dc-history-bar"
                                         style={{
-                                            width: `${(h.energyLevel || 5) * 10}%`,
+                                            width: `${Math.min(100, Math.max(0, (h.energyLevel ?? 0) * 10))}%`,
                                             backgroundColor: moodColors[h.mood] || '#555',
                                         }}
                                     />

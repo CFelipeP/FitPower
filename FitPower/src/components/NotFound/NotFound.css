@@ -13,7 +13,7 @@
 }
 
 .not-found-code {
-    font-size: 120px;
+    font-size: clamp(80px, 22vw, 160px);
     font-weight: 900;
     line-height: 1;
     background: linear-gradient(135deg, var(--power-500), var(--power-700));
@@ -39,6 +39,7 @@
 
 .not-found-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 12px;
     justify-content: center;
 }
@@ -46,6 +47,7 @@
 .not-found-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     padding: 12px 24px;
     border-radius: var(--radius-md);
@@ -53,6 +55,12 @@
     font-size: 14px;
     text-decoration: none;
     transition: all .2s;
+    min-height: 44px;
+}
+
+@media (max-width: 480px) {
+    .not-found-actions { flex-direction: column; width: 100%; }
+    .not-found-btn { width: 100%; }
 }
 
 .not-found-btn-primary {

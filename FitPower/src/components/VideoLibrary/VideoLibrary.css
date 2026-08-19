@@ -677,3 +677,21 @@
     gap: 10px;
     margin-top: 20px;
 }
+
+/* ── Mobile hardening ── */
+@media (max-width: 640px) {
+    .vl-overlay { padding: 0; align-items: flex-end; }
+    .vl-modal {
+        width: 100%;
+        max-width: 100%;
+        max-height: 92vh;
+        border-radius: 16px 16px 0 0;
+        padding-top: 12px;
+    }
+    .vl-modal-close { width: 44px; height: 44px; }
+    .vl-action-btn { min-height: 44px; }
+    .vl-search,
+    .vl-feedback-textarea,
+    .vl-edit-input,
+    .vl-edit-textarea { font-size: 16px; }
+}

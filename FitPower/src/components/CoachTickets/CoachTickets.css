@@ -1,0 +1,152 @@
+.ckt-wrap {
+    padding: 24px;
+    max-width: 860px;
+    margin: 0 auto;
+}
+
+.ckt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.ckt-title {
+    font-size: 24px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 6px;
+    color: #fff;
+}
+
+.ckt-title svg { color: var(--power-500, #FFD600); }
+
+.ckt-subtitle { color: #888; font-size: 14px; margin: 0; }
+
+.ckt-filter {
+    background: #1a1a24;
+    border: 1px solid #2a2a35;
+    border-radius: 10px;
+    color: #ddd;
+    padding: 9px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    min-width: 150px;
+}
+
+.ckt-list { display: flex; flex-direction: column; gap: 12px; }
+
+.ckt-card {
+    background: #13131a;
+    border: 1px solid #2a2a35;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.ckt-card-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    font-family: inherit;
+    text-align: left;
+}
+
+.ckt-card-info { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+.ckt-card-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.ckt-card-subject { font-weight: 600; color: #fff; font-size: 15px; }
+
+.ckt-card-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.ckt-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    text-transform: capitalize;
+}
+
+.ckt-status-open { background: rgba(59, 130, 246, .15); color: #60a5fa; }
+.ckt-status-in_progress { background: rgba(245, 158, 11, .15); color: #fbbf24; }
+.ckt-status-critical { background: rgba(239, 68, 68, .15); color: #f87171; }
+.ckt-status-resolved { background: rgba(34, 197, 94, .15); color: #4ade80; }
+.ckt-status-closed { background: rgba(115, 115, 115, .2); color: #a3a3a3; }
+
+.ckt-card-user { color: #a3a3a3; font-size: 13px; }
+.ckt-card-date { color: #666; font-size: 12px; }
+
+.ckt-card-body { padding: 0 18px 18px; border-top: 1px solid #1f1f28; padding-top: 14px; }
+
+.ckt-message { color: #ccc; font-size: 14px; margin: 0 0 16px; white-space: pre-wrap; }
+
+.ckt-replies { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+
+.ckt-reply { background: #0e0e14; border: 1px solid #23232e; border-radius: 12px; padding: 12px 14px; }
+
+.ckt-reply-staff { border-color: rgba(255, 214, 0, .25); background: rgba(255, 214, 0, .05); }
+
+.ckt-reply-meta { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.ckt-reply-author { font-size: 12px; font-weight: 600; color: var(--power-500, #FFD600); }
+.ckt-reply-date { font-size: 11px; color: #666; }
+.ckt-reply-text { color: #ccc; font-size: 13px; margin: 0; white-space: pre-wrap; }
+
+.ckt-reply-form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+
+.ckt-input {
+    background: #0e0e14;
+    border: 1px solid #2a2a35;
+    border-radius: 10px;
+    color: #fff;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 70px;
+}
+
+.ckt-actions { display: flex; justify-content: flex-end; }
+
+.ckt-btn {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .2s;
+}
+
+.ckt-btn-primary { background: var(--power-500, #FFD600); color: #000; }
+.ckt-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+.ckt-btn-close { background: rgba(239, 68, 68, .12); color: #f87171; border: 1px solid rgba(239, 68, 68, .3); }
+.ckt-btn-close:hover { background: rgba(239, 68, 68, .2); }
+.ckt-btn-close:disabled { opacity: .5; cursor: not-allowed; }
+
+.ckt-empty {
+    text-align: center;
+    color: #666;
+    padding: 48px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .ckt-wrap { padding: 16px 12px; }
+}
+

@@ -225,3 +225,12 @@
         grid-template-columns: 1fr;
     }
 }
+
+.pm-avatar-initials { display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 28px; color: #eee; background: rgba(255, 214, 0, .15); }
+
+/* ── Mobile hardening ── */
+@media (max-width: 640px) {
+    .pm-modal { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+    .pm-field input, .pm-field select { font-size: 16px; }
+    .pm-close { width: 44px; height: 44px; }
+}

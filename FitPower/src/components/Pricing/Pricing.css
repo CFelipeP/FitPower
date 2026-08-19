@@ -22,7 +22,7 @@
 .toggle-label {
     font-size: 14px;
     font-weight: 500;
-    color: #737373;
+    color: var(--text-muted);
     transition: color 0.3s ease;
 }
 
@@ -46,6 +46,14 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     cursor: pointer;
     transition: background 0.3s ease;
+    flex-shrink: 0;
+}
+
+.billing-toggle::before {
+    content: '';
+    position: absolute;
+    inset: -12px;
+    border-radius: inherit;
 }
 
 .toggle-dot {
@@ -116,7 +124,7 @@
 }
 
 .pricing-desc {
-    color: #737373;
+    color: var(--text-muted);
     font-size: 14px;
 }
 
@@ -130,7 +138,7 @@
 }
 
 .pricing-period {
-    color: #737373;
+    color: var(--text-muted);
     font-size: 14px;
     font-weight: 400;
 }
@@ -153,7 +161,7 @@
 }
 
 .pricing-features li.disabled {
-    color: #737373;
+    color: var(--text-muted);
 }
 
 .pricing-features li svg {
@@ -246,3 +254,8 @@
     .billing-toggle-wrapper { margin-top: 24px; }
 }
 
+
+@media (max-width: 767px) {
+    .pricing-grid { grid-template-columns: 1fr !important; }
+    .billing-toggle-wrapper { flex-wrap: wrap; justify-content: center; }
+}

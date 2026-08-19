@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
+import Avatar from '../Avatar/Avatar'
 import { Search, Filter, X, Check, Ban, Trash2, AlertTriangle } from 'lucide-react'
 
 export default function AdminUsers() {
@@ -24,8 +26,8 @@ export default function AdminUsers() {
         if (st) params.set('status', st)
         apiFetch(`/admin/users?${params}`)
             .then(d => { setUsers(d.users || []); setTotal(d.total || 0); setPage(d.page || 1) })
-            .catch(() => showToast('Error loading users'))
-    }, [showToast])
+            .catch(() => swalError('Error loading users'))
+    }, [])
 
     useEffect(() => { fetchUsers(page, search, roleFilter, statusFilter) }, [page, roleFilter, statusFilter, fetchUsers])
 
@@ -57,7 +59,7 @@ export default function AdminUsers() {
             showToast(`Users ${action}ed successfully`)
             setSelected([])
             fetchUsers(page, search, roleFilter, statusFilter)
-        } catch (e) { showToast(e.message || `Error ${action}ing users`) }
+        } catch (e) { swalError(e.message || `Error ${action}ing users`) }
     }
 
     const viewUser = async (user) => {
@@ -75,7 +77,7 @@ export default function AdminUsers() {
 
     const activateUser = async (id) => {
         try { await apiFetch(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify({ status: 'active' }) }); showToast('User activated'); fetchUsers(page, search, roleFilter, statusFilter) }
-        catch (e) { showToast(e.message || 'Error') }
+        catch (e) { swalError(e.message || 'Error') }
     }
 
     const deleteUser = async (id) => {
@@ -103,7 +105,7 @@ export default function AdminUsers() {
             setUserModalOpen(false)
             setSelectedUser(null)
             fetchUsers(page, search, roleFilter, statusFilter)
-        } catch (e) { showToast(e.message || 'Error'); setConfirmAction(null) }
+        } catch (e) { swalError(e.message || 'Error'); setConfirmAction(null) }
     }
 
     const totalPages = Math.ceil(total / 20)
@@ -114,7 +116,7 @@ export default function AdminUsers() {
                 <h1 className="ad-content-title"><Filter size={24} /> User Management</h1>
                 <div className="ad-content-actions">
                     <div style={{ position: 'relative' }}>
-                        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#525252' }} />
+                        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
                         <input className="ad-content-search" style={{ paddingLeft: 36 }} placeholder="Search users..." value={search} onChange={e => handleSearch(e.target.value)} />
                     </div>
                     <select className="ad-content-search" style={{ minWidth: 120 }} value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1) }}>
@@ -154,7 +156,7 @@ export default function AdminUsers() {
                         {users.map(u => (
                             <tr key={u.id} className="ad-user-row">
                                 <td><input type="checkbox" checked={selected.includes(u.id)} onChange={() => toggleSelect(u.id)} style={{ accentColor: 'var(--power-500)' }} /></td>
-                                <td onClick={() => viewUser(u)}><div className="ad-user-cell"><img loading="lazy" src={'https://picsum.photos/seed/user-' + u.id + '/40/40.jpg'} alt="" className="ad-user-avatar" /><div className="ad-user-cell-info"><div>{u.firstName} {u.lastName}</div><div>{u.email}</div></div></div></td>
+                                <td onClick={() => viewUser(u)}><div className="ad-user-cell"><Avatar name={u.firstName + ' ' + u.lastName} src={u.photo || null} size={40} className="ad-user-avatar" /><div className="ad-user-cell-info"><div>{u.firstName} {u.lastName}</div><div>{u.email}</div></div></div></td>
                                 <td><span className={'ad-tier-label ad-tier-' + (u.role === 'admin' ? 'pro' : u.role === 'coach' ? 'elite' : 'starter')}>{u.role || 'client'}</span></td>
                                 <td><span className={'ad-status-badge ad-status-' + (u.status === 'active' ? 'active' : u.status === 'suspended' ? 'cancelled' : 'pending')}><span className="ad-status-dot" />{u.status}</span></td>
                                 <td><span className="ad-time">{u.registered ? new Date(u.registered).toLocaleDateString() : '-'}</span></td>
@@ -168,7 +170,7 @@ export default function AdminUsers() {
                             </tr>
                         ))}
                         {users.length === 0 && (
-                            <tr><td colSpan={6} style={{ textAlign: 'center', color: '#737373', padding: 32 }}>No users found</td></tr>
+                            <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>No users found</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -190,7 +192,7 @@ export default function AdminUsers() {
                     {selectedUser && (
                         <>
                             <div className="ad-modal-profile">
-                                <img loading="lazy" src={'https://picsum.photos/seed/user-' + selectedUser.id + '/80/80.jpg'} alt="" className="ad-modal-avatar" />
+                                <Avatar name={selectedUser.firstName + ' ' + selectedUser.lastName} src={selectedUser.photo || null} size={80} className="ad-modal-avatar" />
                                 <div>
                                     <div className="ad-modal-user-name">{selectedUser.firstName} {selectedUser.lastName}</div>
                                     <div className="ad-modal-user-meta">{selectedUser.email} · UID: {selectedUser.id}</div>

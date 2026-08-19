@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { apiFetch } from '../../lib/api'
+import { swalError } from '../../lib/alerts'
 import { useToast } from '../../context/ToastContext'
 import { Sunrise, Sun, Moon, Cookie, Plus, X, Check, Droplets } from 'lucide-react'
 import './NutritionTracker.css'
@@ -44,21 +45,21 @@ export default function NutritionTracker() {
     }).catch(() => {})
     apiFetch('/nutrition?date=today')
       .then(data => {
-        if (data.breakfastChecked !== undefined) setMeals({
-          breakfastChecked: data.breakfastChecked,
-          lunchChecked: data.lunchChecked,
-          dinnerChecked: data.dinnerChecked,
-          snackChecked: data.snackChecked,
+        if (Array.isArray(data.mealChecked)) setMeals({
+          breakfastChecked: !!data.mealChecked[0],
+          lunchChecked: !!data.mealChecked[1],
+          dinnerChecked: !!data.mealChecked[2],
+          snackChecked: !!data.mealChecked[3],
         })
         if (data.waterGlasses !== undefined) setWaterGlasses(data.waterGlasses)
-        if (data.caloriesConsumed !== undefined) setMacros({
-          caloriesConsumed: data.caloriesConsumed,
-          proteinCurrent: data.proteinCurrent,
-          carbsCurrent: data.carbsCurrent,
-          fatCurrent: data.fatCurrent,
+        if (data.consumed !== undefined) setMacros({
+          caloriesConsumed: data.consumed,
+          proteinCurrent: data.protein?.current ?? 0,
+          carbsCurrent: data.carbs?.current ?? 0,
+          fatCurrent: data.fat?.current ?? 0,
         })
       })
-      .catch(() => showToast('Error loading nutrition data'))
+      .catch(() => swalError('Error loading nutrition data'))
       .finally(() => setLoading(false))
   }, [showToast])
 
@@ -76,7 +77,7 @@ export default function NutritionTracker() {
       })
       showSaveSuccess()
     } catch {
-      showToast('Error saving nutrition data')
+      swalError('Error saving nutrition data')
     }
   }
 

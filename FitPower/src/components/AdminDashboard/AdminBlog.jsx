@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useToast } from '../../context/ToastContext'
 import { apiFetch } from '../../lib/api'
+import { confirmSwal, swalError } from '../../lib/alerts'
 import { FileText, Plus, X, Eye, Archive } from 'lucide-react'
 import DOMPurify from 'dompurify'
 
@@ -27,25 +28,25 @@ export default function AdminBlog() {
     }
 
     const handleSave = async () => {
-        if (!form.title) { showToast('Title is required'); return }
+        if (!form.title) { swalError('Title is required'); return }
         const body = { ...form, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean) }
         try {
             if (editId) { await apiFetch(`/blog/${editId}`, { method: 'PUT', body: JSON.stringify(body) }); showToast('Article updated') }
             else { await apiFetch('/blog', { method: 'POST', body: JSON.stringify(body) }); showToast('Article created') }
             setModalOpen(false); apiFetch('/blog').then(d => setArticles(d.articles || d.data || [])).catch(() => {})
-        } catch (e) { showToast(e.message || 'Error') }
+        } catch (e) { swalError(e.message || 'Error') }
     }
 
     const deleteArticle = async (id) => {
-        if (!confirm('Delete this article?')) return
+        if (!(await confirmSwal('Delete this article?'))) return
         try { await apiFetch(`/blog/${id}`, { method: 'DELETE' }); showToast('Article deleted'); apiFetch('/blog').then(d => setArticles(d.articles || d.data || [])).catch(() => {}) }
-        catch (e) { showToast(e.message || 'Error') }
+        catch (e) { swalError(e.message || 'Error') }
     }
 
     const toggleStatus = async (a) => {
         const newStatus = a.status === 'published' ? 'draft' : 'published'
         try { await apiFetch(`/blog/${a.id}`, { method: 'PUT', body: JSON.stringify({ status: newStatus }) }); showToast(`Article ${newStatus}`); apiFetch('/blog').then(d => setArticles(d.articles || d.data || [])).catch(() => {}) }
-        catch (e) { showToast(e.message || 'Error') }
+        catch (e) { swalError(e.message || 'Error') }
     }
 
     return (
@@ -68,7 +69,7 @@ export default function AdminBlog() {
                         <button className="ad-btn ad-btn-danger ad-btn-xs" onClick={() => deleteArticle(a.id)}><Archive size={14} /></button>
                     </div>
                 ))}
-                {articles.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: '#737373' }}>No articles yet</div>}
+                {articles.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No articles yet</div>}
             </div>
 
             <div className={'ad-modal-overlay' + (modalOpen ? ' ad-modal-open' : '')} onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
