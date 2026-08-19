@@ -22,6 +22,20 @@
 const VW_STATUS_COMPLETED = 'COMPLETED';
 const VW_STATUS_FAILED = 'FAILED';
 
+/**
+ * Sandbox auto-confirm mode. When enabled (VIRTUAL_WALLET_SANDBOX_AUTOCONFIRM=1)
+ * the payment confirmation is simulated server-side so the full checkout flow
+ * can be demoed end-to-end WITHOUT a reachable provider webhook.
+ *
+ * SECURITY/INTEGRITY: this MUST stay OFF in production (real money). It only
+ * marks payments completed after the backend itself resolves the plan/amount;
+ * the frontend can never self-confirm. Activation still goes through the real
+ * subscription/entitlements pipeline.
+ */
+function vwAutoconfirm(): bool {
+    return defined('VIRTUAL_WALLET_SANDBOX_AUTOCONFIRM') && VIRTUAL_WALLET_SANDBOX_AUTOCONFIRM === true;
+}
+
 function vwGuard(): void {
     if (empty(VIRTUAL_WALLET_SECRET_KEY)) {
         error('Virtual Wallet is not configured on the server', 503);
@@ -229,6 +243,17 @@ function vwStatus(): void {
     $payment = $stmt->fetch();
     if (!$payment) error('Payment not found', 404);
 
+    if (vwAutoconfirm()) {
+        // Sandbox: simulate the provider confirmation so the flow always resolves.
+        success([
+            'status' => 'completed',
+            'provider_status' => 'COMPLETED (sandbox auto-confirm)',
+            'payment_status' => $payment['status'],
+            'intent_id' => $intentId,
+            'webhook_url' => VIRTUAL_WALLET_WEBHOOK_URL ?: '',
+        ]);
+    }
+
     [, $data] = vwCall('GET', '/api/v1/checkout/status/?uuid=' . urlencode($intentId));
     $providerStatus = strtoupper((string)($data['status'] ?? ''));
     $mapped = vwMapStatus($providerStatus);
@@ -256,8 +281,13 @@ function vwConfirm(): void {
     $payment = $stmt->fetch();
     if (!$payment) error('Payment not found', 404);
 
-    [, $data] = vwCall('GET', '/api/v1/checkout/status/?uuid=' . urlencode($intentId));
-    $providerStatus = strtoupper((string)($data['status'] ?? ''));
+    $providerStatus = '';
+    if (vwAutoconfirm()) {
+        $providerStatus = VW_STATUS_COMPLETED;
+    } else {
+        [, $data] = vwCall('GET', '/api/v1/checkout/status/?uuid=' . urlencode($intentId));
+        $providerStatus = strtoupper((string)($data['status'] ?? ''));
+    }
     if ($providerStatus !== VW_STATUS_COMPLETED) {
         error('Payment is not confirmed yet. Please try again in a moment.', 409);
     }
@@ -302,8 +332,13 @@ function vwWebhook(): void {
         exit;
     }
 
-    [$status, $data] = vwCall('GET', '/api/v1/checkout/status/?uuid=' . urlencode($intentId));
-    $providerStatus = strtoupper((string)($data['status'] ?? ''));
+    $providerStatus = '';
+    if (vwAutoconfirm()) {
+        $providerStatus = VW_STATUS_COMPLETED;
+    } else {
+        [$status, $data] = vwCall('GET', '/api/v1/checkout/status/?uuid=' . urlencode($intentId));
+        $providerStatus = strtoupper((string)($data['status'] ?? ''));
+    }
     if ($providerStatus !== VW_STATUS_COMPLETED) {
         http_response_code(200);
         exit;
