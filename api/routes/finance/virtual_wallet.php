@@ -54,6 +54,7 @@ function vwCall(string $method, string $path, ?array $payload = null): array {
         CURLOPT_CUSTOMREQUEST => $method,
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_TIMEOUT => 25,
+        CURLOPT_CONNECTTIMEOUT => 6,
     ]);
     if ($payload !== null) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
