@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
 import { apiFetch } from '../../lib/api'
-import { exportProgressData } from '../../lib/export'
+import { exportProgressData, exportWorkoutData } from '../../lib/export'
 import { mediaUrl } from '../../lib/media'
 import {
     Zap, X, LayoutDashboard, CalendarDays, Dumbbell, Utensils,
@@ -430,6 +430,26 @@ export default function ClientDashboard() {
             apiFetch('/dashboard/client').then(setData).catch(() => {})
         } catch (e) {
             showToast(e.message || 'Could not freeze your streak')
+        }
+    }
+
+    // Export progress/workouts to PDF using the real user data.
+    const handleExportProgress = async () => {
+        try {
+            const metrics = await apiFetch('/export/metrics')
+            const list = Array.isArray(metrics) ? metrics : (metrics?.data || [])
+            exportProgressData(Array.isArray(list) ? list : [])
+        } catch {
+            showToast('Could not load your progress data')
+        }
+    }
+
+    const handleExportWorkouts = async () => {
+        try {
+            const sessions = await apiFetch('/sessions')
+            exportWorkoutData(Array.isArray(sessions) ? sessions : [])
+        } catch {
+            showToast('Could not load your workout history')
         }
     }
 
@@ -884,11 +904,16 @@ export default function ClientDashboard() {
         <div className="dashboard-section">
             <div className="dashboard-section-header">
                 <h2 className="dashboard-section-title">Progress</h2>
-                <button className="dashboard-export-btn" onClick={() => exportProgressData(data?.metrics || [])}>
-                    Export PDF
-                </button>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button className="dashboard-export-btn" onClick={handleExportProgress}>
+                        Progress PDF
+                    </button>
+                    <button className="dashboard-export-btn" onClick={handleExportWorkouts}>
+                        Workouts PDF
+                    </button>
+                </div>
             </div>
-            {data?.metrics && <ProgressCharts data={data.metrics} />}
+            <ProgressCharts />
         </div>
     ) : activeNav === 'Training Videos' ? (
         <ClientTrainingVideos />

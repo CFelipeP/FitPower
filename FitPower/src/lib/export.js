@@ -163,10 +163,10 @@ export function exportProgressData(metrics) {
         { key: 'bmi', label: 'BMI' },
     ]
     const data = metrics.map(m => ({
-        date: m.created_at ? new Date(m.created_at).toLocaleDateString() : '—',
-        weight: m.weight ?? '—',
-        bodyFat: m.bodyFat ?? m.body_fat ?? '—',
-        muscle: m.muscle ?? '—',
+        date: m.date || m.log_date || (m.created_at ? new Date(m.created_at).toLocaleDateString() : '—'),
+        weight: m.weight ?? m.weight_kg ?? '—',
+        bodyFat: m.bodyFat ?? m.body_fat ?? m.body_fat_pct ?? '—',
+        muscle: m.muscle ?? m.muscle_kg ?? '—',
         bmi: m.bmi ?? '—',
     }))
     exportToPDF('Progress Report', data, columns)
