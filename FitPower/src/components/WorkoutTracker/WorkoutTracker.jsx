@@ -56,7 +56,7 @@ export default function WorkoutTracker() {
         apiFetch('/sessions')
             .then(list => {
                 const match = list.find(s => s.id === snapshot.sessionId)
-                if (match && match.status !== 'completed') {
+                if (match && !match.progressCompleted) {
                     setResumeSnapshot({ snapshot, session: match })
                 } else {
                     clearWorkoutSnapshot()
@@ -210,8 +210,8 @@ export default function WorkoutTracker() {
 
     const filteredSessions = sessions.filter(s => {
         if (activeTab === 'all') return true
-        if (activeTab === 'scheduled') return s.status === 'scheduled' || s.status === 'in_progress'
-        if (activeTab === 'completed') return s.status === 'completed'
+        if (activeTab === 'scheduled') return !s.progressCompleted && (s.status === 'scheduled' || s.status === 'in_progress')
+        if (activeTab === 'completed') return s.progressCompleted
         return true
     })
 
@@ -219,8 +219,10 @@ export default function WorkoutTracker() {
         setExpandedId(prev => prev === id ? null : id)
     }
 
-    function getStatusLabel(status) {
-        if (status === 'completed') return { label: 'Completed', cls: 'wt-status-completed' }
+    function getStatusLabel(session) {
+        // Completion is per-user (progressCompleted), not the shared session status.
+        if (session.progressCompleted) return { label: 'Completed', cls: 'wt-status-completed' }
+        const status = session.status
         if (status === 'in_progress') return { label: 'In Progress', cls: 'wt-status-inprogress' }
         return { label: 'Scheduled', cls: 'wt-status-scheduled' }
     }
@@ -294,7 +296,7 @@ export default function WorkoutTracker() {
             ) : (
                 <div className="wt-session-list">
                     {filteredSessions.map(session => {
-                        const statusInfo = getStatusLabel(session.status)
+                        const statusInfo = getStatusLabel(session)
                         const isExpanded = expandedId === session.id
                         const exercises = session.exercises || []
                         return (
@@ -313,7 +315,7 @@ export default function WorkoutTracker() {
                                         </div>
                                     </div>
                                     <span className={'wt-status ' + statusInfo.cls}>
-                                        {session.status === 'completed' ? <CheckCircle /> : <Clock />}
+                                        {session.progressCompleted ? <CheckCircle /> : <Clock />}
                                         {statusInfo.label}
                                     </span>
                                     <ChevronDown className={'wt-chevron' + (isExpanded ? ' wt-open' : '')} />
@@ -448,7 +450,7 @@ export default function WorkoutTracker() {
                                         )}
 
                                         <div className="wt-actions">
-                                            {session.status !== 'completed' && (
+                                            {!session.progressCompleted && (
                                                 <>
                                                     <button
                                                         className="wt-btn wt-btn-sm"
@@ -469,7 +471,7 @@ export default function WorkoutTracker() {
                                                         }}
                                                     >
                                                         <CheckCircle style={{ width: 14, height: 14 }} />
-                                                        Mark Completed
+                                                        Complete Workout
                                                     </button>
                                                 </>
                                             )}

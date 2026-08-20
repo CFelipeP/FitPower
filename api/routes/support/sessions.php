@@ -160,11 +160,17 @@ function saveSessionProgress(string $id): void {
 
     // Persist real start/completion timestamps on the session itself and keep
     // program progress in sync. Both are idempotent.
+    // IMPORTANT: program workouts are shared sessions (user_id NULL), so the
+    // session-level status is per-user via session_progress only — we never
+    // mutate the shared row's status for other users.
+    $isOwner = (int)($session['user_id'] ?? 0) === (int)$auth['sub'];
     if ($completed) {
-        $db->prepare("UPDATE sessions SET status = 'completed', completed_at = COALESCE(completed_at, NOW()) WHERE id = ? AND status <> 'completed'")
-            ->execute([(int)$id]);
         recordSessionCompletionLogs($db, (int)$auth['sub'], (int)$id);
-    } else {
+        if ($isOwner) {
+            $db->prepare("UPDATE sessions SET status = 'completed', completed_at = COALESCE(completed_at, NOW()) WHERE id = ? AND status <> 'completed'")
+                ->execute([(int)$id]);
+        }
+    } elseif ($isOwner) {
         $db->prepare("UPDATE sessions SET status = 'in_progress', started_at = COALESCE(started_at, NOW()) WHERE id = ? AND status = 'scheduled'")
             ->execute([(int)$id]);
     }
@@ -468,8 +474,13 @@ function updateSession(string $id): void {
     // is the single source of truth for per-user completion, so the status path
     // converges with the guided-workout progress path.
     if (!empty($input['status']) && $input['status'] === 'completed') {
-        $db->prepare("UPDATE sessions SET completed_at = COALESCE(completed_at, NOW()) WHERE id = ?")
-            ->execute([$id]);
+        // Shared program workouts (user_id NULL) must not be globally marked
+        // completed: completion is per-user via session_progress + logs only.
+        $isOwner = (int)($session['user_id'] ?? 0) === (int)$auth['sub'];
+        if ($isOwner) {
+            $db->prepare("UPDATE sessions SET completed_at = COALESCE(completed_at, NOW()) WHERE id = ?")
+                ->execute([$id]);
+        }
         $db->prepare("
             INSERT INTO session_progress (session_id, user_id, progress, completed, updated_at)
             VALUES (?, ?, NULL, 1, NOW())
