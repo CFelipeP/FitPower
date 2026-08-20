@@ -831,3 +831,21 @@
     font-size: 14px;
     margin-bottom: 24px;
 }
+
+/* ── Responsive hardening (Client) ─────────────────────────────── */
+@media (max-width: 480px) {
+    .cl-main { min-width: 0; }
+    .cl-content { padding: 18px 12px; }
+    .cl-header-inner { height: auto; min-height: 60px; padding: 8px 12px; flex-wrap: wrap; gap: 8px; }
+    .cl-header-left { gap: 10px; }
+    .cl-header-right { gap: 8px; }
+    .cl-kpi-grid { gap: 10px; }
+    .cl-welcome-wrap { gap: 12px; }
+}
+@media (max-width: 360px) {
+    .cl-header-name { display: none; }
+    .cl-kpi-card { padding: 12px 10px; }
+}
+@media (min-width: 1920px) {
+    .cl-content { max-width: 1720px; margin-inline: auto; }
+}

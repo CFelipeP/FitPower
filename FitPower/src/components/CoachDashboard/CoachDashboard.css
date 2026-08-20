@@ -644,3 +644,21 @@
 @media (min-width: 900px) {
     .ctv-upload-grid.ctv-has-preview { grid-template-columns: 1fr 1fr; }
 }
+
+/* ── Responsive hardening (Coach) ──────────────────────────────── */
+@media (max-width: 480px) {
+    .cd-main { min-width: 0; }
+    .cd-content { padding: 18px 12px; }
+    .cd-header-inner { height: auto; min-height: 60px; padding: 8px 12px; flex-wrap: wrap; gap: 8px; }
+    .cd-header-left { gap: 10px; }
+    .cd-header-right { gap: 8px; }
+    .cd-kpi-grid { gap: 10px; }
+    .cd-welcome-wrap { gap: 12px; }
+}
+@media (max-width: 360px) {
+    .cd-header-name { display: none; }
+    .cd-kpi-card { padding: 12px 10px; }
+}
+@media (min-width: 1920px) {
+    .cd-content { max-width: 1720px; margin-inline: auto; }
+}

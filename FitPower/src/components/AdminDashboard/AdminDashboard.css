@@ -2374,3 +2374,20 @@
     .ad-modal-user-meta { min-width: 0; overflow-wrap: anywhere; }
     .ad-modal-actions { flex-wrap: wrap; }
 }
+
+/* ── Responsive hardening (Admin) ──────────────────────────────── */
+@media (max-width: 480px) {
+    .ad-main { min-width: 0; }
+    .ad-main-content { padding: 16px 12px; }
+    .ad-header-inner { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+    .ad-header-left, .ad-header-right { gap: 8px; }
+    .ad-kpi-grid { gap: 10px; }
+    .ad-content-header { flex-wrap: wrap; gap: 8px; }
+}
+@media (max-width: 360px) {
+    .ad-header-name { display: none; }
+    .ad-kpi-card { padding: 12px 10px; }
+}
+@media (min-width: 1920px) {
+    .ad-main-content { max-width: 1760px; margin-inline: auto; }
+}
