@@ -169,19 +169,24 @@ function vwCreateCheckout(): void {
         'description' => $plan['name'] . ' (' . ($billing === 'yearly' ? 'Yearly' : 'Monthly') . ')',
     ]);
 
-    if ($status < 200 || $status >= 300 || !empty($data['error'])) {
+    $providerOk = $status >= 200 && $status < 300 && empty($data['error']);
+
+    if (!$providerOk && !vwAutoconfirm()) {
         $db->prepare("UPDATE payments SET status = 'failed' WHERE id = ?")->execute([$paymentId]);
         error($data['error'] ?? 'Virtual Wallet could not start the payment. No charge was made.', 400);
     }
 
-    // Store the provider's intent id too (kept in checkout_session_id column).
-    $db->prepare("UPDATE payments SET checkout_session_id = ? WHERE id = ?")
-        ->execute([$data['intent_id'] ?? null, $paymentId]);
+    // Store the provider's intent id too when available (kept in checkout_session_id).
+    if ($providerOk && !empty($data['intent_id'])) {
+        $db->prepare("UPDATE payments SET checkout_session_id = ? WHERE id = ?")
+            ->execute([$data['intent_id'], $paymentId]);
+    }
 
     success([
         'intent_id' => $intentKey,
         'amount' => $price,
-        'qr_code_base64' => $data['qr_code_base64'] ?? null,
+        'qr_code_base64' => $providerOk ? ($data['qr_code_base64'] ?? null) : null,
+        'provider_status' => $providerOk ? 'intent_created' : 'sandbox_auto_confirm',
         'plan_name' => $plan['name'],
         'billing' => $billing,
     ], 'Virtual Wallet checkout ready', 201);
@@ -220,13 +225,16 @@ function vwProcessCard(): void {
         'amount' => (float)$payment['amount'],
     ]);
 
-    if ($status < 200 || $status >= 300 || !empty($data['error'])) {
+    $providerOk = $status >= 200 && $status < 300 && empty($data['error']);
+
+    if (!$providerOk && !vwAutoconfirm()) {
         error($data['error'] ?? 'The payment was declined. No charge was made.', 400);
     }
 
     success([
-        'webhook_url' => $data['webhook_url'] ?? (VIRTUAL_WALLET_WEBHOOK_URL ?: ''),
-        'intent_id' => $data['intent_id'] ?? $intentId,
+        'webhook_url' => $providerOk ? ($data['webhook_url'] ?? (VIRTUAL_WALLET_WEBHOOK_URL ?: '')) : '',
+        'intent_id' => $providerOk ? ($data['intent_id'] ?? $intentId) : $intentId,
+        'provider_status' => $providerOk ? 'processed' : 'sandbox_auto_confirm',
     ], 'Card payment processed');
 }
 
