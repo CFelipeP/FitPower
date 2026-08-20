@@ -532,6 +532,7 @@ export default function ClientDashboard() {
                                         </h1>
                                         <p className="cl-welcome-desc">
                                             You're on a <span className="cl-highlight-yellow"><strong>{data?.kpis?.streak || 0}-day streak</strong></span>.
+                                            {data?.kpis?.bestStreak > 0 && ` Best: ${data.kpis.bestStreak} days.`}
                                             {data?.streak?.atRisk
                                                 ? ' Complete a workout today to keep it.'
                                                 : ' Keep pushing.'}
@@ -584,6 +585,9 @@ export default function ClientDashboard() {
                                         <div className="cl-kpi-icon-box cl-blue"><Target /></div>
                                         <div className="cl-kpi-value" style={{ color: 'var(--power-500)' }}>{data?.kpis?.streak || 0}</div>
                                         <div className="cl-kpi-label">Day streak</div>
+                                        <div className="cl-kpi-label" style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                            Best: {data?.kpis?.bestStreak || 0} days
+                                        </div>
                                     </div>
                                 </div>
                             </div>

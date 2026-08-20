@@ -939,6 +939,28 @@ function clientDashboard(): void {
     $userName->execute([$userId]);
     $userName = $userName->fetchColumn() ?: 'Athlete';
 
+    // Real streak: days with at least one completed workout (single source of
+    // truth in helpers/streak.php). Best streak = longest consecutive run.
+    require_once __DIR__ . '/../../helpers/streak.php';
+    $streakInfo = computeStreak($db, $userId);
+    $streak = $streakInfo['streak'];
+    $workoutDates = getCompletedWorkoutDates($db, $userId);
+    $bestStreak = 0;
+    if (count($workoutDates) > 0) {
+        $run = 1;
+        $bestStreak = 1;
+        for ($i = 1; $i < count($workoutDates); $i++) {
+            $d1 = new DateTime($workoutDates[$i - 1]);
+            $d2 = new DateTime($workoutDates[$i]);
+            if ($d1->diff($d2)->days === 1) {
+                $run++;
+                if ($run > $bestStreak) $bestStreak = $run;
+            } else {
+                $run = 1;
+            }
+        }
+    }
+
     success([
         'userName' => $userName,
         'coachApplication' => $coachApplication,
@@ -947,6 +969,7 @@ function clientDashboard(): void {
             'workouts' => $workoutsDone . '/' . $workoutTarget,
             'totalHours' => $totalHours,
             'streak' => $streak,
+            'bestStreak' => $bestStreak,
         ],
         'activeProgram' => $activeProgram,
         'macros' => $macros,
