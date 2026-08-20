@@ -456,11 +456,16 @@ function updateSession(string $id): void {
     $updates = [];
     $params = [];
 
+    // Shared program workouts (user_id NULL) are per-user: their lifecycle
+    // (status/started/completed) must not be mutated on the shared row. Only
+    // session_progress + workout_logs change per user. Owners may edit freely.
+    $isOwner = (int)($session['user_id'] ?? 0) === (int)$auth['sub'];
+
     foreach ($fieldMap as $inputKey => $dbColumn) {
-        if (isset($input[$inputKey])) {
-            $updates[] = "$dbColumn = ?";
-            $params[] = $input[$inputKey];
-        }
+        if (!isset($input[$inputKey])) continue;
+        if (!$isOwner && ($inputKey === 'status')) continue; // per-user only
+        $updates[] = "$dbColumn = ?";
+        $params[] = $input[$inputKey];
     }
 
     if (!empty($updates)) {
