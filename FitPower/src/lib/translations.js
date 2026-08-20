@@ -1,4 +1,4 @@
-const translations = {
+﻿const translations = {
     en: {
         nav: {
             programs: 'Programs',
@@ -67,6 +67,7 @@ const translations = {
             startFree: 'Start Free Trial',
             mostPopular: 'Most Popular',
             perMonth: '/mo',
+            perYear: '/yr',
         },
         testimonials: {
             label: 'Reviews',
@@ -113,3 +114,4 @@ const translations = {
 }
 
 export default translations
+

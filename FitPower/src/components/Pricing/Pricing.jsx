@@ -76,7 +76,7 @@ export default function Pricing() {
                                 </div>
                                 <div className="pricing-price">
                                     <span className={plan.popular ? 'text-power' : ''}>{isYearly ? plan.price?.yearly : plan.price?.monthly}</span>
-                                    <span className="pricing-period">{t('pricing.perMonth')}</span>
+                                    <span className="pricing-period">{isYearly ? t('pricing.perYear') : t('pricing.perMonth')}</span>
                                 </div>
                                 <ul className="pricing-features">
                                     {(plan.features || []).map((f, j) => (
