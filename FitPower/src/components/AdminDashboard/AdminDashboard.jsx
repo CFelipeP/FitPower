@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+﻿import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
@@ -9,7 +9,7 @@ import { mediaUrl } from '../../lib/media'
 import { exportToCSV } from '../../lib/export'
 import { Counter } from '../Counter'
 import {
-    X, Zap, LayoutDashboard, Users, Dumbbell, CalendarDays,
+    X, Zap, LayoutDashboard, Users, Dumbbell,
     CreditCard, BarChart3, Video, FileText, Image as ImageIcon,
     MessageCircle, AlertTriangle, Settings, Shield,
     Search, Bell, ChevronDown, AlertCircle, Trash2,
@@ -49,7 +49,6 @@ const navItems = [
     { label: 'User Management', icon: Users },
     { label: 'Coaches', icon: Award },
     { label: 'Programs', icon: Dumbbell },
-    { label: 'Live Sessions', icon: CalendarDays },
     { label: 'Billing & Subs', icon: CreditCard },
     { label: 'Payments', icon: Wallet },
     { label: 'Plans', icon: Star },
@@ -108,8 +107,6 @@ export default function AdminDashboard() {
     const [replyTicketId, setReplyTicketId] = useState(null)
     const [replyMessage, setReplyMessage] = useState('')
     const [replySubmitting, setReplySubmitting] = useState(false)
-    const [liveSessions, setLiveSessions] = useState([])
-    const [liveSessionsLoading, setLiveSessionsLoading] = useState(false)
     const [mediaAssets, setMediaAssets] = useState([])
     const [mediaAssetsLoading, setMediaAssetsLoading] = useState(false)
     const [flaggedReports, setFlaggedReports] = useState([])
@@ -221,10 +218,7 @@ export default function AdminDashboard() {
 
     // Lazy-load tab-specific data only when tab is activated
     useEffect(() => {
-        if (activeNav === 'Live Sessions') {
-            setLiveSessionsLoading(true)
-            apiFetch('/admin/sessions').then(r => setLiveSessions(r.sessions || r.data || [])).catch(() => {}).finally(() => setLiveSessionsLoading(false))
-        } else if (activeNav === 'Media Assets') {
+        if (activeNav === 'Media Assets') {
             setMediaAssetsLoading(true)
             apiFetch('/admin/media').then(r => setMediaAssets(r.assets || r.data || [])).catch(() => {}).finally(() => setMediaAssetsLoading(false))
         } else if (activeNav === 'Flagged Reports') {
@@ -457,54 +451,7 @@ export default function AdminDashboard() {
 
             {/* ═══ MAIN CONTENT ═══ */}
             <main className="ad-main" style={{ marginLeft: sidebarCollapsed ? 64 : 260 }}>
-                {activeNav === 'User Management' ? <AdminUsers /> : activeNav === 'Coaches' ? <AdminCoaches /> : activeNav === 'Plans' ? <AdminPlans /> : activeNav === 'Coupons' ? <AdminCoupons /> : activeNav === 'Payments' ? <AdminPayments /> : activeNav === 'Billing & Subs' ? <AdminSubscriptions /> : activeNav === 'Support Tickets' ? <AdminTickets /> : activeNav === 'Blog' ? <AdminBlog /> : activeNav === 'Messages' ? <AdminMessages /> : activeNav === 'Exercises' ? <AdminExercises /> : activeNav === 'Challenges' ? <AdminChallenges /> : activeNav === 'Recipes' ? <AdminRecipes /> : activeNav === 'Analytics' ? <AdminAnalytics /> : activeNav === 'Forum' ? <AdminForum /> : activeNav === 'Notifications' ? <AdminNotifications /> : activeNav === 'Programs' ? <ProgramsManager role="admin" /> : activeNav === 'Settings' ? <SettingsPanel /> : activeNav === 'Live Sessions' ? (
-                    <div className="ad-main-content">
-                        <div className="ad-content-header">
-                            <h1 className="ad-content-title"><CalendarDays size={24} /> Live Sessions</h1>
-                            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sessions are created by coaches from their dashboards</span>
-                        </div>
-                        <div className="ad-section-grid ad-section-grid-2" style={{ padding: '24px' }}>
-                            <div className="ad-dash-card">
-                                <h3 className="ad-section-title-sm">Today's Sessions</h3>
-                                {liveSessionsLoading ? (
-                                    <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
-                                ) : (
-                                <div className="ad-ticket-list" style={{ marginTop: 16 }}>
-                                    {liveSessions.filter(s => s.date === new Date().toISOString().slice(0,10)).slice(0,5).map((s, i) => (
-                                        <div key={s.id || i} className="ad-ticket-item" style={{ cursor: 'default' }}>
-                                            <div className="ad-ticket-top"><span style={{color:'var(--power-500)',fontWeight:600}}>{s.startTime?.slice(0,5) || '09:00'}</span><span className={'ad-status-badge ad-status-'+(s.status==='scheduled'?'pending':'active')}>{s.status}</span></div>
-                                            <div className="ad-ticket-desc" style={{fontSize:15,fontWeight:500}}>{s.title}</div>
-                                            <div className="ad-ticket-top" style={{marginBottom:0}}><span style={{color:'var(--text-muted)',fontSize:13}}>{s.trainerName || 'Unassigned'} · {s.type === 'group' ? 'Group' : '1:1'} session</span></div>
-                                        </div>
-                                    ))}
-                                    {liveSessions.filter(s => s.date === new Date().toISOString().slice(0,10)).length === 0 && (
-                                        <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>No sessions scheduled for today</div>
-                                    )}
-                                </div>
-                                )}
-                            </div>
-                            <div className="ad-dash-card">
-                                <h3 className="ad-section-title-sm">Upcoming (Next 7 Days)</h3>
-                                {liveSessionsLoading ? (
-                                    <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>Loading...</div>
-                                ) : (
-                                <div className="ad-ticket-list" style={{ marginTop: 16 }}>
-                                    {Array.from({length:7}, (_, di) => {
-                                        const d = new Date(); d.setDate(d.getDate() + di)
-                                        const dateStr = d.toISOString().slice(0,10)
-                                        const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]
-                                        const count = liveSessions.filter(s => s.date === dateStr).length
-                                        return (
-                                        <div key={dateStr} className="ad-ticket-item" style={{cursor:'default'}}>
-                                            <div className="ad-ticket-top"><span style={{color:'#fff',fontWeight:500}}>{dayName}</span><span style={{color:'var(--text-muted)',fontSize:13}}>{count} session{count !== 1 ? 's' : ''}</span></div>
-                                        </div>
-                                    )})}
-                                </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                ) : activeNav === 'Video Library' ? (
+                {activeNav === 'User Management' ? <AdminUsers /> : activeNav === 'Coaches' ? <AdminCoaches /> : activeNav === 'Plans' ? <AdminPlans /> : activeNav === 'Coupons' ? <AdminCoupons /> : activeNav === 'Payments' ? <AdminPayments /> : activeNav === 'Billing & Subs' ? <AdminSubscriptions /> : activeNav === 'Support Tickets' ? <AdminTickets /> : activeNav === 'Blog' ? <AdminBlog /> : activeNav === 'Messages' ? <AdminMessages /> : activeNav === 'Exercises' ? <AdminExercises /> : activeNav === 'Challenges' ? <AdminChallenges /> : activeNav === 'Recipes' ? <AdminRecipes /> : activeNav === 'Analytics' ? <AdminAnalytics /> : activeNav === 'Forum' ? <AdminForum /> : activeNav === 'Notifications' ? <AdminNotifications /> : activeNav === 'Programs' ? <ProgramsManager role="admin" /> : activeNav === 'Settings' ? <SettingsPanel /> : activeNav === 'Video Library' ? (
                     <VideoLibrary />
                 ) : activeNav === 'Media Assets' ? (
                     <div className="ad-main-content">
@@ -1400,3 +1347,4 @@ export default function AdminDashboard() {
         </div>
     )
 }
+

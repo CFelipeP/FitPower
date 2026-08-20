@@ -16,10 +16,6 @@ export default defineConfig({
         target: 'http://127.0.0.1:8088',
         changeOrigin: true,
       },
-      '/ws/mediasoup': {
-        target: 'http://127.0.0.1:5181',
-        ws: true,
-      },
       '/ws/chat': {
         target: 'http://127.0.0.1:5180',
         ws: true,

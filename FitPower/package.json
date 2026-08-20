@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n API,VITE,CHAT,MEDIA,PUSH -c yellow,cyan,magenta,green,blue \"C:\\laragon\\bin\\php\\php-8.1.10-Win32-vs16-x64\\php.exe -S 127.0.0.1:8088 -t ../api ../api/index.php\" \"vite\" \"node chat-server.js\" \"node mediasoup-server.js\" \"node push-server.cjs\"",
+    "dev": "concurrently -n API,VITE,CHAT,PUSH -c yellow,cyan,magenta,blue \"C:\\laragon\\bin\\php\\php-8.1.10-Win32-vs16-x64\\php.exe -S 127.0.0.1:8088 -t ../api ../api/index.php\" \"vite\" \"node chat-server.js\" \"node push-server.cjs\"",
     "build": "vite build",
     "lint": "eslint .",
     "test": "vitest run",
@@ -22,8 +22,6 @@
     "firebase": "^12.15.0",
     "firebase-admin": "^14.0.0",
     "lucide-react": "^1.16.0",
-    "mediasoup": "^3.20.3",
-    "mediasoup-client": "^3.20.0",
     "mysql2": "^3.22.5",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

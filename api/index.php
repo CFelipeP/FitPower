@@ -633,22 +633,6 @@ route('/messages/{id}', ['method' => 'POST', 'handler' => function($p) {
     sendMessage($p);
 }]);
 
-// --- Video Sessions Routes ---
-route('/video-sessions', ['method' => 'GET', 'handler' => function() {
-    require __DIR__ . '/routes/support/video_sessions.php';
-    listVideoSessions();
-}]);
-
-route('/video-sessions', ['method' => 'POST', 'handler' => function() {
-    require __DIR__ . '/routes/support/video_sessions.php';
-    createVideoSession();
-}]);
-
-route('/video-sessions/{id}', ['method' => 'PUT', 'handler' => function($p) {
-    require __DIR__ . '/routes/support/video_sessions.php';
-    updateVideoSessionStatus($p['id']);
-}]);
-
 // --- Exercise Library Routes ---
 route('/exercises', ['method' => 'GET', 'handler' => function() {
     require __DIR__ . '/routes/content/exercises.php';

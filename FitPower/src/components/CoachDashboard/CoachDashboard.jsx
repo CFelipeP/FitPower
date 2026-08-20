@@ -18,7 +18,6 @@ import ProgramsManager from '../ProgramsManager/ProgramsManager'
 import ChatMessenger from '../ChatMessenger/ChatMessenger'
 import CoachCalendar from '../CoachCalendar/CoachCalendar'
 import WorkoutBuilder from '../WorkoutBuilder/WorkoutBuilder'
-import LiveSessions from '../LiveSessions/LiveSessions'
 import Sidebar from '../Sidebar/Sidebar'
 import { DashboardSkeleton } from '../LoadingSkeleton/LoadingSkeleton'
 import '../DashboardShared.css'
@@ -302,8 +301,7 @@ export default function CoachDashboard() {
                     { label: 'Client Analytics', icon: BarChart3 },
                     { section: 'Communication' },
                     { label: 'Messages', icon: MessageCircle, badge: unreadCount || undefined },
-                    { label: 'Live Sessions', icon: Video },
-            { label: 'Client Notes', icon: FileText },
+                    { label: 'Client Notes', icon: FileText },
             { label: 'Training Videos', icon: Video },
             { label: 'Support Tickets', icon: MessageCircle },
                     { section: 'Account' },
@@ -434,8 +432,6 @@ export default function CoachDashboard() {
                             </div>
                         </div>
                     </div>
-                ) : activeNav === 'Live Sessions' ? (
-                    <LiveSessions role="coach" />
                 ) : activeNav === 'Client Notes' ? (
                     <ClientNotesPanel selectedClientId={notesClientId} onSelectClient={setNotesClientId} />
                 ) : activeNav === 'Training Videos' ? (
@@ -515,9 +511,6 @@ export default function CoachDashboard() {
                             </div>
                         </div>
                         <div className="cd-header-right">
-                            <button className="cd-go-live" onClick={() => setActiveNav('Live Sessions')}>
-                                <span className="cd-live-dot" aria-hidden="true" /> GO LIVE
-                            </button>
                             <button
                                 ref={notifBtnRef}
                                 className="cd-notif-btn"

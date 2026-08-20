@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useToast } from '../../context/ToastContext'
 
 import { apiFetch } from '../../lib/api'
@@ -230,7 +230,7 @@ export default function Settings({ compact = false }) {
                                 <div className="stg-card">
                                     {[
                                         { key: 'notifications_push_workout', label: 'Workouts & streaks', desc: 'Workout reminders, streak alerts, weekly summaries' },
-                                        { key: 'notifications_push_coach', label: 'Coach & messages', desc: 'New messages, video calls, assigned routines' },
+                                        { key: 'notifications_push_coach', label: 'Coach & messages', desc: 'New messages and assigned routines' },
                                         { key: 'notifications_push_payments', label: 'Payments', desc: 'Payment failures, subscription updates' },
                                         { key: 'notifications_push_achievements', label: 'Achievements', desc: 'New achievements and milestones' },
                                         { key: 'notifications_push_system', label: 'System', desc: 'Account and support updates' },
@@ -383,5 +383,6 @@ export default function Settings({ compact = false }) {
         </div>
     )
 }
+
 
 
