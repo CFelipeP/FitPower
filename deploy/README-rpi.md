@@ -108,3 +108,28 @@ pm2 stop all         # Stop everything
 2. **PHP errors**: Check `sudo tail -f /var/log/nginx/error.log`
 3. **DB connection**: Verify credentials in `/var/www/fitpower/api/.env`
 4. **Port conflicts**: `sudo netstat -tlnp | grep -E '80|5180|5181|8088'`
+
+---
+
+## Current Pi deployment (perezpi) — operational notes
+
+- **Host/IP**: perezpi · 192.168.0.73 · Debian 13 (aarch64, RPi 5, 8 GB)
+- **App**: PHP API (NOT Django — this project's real backend is PHP) + React/Vite
+- **Paths**: code `/home/perezpi/fitpower` · frontend dist `/home/perezpi/fitpower/FitPower/dist` · uploads `/home/perezpi/fitpower/api/uploads` · `.env` `/home/perezpi/fitpower/api/.env` (chmod 600)
+- **DB**: MariaDB 11.8 · database `fitpower` · user `fitpower` (localhost only, non-root)
+- **Services (systemd, all enabled at boot)**:
+  - `fitpower-api`    → php -S 127.0.0.1:8088  (API)
+  - `fitpower-chat`   → node chat-server.js    → :5180 (WS)
+  - `fitpower-push`   → node push-server.cjs   → :5182 (127.0.0.1)
+  - `fitpower-mediasoup` → node mediasoup-server.js → :5181 (WS signaling)
+  - `nginx`           → :80 (frontend + proxy /api→8088, /ws/*, /uploads)
+  - `mariadb`         → :3306 (localhost)
+- **Restart**: `sudo systemctl restart fitpower-api fitpower-chat fitpower-push fitpower-mediasoup`
+- **Logs**: `journalctl -u fitpower-api -f` · `/var/log/nginx/error.log`
+- **Sandbox payment modes** (demo only; turn OFF for real money):
+  - `.env`: `VIRTUAL_WALLET_SANDBOX_AUTOCONFIRM=1` and `PAYPAL_SANDBOX_AUTOCAPTURE=1`
+  - VW sandbox keys: `VIRTUAL_WALLET_PUBLIC_KEY=pk_sandbox_...`, `VIRTUAL_WALLET_SECRET_KEY=sk_...` (backend only)
+  - PayPal sandbox: `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` (sandbox); `PAYPAL_WEBHOOK_ID` empty
+- **Webhooks**: VW `/api/vw/webhook` (+ `/vw/confirm`, `/vw/status`) · PayPal `/api/paypal/webhook`. For production they need a public HTTPS URL + webhook IDs configured in the provider dashboards.
+- **Backup**: `/home/perezpi/fitpower_final_backup.tar.gz` (DB dump + `.env` + nginx + systemd)
+- **Restore DB**: `mysqldump`/`mysql` with the fitpower user (or `sudo mysql < dump`)
