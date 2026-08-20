@@ -98,6 +98,7 @@ export default function SubscriptionPlans({ standalone = false }) {
     const activePlanId = subscription?.planId || subscription?.plan_id || subscription?.plan?.id || null
     const activePlanName = subscription?.planName || subscription?.plan?.name || subscription?.plan_name || 'Active Plan'
     const status = subscription?.status || null
+    const subBilling = subscription?.billing || subscription?.billing_cycle || null
     const hasPlan = activePlanId !== null && ['active', 'pending_cancel', 'payment_failed', 'suspended'].includes(status)
     const endsAt = subscription?.endsAt ? new Date(subscription.endsAt).toLocaleDateString() : null
 
@@ -186,7 +187,12 @@ export default function SubscriptionPlans({ standalone = false }) {
 
             <div className="sp-grid">
                 {plans.map((plan, i) => {
-                    const isCurrent = activePlanId === plan.id && status === 'active'
+                    const viewBilling = isYearly ? 'yearly' : 'monthly'
+                    // A plan is "current" ONLY when both the plan id AND the
+                    // billing cycle on the toggle match your real subscription.
+                    // Otherwise monthly and annual get mixed up (e.g. an annual
+                    // $150 card marked "Current Plan" when you only paid $15/mo).
+                    const isCurrent = activePlanId === plan.id && status === 'active' && (subBilling === null || subBilling === viewBilling)
                     const rawPrice = isYearly ? plan.price?.yearly : plan.price?.monthly
                     const planPrice = rawPrice != null && rawPrice !== '' ? `$${Number(String(rawPrice).replace(/[^0-9.]/g, '')).toLocaleString('en-US', { minimumFractionDigits: Number(String(rawPrice).replace(/[^0-9.]/g, '')) % 1 !== 0 ? 2 : 0 })}` : null
 
