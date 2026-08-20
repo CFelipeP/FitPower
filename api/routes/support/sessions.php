@@ -163,6 +163,7 @@ function saveSessionProgress(string $id): void {
     if ($completed) {
         $db->prepare("UPDATE sessions SET status = 'completed', completed_at = COALESCE(completed_at, NOW()) WHERE id = ? AND status <> 'completed'")
             ->execute([(int)$id]);
+        recordSessionCompletionLogs($db, (int)$auth['sub'], (int)$id);
     } else {
         $db->prepare("UPDATE sessions SET status = 'in_progress', started_at = COALESCE(started_at, NOW()) WHERE id = ? AND status = 'scheduled'")
             ->execute([(int)$id]);
@@ -474,6 +475,7 @@ function updateSession(string $id): void {
             VALUES (?, ?, NULL, 1, NOW())
             ON DUPLICATE KEY UPDATE completed = 1, updated_at = NOW()
         ")->execute([(int)$id, (int)$auth['sub']]);
+        recordSessionCompletionLogs($db, (int)$auth['sub'], (int)$id);
         if (!empty($session['program_id'])) {
             require_once __DIR__ . '/../../helpers/program_progress.php';
             recomputeProgramProgress($db, (int)$auth['sub'], (int)$session['program_id']);
@@ -630,4 +632,58 @@ function reorderSessionExercises(string $sessionId): void {
 
     $bySession = loadExercises($db, [(int)$sessionId]);
     success(['exercises' => $bySession[(int)$sessionId] ?? []], 'Exercise order saved');
+}
+
+/**
+ * Records workout progress whenever a workout is completed, if it was not
+ * already logged (the GuidedWorkout flow logs per-exercise detail via
+ * POST /workout-logs; this covers the "Mark Completed" path and any session
+ * completed without per-set detail). One row per session exercise; a summary
+ * row when the session has no exercises. logged_at powers the streak.
+ */
+function recordSessionCompletionLogs(PDO $db, int $userId, int $sessionId): void {
+    $exists = $db->prepare("SELECT id FROM workout_logs WHERE user_id = ? AND session_id = ? LIMIT 1");
+    $exists->execute([$userId, $sessionId]);
+    if ($exists->fetchColumn()) {
+        return; // already logged — never duplicate
+    }
+
+    $loggedAt = date('Y-m-d H:i:s');
+    $exStmt = $db->prepare("SELECT e.name, e.sets, e.reps, e.weight, e.exercise_id FROM exercises e WHERE e.session_id = ? ORDER BY e.sort_order, e.id");
+    $exStmt->execute([$sessionId]);
+    $rows = $exStmt->fetchAll();
+
+    if (empty($rows)) {
+        $db->prepare("INSERT INTO workout_logs (user_id, session_id, exercise_id, sets_completed, reps_completed, weight_used, notes, calories_burned, total_volume, logged_at, created_at)
+            VALUES (?, ?, NULL, 0, NULL, NULL, 'Workout completed', NULL, NULL, ?, NOW())")
+            ->execute([$userId, $sessionId, $loggedAt]);
+        return;
+    }
+
+    $ins = $db->prepare("INSERT INTO workout_logs (user_id, session_id, exercise_id, sets_completed, reps_completed, weight_used, notes, calories_burned, total_volume, logged_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, NOW())");
+    foreach ($rows as $ex) {
+        $sets = (int)($ex['sets'] ?? 0);
+        $reps = $ex['reps'] !== null && $ex['reps'] !== '' ? (string)$ex['reps'] : null;
+        $weight = $ex['weight'] !== null && $ex['weight'] !== '' ? (string)$ex['weight'] : null;
+        $calories = null;
+        if (!empty($ex['exercise_id'])) {
+            $calStmt = $db->prepare("SELECT calories_burned FROM exercise_library WHERE id = ?");
+            $calStmt->execute([(int)$ex['exercise_id']]);
+            $calRow = $calStmt->fetch();
+            if ($calRow && $calRow['calories_burned'] !== null) {
+                $calories = (int)round((float)$calRow['calories_burned'] * max(1, $sets));
+            }
+        }
+        $ins->execute([
+            $userId,
+            $sessionId,
+            $ex['exercise_id'] !== null ? (int)$ex['exercise_id'] : null,
+            $sets,
+            $reps,
+            $weight,
+            $calories,
+            $loggedAt,
+        ]);
+    }
 }
