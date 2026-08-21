@@ -16,6 +16,7 @@ export default function PaymentResult() {
     const paypalOrder = searchParams.get('paypal_order') || searchParams.get('token')
     // Virtual Wallet returns via ?intent_id=<idempotency key>
     const intentId = searchParams.get('intent_id')
+    const demo = searchParams.get('demo') === '1'
     const { refresh: refreshEntitlements } = useEntitlements()
 
     const [planName, setPlanName] = useState(planNameParam || null)
@@ -132,7 +133,7 @@ export default function PaymentResult() {
                         <div className="payment-result-icon-wrap success">
                             <CheckCircle size={52} />
                         </div>
-                        <h1>Payment Successful!</h1>
+                        <h1>{demo ? 'Demo Payment Approved' : 'Payment Successful!'}</h1>
 
                         {loading ? (
                             <p className="payment-result-loading">
@@ -177,7 +178,9 @@ export default function PaymentResult() {
                                 </div>
 
                                 <p className="payment-result-msg">
-                                    Your subscription is now active. Welcome to FitPower!
+                                    {demo
+                                        ? 'Sandbox demo — no real charge was made. Your plan was activated for testing.'
+                                        : 'Your subscription is now active. Welcome to FitPower!'}
                                 </p>
                             </div>
                         )}

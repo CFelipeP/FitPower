@@ -107,9 +107,16 @@ export default function CheckoutPage() {
                 method: 'POST',
                 body: JSON.stringify({ plan_id: plan.id, billing, coupon_code: couponApplied?.code || undefined }),
             })
-            setVw({ intent_id: res.intent_id, amount: res.amount, qr: res.qr_code_base64 || null })
-            setVwMsg('Payment pending — scan the QR with Virtual Wallet or pay by card.')
-            startPolling(res.intent_id)
+            const demo = !res.qr_code_base64 // provider unavailable / sandbox auto-confirm
+            setVw({ intent_id: res.intent_id, amount: res.amount, qr: res.qr_code_base64 || null, demo })
+            if (demo) {
+                // No real QR from the provider: never auto-confirm. The user must
+                // explicitly press "Pay" so we don't fake a payment success.
+                setVwMsg('Demo environment — Virtual Wallet is unreachable. No real charge will be made. Press "Pay" to complete (sandbox).')
+            } else {
+                setVwMsg('Payment pending — scan the QR with Virtual Wallet or pay by card.')
+                startPolling(res.intent_id)
+            }
         } catch (e) {
             setVwMsg('')
             swalError(e.message || 'Virtual Wallet could not start the payment. No charge was made.')
@@ -150,6 +157,7 @@ export default function CheckoutPage() {
         setProcessing(true)
         setVwMsg('')
         try {
+            stopPolling()
             await apiFetch('/vw/process-card', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -160,8 +168,12 @@ export default function CheckoutPage() {
                     CVV: vwCard.cvv,
                 }),
             })
-            setVwMsg('Payment processed — confirming with Virtual Wallet…')
-            // The provider polls internally; our /vw/status will flip to completed.
+            // Explicit user action (Pay). Only now confirm and go to the result.
+            const confirm = await apiFetch('/vw/confirm', {
+                method: 'POST',
+                body: JSON.stringify({ intent_id: vw.intent_id }),
+            })
+            navigate(`/payment/success?intent_id=${encodeURIComponent(vw.intent_id)}&plan_name=${encodeURIComponent(confirm?.plan_name || plan.name)}${vw.demo ? '&demo=1' : ''}`)
         } catch (e) {
             setVwMsg('')
             swalError(e.message || 'The payment was declined. No charge was made.')
