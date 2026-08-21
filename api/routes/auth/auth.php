@@ -666,6 +666,11 @@ function logoutUser(): void {
     $db->prepare("UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND revoked = 0")
         ->execute([(int)$auth['sub']]);
 
+    // Invalidate the access token immediately: bump token_version so any token
+    // issued before logout is rejected by requireAuth (401 "Session revoked").
+    $db->prepare("UPDATE users SET token_version = token_version + 1 WHERE id = ?")
+        ->execute([(int)$auth['sub']]);
+
     success(null, 'Logged out successfully');
 }
 
