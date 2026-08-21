@@ -121,6 +121,16 @@ function getProgram(string $id): void {
     $sessionStmt->execute([$id]);
     $sessions = $sessionStmt->fetchAll();
 
+    // Attach each workout's real exercises (from the exercise library) so every
+    // program shows its exercises when opened.
+    require_once __DIR__ . '/../support/sessions.php';
+    $sessionIds = array_map('intval', array_column($sessions, 'id'));
+    $exercisesBySession = loadExercises($db, $sessionIds);
+    foreach ($sessions as &$s) {
+        $s['exercises'] = $exercisesBySession[(int)$s['id']] ?? [];
+    }
+    unset($s);
+
     $payload = [
         'id' => (int)$program['id'],
         'trainerId' => $program['trainer_id'] ? (int)$program['trainer_id'] : null,
@@ -167,6 +177,7 @@ function getProgram(string $id): void {
                 'week' => $weekBySession[$sId] ?? null,
                 'day' => (($i = array_search($sId, array_column($workouts, 'id'), true)) !== false) ? ($i % $spw) + 1 : null,
                 'progressCompleted' => $done,
+                'exercises' => $exercisesBySession[$sId] ?? [],
             ];
         }
         $payload['sessions'] = $sessionPayloads;
