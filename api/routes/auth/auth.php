@@ -308,6 +308,11 @@ function resetPassword(): void {
     success(null, 'Password updated successfully');
 }
 
+/** Public Google sign-in configuration (client id is public by design). */
+function getGoogleConfig(): void {
+    success(['client_id' => GOOGLE_CLIENT_ID, 'enabled' => !empty(GOOGLE_CLIENT_ID)]);
+}
+
 function googleLogin(): void {
     $input = getJsonInput();
     $rules = ['credential' => 'required|string'];

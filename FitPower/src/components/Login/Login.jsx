@@ -12,6 +12,7 @@ import {
     KeyRound, ShieldCheck, Check, AlertTriangle,
     CheckCircle
 } from 'lucide-react'
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
 import './Login.css'
 
 const VIEWS = {
@@ -39,6 +40,33 @@ export default function Login() {
     const [activeSessions, setActiveSessions] = useState([])
     const [sessionsLoading, setSessionsLoading] = useState(false)
     const [emailRole, setEmailRole] = useState(null)
+
+    // Google sign-in (client id comes from the backend; button hidden if unconfigured)
+    const [googleClientId, setGoogleClientId] = useState(null)
+
+    useEffect(() => {
+        apiFetch('/auth/google/config').then(d => setGoogleClientId(d?.client_id || null)).catch(() => {})
+    }, [])
+
+    const handleGoogleSuccess = async (credentialResponse) => {
+        const credential = credentialResponse?.credential
+        if (!credential) { swalError('Google sign-in failed. Please try again.'); return }
+        try {
+            const data = await apiFetch('/auth/google', {
+                method: 'POST',
+                body: JSON.stringify({ credential }),
+            })
+            if (!data?.token) throw new Error('No token')
+            localStorage.setItem('token', data.token)
+            if (data.refresh_token) localStorage.setItem('refresh_token', data.refresh_token)
+            if (data.user?.role) localStorage.setItem('role', data.user.role)
+            const dashboards = { admin: '/admin/dashboard', coach: '/coach/dashboard', client: '/client/dashboard' }
+            navigate(dashboards[data.user?.role] || '/client/dashboard', { replace: true })
+            window.location.reload()
+        } catch (e) {
+            swalError(e.message || 'Google sign-in failed. Please try again.')
+        }
+    }
 
     // Public stats
     const [publicStats, setPublicStats] = useState({ workouts: 0, trainers: 0, clients: 0 })
@@ -612,6 +640,20 @@ export default function Login() {
                                             'Log In'
                                         )}
                                     </button>
+
+                                    {googleClientId && (
+                                        <div className="login-google">
+                                            <div className="login-google-divider"><span>or continue with</span></div>
+                                            <GoogleOAuthProvider clientId={googleClientId}>
+                                                <GoogleLogin
+                                                    onSuccess={handleGoogleSuccess}
+                                                    onError={() => swalError('Google sign-in failed. Please try again.')}
+                                                    shape="pill"
+                                                    text="continue_with"
+                                                />
+                                            </GoogleOAuthProvider>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

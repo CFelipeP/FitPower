@@ -1281,6 +1281,11 @@ route('/admin/audit-log', ['method' => 'GET', 'handler' => function() {
 }]);
 
 // --- Revoke Sessions Route ---
+route('/auth/google/config', ['method' => 'GET', 'handler' => function() {
+    require __DIR__ . '/routes/auth/auth.php';
+    getGoogleConfig();
+}]);
+
 route('/auth/google', ['method' => 'POST', 'handler' => function() {
     require __DIR__ . '/routes/auth/auth.php';
     googleLogin();

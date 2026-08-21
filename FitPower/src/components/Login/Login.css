@@ -1064,3 +1064,8 @@
 @media (max-width: 480px) {
     .login-form-card { padding: 20px 14px; }
 }
+
+.login-google { margin-top: 18px; width: 100%; }
+.login-google-divider { display: flex; align-items: center; gap: 10px; color: #8b8b93; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 14px; }
+.login-google-divider::before, .login-google-divider::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,.08); }
+.login-google .google-login-wrap { display: flex; justify-content: center; }
