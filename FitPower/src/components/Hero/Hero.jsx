@@ -5,10 +5,10 @@ import { useI18n } from '../../context/I18nContext'
 import './Hero.css'
 
 const slides = [
-    { img: 'https://cdn.prod.website-files.com/61f6a1f670934ed39d548853/64aa5cc15b2a0b30415ce2dc_The%20Weightlifters.webp', tag: 'Strength', title: 'Power Lifting Pro', desc: '45-60 min sessions' },
-    { img: 'https://lifehacker.com/imagery/articles/01HF2GQBNWVY9PNNCPKWPM38XC/hero-image.fill.size_1248x702.v1699833312.jpg', tag: 'Cardio', title: 'HIIT Inferno', desc: '25-40 min sessions' },
-    { img: 'https://nutritionsource.hsph.harvard.edu/wp-content/uploads/2021/11/pexels-yan-krukov-8436601-copy-1024x768.jpg', tag: 'Mobility', title: 'Flow Yoga', desc: '30-50 min sessions' },
-    { img: 'https://www.strongfitnessmag.com/wp-content/uploads/2021/12/Boxing-GirlsJustwannabox.jpg', tag: 'Combat', title: 'Boxing Fit', desc: '30-45 min sessions' },
+    { img: '/hero/hero-strength.webp', tag: 'Strength', title: 'Power Lifting Pro', desc: '45-60 min sessions' },
+    { img: '/hero/hero-hiit.jpg', tag: 'Cardio', title: 'HIIT Inferno', desc: '25-40 min sessions' },
+    { img: '/hero/hero-yoga.jpg', tag: 'Mobility', title: 'Flow Yoga', desc: '30-50 min sessions' },
+    { img: '/hero/hero-boxing.jpg', tag: 'Combat', title: 'Boxing Fit', desc: '30-45 min sessions' },
 ]
 
 function CounterItem({ target, suffix, label }) {

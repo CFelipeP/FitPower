@@ -213,6 +213,7 @@ function getCurrentUser(): void {
 }
 
 function forgotPassword(): void {
+    rateLimit(5);
     $input = getJsonInput();
 
     $errors = validate($input, ['email' => 'required|email']);
