@@ -232,10 +232,10 @@ function vwProcessCard(): void {
         error($data['error'] ?? 'The payment was declined. No charge was made.', 400);
     }
 
-    // Record that a real card payment action was submitted. vwConfirm only
-    // activates a subscription when this marker exists, so a payment can never
-    // be "confirmed" without the user having entered their card data.
-    $db->prepare("UPDATE payments SET checkout_session_id = ? WHERE id = ?")
+    // Record that a real card payment action was submitted. In sandbox/demo
+    // mode vwConfirm only activates when this flag is set, so a payment can
+    // never be "confirmed" without the user having entered their card data.
+    $db->prepare("UPDATE payments SET card_submitted = 1, checkout_session_id = ? WHERE id = ?")
         ->execute(['card_' . $intentId, (int)$payment['id']]);
 
     success([
@@ -296,10 +296,11 @@ function vwConfirm(): void {
     $payment = $stmt->fetch();
     if (!$payment) error('Payment not found', 404);
 
-    // A subscription can NEVER be confirmed without a real payment action:
-    // the user must have submitted their card data via process-card (marker
-    // stored in checkout_session_id). Otherwise we reject — no fake success.
-    if (empty($payment['checkout_session_id'])) {
+    // In sandbox/demo mode (autoconfirm) a subscription can NEVER be confirmed
+    // without a real card payment action: the user must submit their card data
+    // (process-card sets card_submitted=1). Otherwise we reject — no fake success.
+    // In real production mode the provider's COMPLETED status is the source of truth.
+    if (vwAutoconfirm() && empty($payment['card_submitted'])) {
         error('Payment not completed. Enter your card details and pay first.', 409);
     }
 
@@ -367,8 +368,9 @@ function vwWebhook(): void {
     }
 
     $payment = vwFindPayment($db, $intentId);
-    // Only activate when a real card payment action was submitted (marker).
-    if ($payment && $payment['status'] === 'pending' && !empty($payment['checkout_session_id'])) {
+    // In sandbox/demo mode only activate when a real card payment action was
+    // submitted. In real production mode the provider's COMPLETED status rules.
+    if ($payment && $payment['status'] === 'pending' && (!vwAutoconfirm() || !empty($payment['card_submitted']))) {
         vwActivateSubscription($db, (int)$payment['user_id'], (int)$payment['plan_id'], $payment['billing'], (int)$payment['id'], $payment['coupon_code']);
     }
     http_response_code(200);
