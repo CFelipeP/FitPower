@@ -232,6 +232,12 @@ function vwProcessCard(): void {
         error($data['error'] ?? 'The payment was declined. No charge was made.', 400);
     }
 
+    // Record that a real card payment action was submitted. vwConfirm only
+    // activates a subscription when this marker exists, so a payment can never
+    // be "confirmed" without the user having entered their card data.
+    $db->prepare("UPDATE payments SET checkout_session_id = ? WHERE id = ?")
+        ->execute(['card_' . $intentId, (int)$payment['id']]);
+
     success([
         'webhook_url' => $providerOk ? ($data['webhook_url'] ?? (VIRTUAL_WALLET_WEBHOOK_URL ?: '')) : '',
         'intent_id' => $providerOk ? ($data['intent_id'] ?? $intentId) : $intentId,
@@ -289,6 +295,13 @@ function vwConfirm(): void {
     $stmt->execute([$intentId, $auth['sub']]);
     $payment = $stmt->fetch();
     if (!$payment) error('Payment not found', 404);
+
+    // A subscription can NEVER be confirmed without a real payment action:
+    // the user must have submitted their card data via process-card (marker
+    // stored in checkout_session_id). Otherwise we reject — no fake success.
+    if (empty($payment['checkout_session_id'])) {
+        error('Payment not completed. Enter your card details and pay first.', 409);
+    }
 
     $providerStatus = '';
     if (vwAutoconfirm()) {
@@ -354,7 +367,8 @@ function vwWebhook(): void {
     }
 
     $payment = vwFindPayment($db, $intentId);
-    if ($payment && $payment['status'] === 'pending') {
+    // Only activate when a real card payment action was submitted (marker).
+    if ($payment && $payment['status'] === 'pending' && !empty($payment['checkout_session_id'])) {
         vwActivateSubscription($db, (int)$payment['user_id'], (int)$payment['plan_id'], $payment['billing'], (int)$payment['id'], $payment['coupon_code']);
     }
     http_response_code(200);
